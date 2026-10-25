@@ -102,7 +102,7 @@ export function TradesTable({ trades, currency }: TradesTableProps) {
         <Card>
           {/* ── Desktop table (lg+) ── */}
           <div className="hidden lg:block">
-            <Table stickyHeader>
+            <Table stickyHeader caption={t("title")}>
               <TableHeader>
                 <TableRow>
                   <SortableTableHead

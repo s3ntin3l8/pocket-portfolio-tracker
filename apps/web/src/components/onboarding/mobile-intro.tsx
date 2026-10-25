@@ -192,18 +192,24 @@ export function MobileIntro({
       </div>
 
       <div className="relative z-[3] mt-6.5">
-        <div className="mb-5 flex gap-1.75">
+        {/* The dots are 24×24 hit areas (WCAG 2.5.8) with the visual dot centred
+            inside; the 4px gap keeps the 24px spacing circles from intersecting. */}
+        <div className="mb-5 flex gap-1">
           {slides.map((_, k) => (
             <button
               key={k}
               type="button"
               onClick={() => onGoToSlide(k)}
               aria-label={tA("goToSlide", { n: k + 1 })}
-              className={cn(
-                "h-1.75 cursor-pointer rounded-full transition-[width,background-color] duration-250",
-                k === slide ? "w-5.5 bg-brand-mint" : "w-1.75 bg-white/24",
-              )}
-            />
+              className="flex h-6 w-6 cursor-pointer items-center justify-center rounded-full"
+            >
+              <span
+                className={cn(
+                  "block h-1.75 rounded-full transition-[width,background-color] duration-250",
+                  k === slide ? "w-5.5 bg-brand-mint" : "w-1.75 bg-white/24",
+                )}
+              />
+            </button>
           ))}
         </div>
         <div className="flex flex-col gap-2.5">

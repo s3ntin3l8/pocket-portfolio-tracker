@@ -186,7 +186,7 @@ export function TaxReportsInbox({
 
       {/* Desktop table */}
       <Card className="hidden overflow-hidden lg:block">
-        <Table>
+        <Table caption={t("title")}>
           <TableHeader>
             <TableRow>
               <SortableTableHead

@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableFooter, TableRow } from "../src/compo
 
 function renderTable(cell: React.ReactNode) {
   return render(
-    <Table>
+    <Table caption="Test table">
       <TableBody>
         <TableRow>{cell}</TableRow>
       </TableBody>
@@ -22,7 +22,7 @@ describe("Table", () => {
 describe("TableFooter", () => {
   it("shares the table body size", () => {
     const { container } = render(
-      <Table>
+      <Table caption="Test table">
         <TableFooter>
           <TableRow>
             <TableCell>Total</TableCell>

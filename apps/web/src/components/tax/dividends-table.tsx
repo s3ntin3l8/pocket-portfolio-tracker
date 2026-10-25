@@ -68,7 +68,7 @@ export function DividendsTable({
             {t("dividendsTable.empty", { year })}
           </p>
         ) : (
-          <Table edgeAffordance className="min-w-[640px]">
+          <Table caption={t("dividendsTable.title")} edgeAffordance className="min-w-[640px]">
             <TableHeader>
               <TableRow>
                 <SortableTableHead

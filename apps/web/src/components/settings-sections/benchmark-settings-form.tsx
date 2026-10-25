@@ -84,7 +84,7 @@ export function BenchmarkSettingsForm({
               <button
                 type="button"
                 onClick={() => removeAt(i)}
-                className="rounded-full p-0.5 text-text-2 transition-colors hover:text-foreground"
+                className="flex size-6 items-center justify-center rounded-full text-text-2 transition-colors hover:text-foreground"
                 aria-label={t("removeBenchmark")}
               >
                 <X className="size-3" />

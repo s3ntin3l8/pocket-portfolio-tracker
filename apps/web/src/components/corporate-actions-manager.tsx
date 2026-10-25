@@ -30,7 +30,7 @@ export function CorporateActionsManager({
   return (
     <>
       <div className="hidden lg:block">
-        <Table>
+        <Table caption={ca.tc("actionsTable")}>
           <TableHeader>
             <TableRow>
               <SortableTableHead

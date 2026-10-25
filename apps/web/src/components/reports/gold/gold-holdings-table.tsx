@@ -33,7 +33,7 @@ export function GoldHoldingsTable({
   const t = useTranslations("GoldReport");
   return (
     <div className="overflow-x-auto">
-      <Table>
+      <Table caption={t("holdingsTitle")}>
         <TableHeader>
           <TableRow>
             <TableHead>{t("colGold")}</TableHead>

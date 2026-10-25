@@ -104,7 +104,7 @@ export function IdIncomeTable({
           </p>
         ) : (
           <>
-            <Table edgeAffordance className="min-w-[720px]">
+            <Table caption={t("id.incomeTable.title")} edgeAffordance className="min-w-[720px]">
               <TableHeader>
                 <TableRow>
                   <SortableTableHead
@@ -244,7 +244,7 @@ export function IdForeignIncomeTable({
         <CardTitle className="text-base">{t("id.foreignTable.title")}</CardTitle>
       </CardHeader>
       <CardContent className="px-0 pt-0">
-        <Table edgeAffordance className="min-w-[480px]">
+        <Table caption={t("id.foreignTable.title")} edgeAffordance className="min-w-[480px]">
           <TableHeader>
             <TableRow>
               <SortableTableHead
