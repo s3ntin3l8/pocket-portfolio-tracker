@@ -77,23 +77,38 @@ jobs:
       # Dockerfile. It also removes the tsx/dist emit race documented in CLAUDE.md.
       - name: Build workspace packages
         run: npx turbo run build --filter=@portfolio/api...
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
       - name: Resolve the Playwright version
         id: playwright
         run: |
           echo "version=$(node -p "require('./package.json').devDependencies['@playwright/test']")" >> "$GITHUB_OUTPUT"
+      # The cache step MUST come before the browser install: actions/cache restores
+      # when it runs, so a cache hit only saves the download if the download has not
+      # happened yet. With the install first, every run would pay the full download
+      # and the restore would then re-extract the archive over the fresh copy.
       - name: Cache Playwright browsers
+        id: playwright-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
           # Keyed on the Playwright version, so bumping the dependency invalidates
           # the cache instead of serving a browser build that doesn't match.
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - name: Install Playwright browsers
+        # Skipped on a cache hit — the browsers are already there.
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+      - name: Install Playwright system dependencies
+        # Always: the browser binary and the OS packages it needs are cached
+        # separately, and the OS packages are cheap next to the download.
+        run: npx playwright install-deps chromium
       - name: Run e2e
         run: npm run e2e --workspace @portfolio/web
       - name: Upload e2e artifacts
-        if: ${{ failure() }}
+        # `!cancelled()` rather than `failure()`: a job that hits its timeout is
+        # cancelled, not failed, and that is exactly the case where the traces are
+        # the only diagnostic (the webServer timeouts are 180s/240s inside a
+        # 30-minute budget).
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: playwright-report

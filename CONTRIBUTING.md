@@ -74,8 +74,9 @@ npm run build
 Skipping it is the classic "column does not exist" / "cannot find module" failure — the
 compiled `dist/` and the checked-out migrations have to agree.)
 
-In CI the run writes an HTML report to `apps/web/playwright-report/` and uploads it, with
-the failure traces, as the `playwright-report` artifact.
+In CI the run additionally writes an HTML report to `apps/web/playwright-report/`. A run that
+does not succeed uploads it, together with the failure traces, as the `playwright-report`
+artifact — so a failed or timed-out job still leaves you the diagnostics.
 
 ## Branching
 
