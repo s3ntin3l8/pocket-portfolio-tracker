@@ -76,18 +76,18 @@
     "settings": "Pengaturan",
     "admin": "Admin",
     "signOut": "Keluar",
-    "trades": "Catatan Dagang",
+    "trades": "P&L Terwujud",
     "tax": "Pajak",
     "activity": "Aktivitas",
     "reports": "Laporan",
     "insights": "Wawasan",
-    "profile": "Profil",
     "netWorth": "Kekayaan bersih",
     "allTime": "sepanjang masa",
     "version": "Versi {version} — catatan rilis"
   },
   "Reports": {
     "title": "Laporan",
+    "scopeAll": "Semua portofolio",
     "open": "Buka",
     "income": {
       "title": "Pendapatan",

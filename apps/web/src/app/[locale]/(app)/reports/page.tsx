@@ -18,6 +18,10 @@ import { startReportsLoads } from "@/components/reports/reports-data";
  * behind its own `<Suspense>`, so a slow endpoint (tax, trades) no longer holds back the
  * rest. All loaders are started up-front (request-cached, see reports-data) so the cards
  * overlap rather than waterfall. A card with no data renders nothing once it resolves.
+ *
+ * The cards are the AGGREGATE (every portfolio — see reports-data), while the neighbouring
+ * pages' figures follow the selected scope. The scope line under the header says so; it is
+ * plain text on purpose — a scope control would imply the cards follow the scope.
  */
 export default async function ReportsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -32,7 +36,7 @@ export default async function ReportsPage({ params }: { params: Promise<{ locale
 
   return (
     <div className="space-y-5">
-      <PageHeader title={t("title")} />
+      <PageHeader title={t("title")} subtitle={t("scopeAll")} />
 
       <Suspense fallback={null}>
         <ReportsStatus />
