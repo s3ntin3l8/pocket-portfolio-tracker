@@ -101,7 +101,11 @@ export function InstrumentEditDialog({
       // which is what would wipe the shared schedule.
       const check = checkRateScheduleDraft(rateSchedule);
       if (!check.ok) {
-        toast.error(tb(`issue.${check.issue}`));
+        // The issue code is a closed set, but a code added without a catalogue
+        // entry would throw at runtime — so the lookup is guarded (R4-F7).
+        toast.error(
+          tb.has(`issue.${check.issue}`) ? tb(`issue.${check.issue}`) : tb("issue.generic"),
+        );
         return;
       }
       couponRateSchedule = check.schedule;

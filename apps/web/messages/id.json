@@ -1193,7 +1193,8 @@
       "noPeriods": "Tambahkan minimal satu periode suku bunga.",
       "periodIncomplete": "Setiap periode butuh tanggal mulai dan rate; tanggal akhir opsional.",
       "periodOverlaps": "Periode suku bunga tidak boleh saling tumpang tindih.",
-      "floorAboveRate": "Suku bunga dasar tidak boleh lebih tinggi dari suku bunga yang diumumkan."
+      "floorAboveRate": "Suku bunga dasar tidak boleh lebih tinggi dari suku bunga yang diumumkan.",
+      "generic": "Jadwal suku bunga tidak dapat diterima."
     }
   },
   "CorpAction": {
@@ -1865,6 +1866,7 @@
       "expired": "Sesi kedaluwarsa",
       "error": "Kesalahan"
     },
+    "statusOther": "Status tidak diketahui",
     "phone": "Nomor telepon",
     "pin": "PIN",
     "advanced": "Lanjutan",
@@ -1929,6 +1931,7 @@
       "expired": "Token kedaluwarsa",
       "error": "Kesalahan"
     },
+    "statusOther": "Status tidak diketahui",
     "flexToken": "Token Flex",
     "flexTokenPlaceholder": "Token Flex Web Service Anda",
     "queryId": "ID Kueri",

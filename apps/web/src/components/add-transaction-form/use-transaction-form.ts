@@ -629,7 +629,9 @@ export function useTransactionForm({
     if (createsBondWithSchedule) {
       const check = checkRateScheduleDraft(rateSchedule);
       if (!check.ok) {
-        setError(tb(`issue.${check.issue}`));
+        // The issue code is a closed set, but a code added without a catalogue
+        // entry would throw at runtime — so the lookup is guarded (R4-F7).
+        setError(tb.has(`issue.${check.issue}`) ? tb(`issue.${check.issue}`) : tb("issue.generic"));
         return;
       }
       bondSchedule = check.schedule;

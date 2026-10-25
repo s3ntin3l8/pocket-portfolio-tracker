@@ -39,7 +39,11 @@ export async function DataConnectionsSection({
           {
             key: "tr",
             label: t("dataSourceTr"),
-            hint: ttr(`status.${trConnection.status}`),
+            // A status the catalogue doesn't know yet must not render the key path
+            // (or throw) — fall back to a real, translatable label (R4-F7).
+            hint: ttr.has(`status.${trConnection.status}`)
+              ? ttr(`status.${trConnection.status}`)
+              : ttr("statusOther"),
             on: trConnection.status === "connected",
           },
         ]
@@ -49,7 +53,9 @@ export async function DataConnectionsSection({
           {
             key: "ibkr",
             label: t("dataSourceIbkr"),
-            hint: tibkr(`status.${ibkrConnection.status}`),
+            hint: tibkr.has(`status.${ibkrConnection.status}`)
+              ? tibkr(`status.${ibkrConnection.status}`)
+              : tibkr("statusOther"),
             on: ibkrConnection.status === "connected",
           },
         ]

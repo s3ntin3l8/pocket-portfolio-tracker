@@ -64,7 +64,7 @@ interface InstrumentFieldProps {
   t: ((key: string) => string) & { has?: (key: string) => boolean };
   tc: (key: string) => string;
   /** Translator for the `BondTerms` namespace (the floating-rate schedule strings). */
-  tb: (key: string) => string;
+  tb: ((key: string) => string) & { has: (key: string) => boolean };
 }
 
 /** The v2 design's "Instrument" section. In Add mode there's no enclosing card (just a

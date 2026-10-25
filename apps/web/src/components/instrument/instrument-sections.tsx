@@ -19,12 +19,7 @@ import {
   selectedPortfolioIdOnce,
   type InstrumentTxFilters,
 } from "@/components/instrument/instrument-data";
-import {
-  formatMoney,
-  formatPercent,
-  formatPercentPoints,
-  rowAnomalyCounts,
-} from "@/lib/utils";
+import { formatMoney, formatPercent, formatPercentPoints, rowAnomalyCounts } from "@/lib/utils";
 import { effectiveRateForDate } from "@/lib/bond-rate";
 import { lastPriceInfo } from "@/lib/instrument-price";
 

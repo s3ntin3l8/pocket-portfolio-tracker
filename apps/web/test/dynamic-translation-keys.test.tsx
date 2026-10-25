@@ -141,6 +141,9 @@ function walk(dir: string, out: string[] = []): string[] {
  * Every dynamic key built from a TEMPLATE LITERAL (`t(\`…\`)`) must be guarded by a
  * `t.has()` on the same expression. Keys passed as a plain identifier (`t(key)`) are the
  * "typed map" case the audit allows — they come from a closed set the compiler checks.
+ *
+ * The pattern matches any translator alias, not just `t(` — `tb(\`issue.${code}\`)` is the
+ * same defect as `t(\`…\`)`, and a scan that only looks at `t(` misses it.
  */
 describe("dynamic translation keys are guarded", () => {
   it("guards every template-literal t() call in the web app", () => {
@@ -149,9 +152,12 @@ describe("dynamic translation keys are guarded", () => {
     for (const file of walk(SRC)) {
       // Collapse the file to one line so a guard that sits on the line above still counts.
       const text = readFileSync(file, "utf8").replace(/\s+/g, " ");
-      for (const match of text.matchAll(/\bt\(`/g)) {
+      // A translator alias: an identifier that STARTS with `t` and adds at most four
+      // lowercase letters (`t`, `tb`, `tc`, `tt`, …). The word boundary keeps
+      // `redirect(` / `import(` / `format(` out — their `t` is not at a word start.
+      for (const match of text.matchAll(/\bt[a-z]{0,4}\(`/g)) {
         const before = text.slice(Math.max(0, match.index - 400), match.index);
-        if (!before.includes("t.has(")) {
+        if (!before.includes(".has(")) {
           unguarded.push(
             `${path.relative(SRC, file)}: ${text.slice(match.index, match.index + 60)}`,
           );

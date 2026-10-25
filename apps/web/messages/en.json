@@ -1193,7 +1193,8 @@
       "noPeriods": "Add at least one rate period.",
       "periodIncomplete": "Every period needs a start date and a rate; the end date is optional.",
       "periodOverlaps": "Rate periods must not overlap.",
-      "floorAboveRate": "The floor rate cannot be above an announced rate."
+      "floorAboveRate": "The floor rate cannot be above an announced rate.",
+      "generic": "The rate schedule could not be accepted."
     }
   },
   "CorpAction": {
@@ -1865,6 +1866,7 @@
       "expired": "Session expired",
       "error": "Error"
     },
+    "statusOther": "Unknown status",
     "phone": "Phone number",
     "pin": "PIN",
     "advanced": "Advanced",
@@ -1929,6 +1931,7 @@
       "expired": "Token expired",
       "error": "Error"
     },
+    "statusOther": "Unknown status",
     "flexToken": "Flex Token",
     "flexTokenPlaceholder": "Your Flex Web Service token",
     "queryId": "Query ID",

@@ -33,10 +33,12 @@ vi.mock("@/i18n/navigation", () => ({
 
 // Identity translator: Settings/TradeRepublic/InteractiveBrokers messages aren't loaded,
 // so a key-echoing stub is enough to assert structure without a full i18n provider.
+// `has` answers "is this key in the catalogue" — the stub knows no keys, so every
+// lookup counts as present and the key echo stays the rendered value.
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn(async (namespace?: string) => {
     const t = (key: string) => `${namespace ?? ""}.${key}`;
-    return t;
+    return Object.assign(t, { has: () => true });
   }),
 }));
 

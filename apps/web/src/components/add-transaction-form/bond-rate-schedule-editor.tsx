@@ -27,7 +27,7 @@ export function BondRateScheduleEditor({
   value: RateScheduleDraft;
   onChange: (next: RateScheduleDraft) => void;
   /** Translator bound to the `BondTerms` namespace. */
-  t: (key: string) => string;
+  t: ((key: string) => string) & { has: (key: string) => boolean };
   /** Prefix for the input ids — the create form and the edit dialog both render this. */
   idPrefix?: string;
 }) {
@@ -129,7 +129,9 @@ export function BondRateScheduleEditor({
 
       {issue && (
         <p role="alert" className="text-xs text-destructive">
-          {t(`issue.${issue}`)}
+          {/* The issue code is a closed set, but a code added without a catalogue
+              entry would throw at runtime — so the lookup is guarded (R4-F7). */}
+          {t.has(`issue.${issue}`) ? t(`issue.${issue}`) : t("issue.generic")}
         </p>
       )}
     </div>
