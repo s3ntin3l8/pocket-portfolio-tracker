@@ -221,6 +221,8 @@ export function InstrumentField({
             <button
               type="button"
               onClick={onToggleCustom}
+              aria-expanded={customOpen}
+              aria-controls="tx-custom-instrument-panel"
               className="flex items-center gap-1.5 self-start text-xs font-semibold text-primary"
             >
               <ChevronDown
@@ -230,164 +232,172 @@ export function InstrumentField({
               {t("customInstrumentToggle")}
             </button>
 
-            {customOpen && (
-              <div className="flex flex-col gap-[13px] border-t border-line pt-[13px]">
-                <FormField label={t("kind")} id="tx-kind">
-                  <Select
-                    id="tx-kind"
-                    value={assetClass}
-                    onChange={(e) => {
-                      const ac = e.target.value as (typeof ASSET_CLASSES)[number];
-                      setAssetClass(ac);
-                      setUnit(unitForClass(ac));
-                    }}
-                  >
-                    {ASSET_CLASSES.map((c) => (
-                      <option key={c} value={c}>
-                        {tc(c)}
-                      </option>
-                    ))}
-                  </Select>
-                </FormField>
+            {/* The panel keeps its node (and its id) whether it is open or not, so
+                `aria-controls` always points at an element that exists. */}
+            <div id="tx-custom-instrument-panel" className={cn(!customOpen && "hidden")}>
+              {customOpen && (
+                <div className="flex flex-col gap-[13px] border-t border-line pt-[13px]">
+                  <FormField label={t("kind")} id="tx-kind">
+                    <Select
+                      id="tx-kind"
+                      value={assetClass}
+                      onChange={(e) => {
+                        const ac = e.target.value as (typeof ASSET_CLASSES)[number];
+                        setAssetClass(ac);
+                        setUnit(unitForClass(ac));
+                      }}
+                    >
+                      {ASSET_CLASSES.map((c) => (
+                        <option key={c} value={c}>
+                          {tc(c)}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
 
-                {assetClass === "gold" ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField label={t("goldSource")} id="tx-gold-source">
-                      <Select
-                        id="tx-gold-source"
-                        value={goldMarket}
-                        onChange={(e) => setGoldMarket(e.target.value)}
-                      >
-                        {goldSourceList.map((s) => (
-                          <option key={s.market} value={s.market}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </Select>
-                    </FormField>
-                    <FormField label={t("goldLabel")} id="tx-gold-label">
-                      <Input
-                        id="tx-gold-label"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder={t("goldLabelPlaceholder")}
-                      />
-                    </FormField>
-                    <p className="col-span-2 text-xs text-text-2">{t("goldNote")}</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField label={t("symbol")} id="tx-symbol">
-                      <Input
-                        id="tx-symbol"
-                        value={symbol}
-                        onChange={(e) => {
-                          setSymbol(e.target.value.toUpperCase());
-                          setIsin(null);
-                          setDiscoveredMarket(null);
-                        }}
-                      />
-                    </FormField>
-                    <FormField label={t("name")} id="tx-name">
-                      <Input id="tx-name" value={name} onChange={(e) => setName(e.target.value)} />
-                    </FormField>
-                    <div className="col-span-2">
-                      <FormField label={t("unit")} id="tx-unit">
+                  {assetClass === "gold" ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField label={t("goldSource")} id="tx-gold-source">
                         <Select
-                          id="tx-unit"
-                          value={unit}
-                          onChange={(e) => setUnit(e.target.value as (typeof UNITS)[number])}
+                          id="tx-gold-source"
+                          value={goldMarket}
+                          onChange={(e) => setGoldMarket(e.target.value)}
                         >
-                          {UNITS.map((u) => (
-                            <option key={u} value={u}>
-                              {t.has && !t.has(`units.${u}`) ? t("unit") : t(`units.${u}`)}
+                          {goldSourceList.map((s) => (
+                            <option key={s.market} value={s.market}>
+                              {s.label}
                             </option>
                           ))}
                         </Select>
                       </FormField>
+                      <FormField label={t("goldLabel")} id="tx-gold-label">
+                        <Input
+                          id="tx-gold-label"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder={t("goldLabelPlaceholder")}
+                        />
+                      </FormField>
+                      <p className="col-span-2 text-xs text-text-2">{t("goldNote")}</p>
                     </div>
-
-                    {assetClass === "bond" && (
-                      <>
-                        <FormField label={t("bondFaceValueLabel")} id="tx-bond-face-value">
-                          <Input
-                            id="tx-bond-face-value"
-                            inputMode="decimal"
-                            value={faceValue}
-                            onChange={(e) => setFaceValue(e.target.value)}
-                            placeholder={t("bondFaceValuePlaceholder")}
-                          />
-                        </FormField>
-                        {/* Floating-rate bonds (Indonesian retail SBR/ST) reset their
-                            coupon rate every few months while the PAYMENTS stay on the
-                            same schedule. The toggle swaps the single rate for a rate
-                            schedule — two independent axes, never merged. */}
-                        <div className="col-span-2 flex items-start gap-2">
-                          <Checkbox
-                            id="tx-bond-floating-rate"
-                            checked={floatingRate}
-                            onCheckedChange={(v) => setFloatingRate(v === true)}
-                          />
-                          <div className="space-y-0.5">
-                            <Label htmlFor="tx-bond-floating-rate" className="text-sm">
-                              {tb("floatingRateLabel")}
-                            </Label>
-                            <p className="text-xs text-text-2">{tb("floatingRateHint")}</p>
-                          </div>
-                        </div>
-                        {!floatingRate && (
-                          <FormField label={t("bondCouponRateLabel")} id="tx-bond-coupon-rate">
-                            <Input
-                              id="tx-bond-coupon-rate"
-                              inputMode="decimal"
-                              value={couponRatePercent}
-                              onChange={(e) => setCouponRatePercent(e.target.value)}
-                              placeholder="6.35"
-                            />
-                          </FormField>
-                        )}
-                        <FormField label={t("bondCouponSchedule")} id="tx-bond-coupon-schedule">
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField label={t("symbol")} id="tx-symbol">
+                        <Input
+                          id="tx-symbol"
+                          value={symbol}
+                          onChange={(e) => {
+                            setSymbol(e.target.value.toUpperCase());
+                            setIsin(null);
+                            setDiscoveredMarket(null);
+                          }}
+                        />
+                      </FormField>
+                      <FormField label={t("name")} id="tx-name">
+                        <Input
+                          id="tx-name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                        />
+                      </FormField>
+                      <div className="col-span-2">
+                        <FormField label={t("unit")} id="tx-unit">
                           <Select
-                            id="tx-bond-coupon-schedule"
-                            value={couponSchedule}
-                            onChange={(e) => setCouponSchedule(e.target.value)}
+                            id="tx-unit"
+                            value={unit}
+                            onChange={(e) => setUnit(e.target.value as (typeof UNITS)[number])}
                           >
-                            {COUPON_SCHEDULES.map((s) => (
-                              <option key={s} value={s}>
-                                {t(
-                                  `bondSchedule${s.charAt(0).toUpperCase()}${s.slice(1)}` as
-                                    | "bondScheduleMonthly"
-                                    | "bondScheduleQuarterly"
-                                    | "bondScheduleSemiannual"
-                                    | "bondScheduleAnnual",
-                                )}
+                            {UNITS.map((u) => (
+                              <option key={u} value={u}>
+                                {t.has && !t.has(`units.${u}`) ? t("unit") : t(`units.${u}`)}
                               </option>
                             ))}
                           </Select>
                         </FormField>
-                        <FormField label={t("bondMaturityDate")} id="tx-bond-maturity">
-                          <Input
-                            id="tx-bond-maturity"
-                            type="date"
-                            value={maturityDate}
-                            onChange={(e) => setMaturityDate(e.target.value)}
-                          />
-                        </FormField>
-                        {floatingRate && (
-                          <BondRateScheduleEditor
-                            value={rateSchedule}
-                            onChange={setRateSchedule}
-                            t={tb}
-                            idPrefix="tx-bond-rate"
-                          />
-                        )}
-                        <p className="col-span-2 text-xs text-text-2">{t("bondNote")}</p>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+                      </div>
+
+                      {assetClass === "bond" && (
+                        <>
+                          <FormField label={t("bondFaceValueLabel")} id="tx-bond-face-value">
+                            <Input
+                              id="tx-bond-face-value"
+                              inputMode="decimal"
+                              value={faceValue}
+                              onChange={(e) => setFaceValue(e.target.value)}
+                              placeholder={t("bondFaceValuePlaceholder")}
+                            />
+                          </FormField>
+                          {/* Floating-rate bonds (Indonesian retail SBR/ST) reset their
+                            coupon rate every few months while the PAYMENTS stay on the
+                            same schedule. The toggle swaps the single rate for a rate
+                            schedule — two independent axes, never merged. */}
+                          <div className="col-span-2 flex items-start gap-2">
+                            <Checkbox
+                              id="tx-bond-floating-rate"
+                              checked={floatingRate}
+                              onCheckedChange={(v) => setFloatingRate(v === true)}
+                            />
+                            <div className="space-y-0.5">
+                              <Label htmlFor="tx-bond-floating-rate" className="text-sm">
+                                {tb("floatingRateLabel")}
+                              </Label>
+                              <p className="text-xs text-text-2">{tb("floatingRateHint")}</p>
+                            </div>
+                          </div>
+                          {!floatingRate && (
+                            <FormField label={t("bondCouponRateLabel")} id="tx-bond-coupon-rate">
+                              <Input
+                                id="tx-bond-coupon-rate"
+                                inputMode="decimal"
+                                value={couponRatePercent}
+                                onChange={(e) => setCouponRatePercent(e.target.value)}
+                                placeholder="6.35"
+                              />
+                            </FormField>
+                          )}
+                          <FormField label={t("bondCouponSchedule")} id="tx-bond-coupon-schedule">
+                            <Select
+                              id="tx-bond-coupon-schedule"
+                              value={couponSchedule}
+                              onChange={(e) => setCouponSchedule(e.target.value)}
+                            >
+                              {COUPON_SCHEDULES.map((s) => (
+                                <option key={s} value={s}>
+                                  {t(
+                                    `bondSchedule${s.charAt(0).toUpperCase()}${s.slice(1)}` as
+                                      | "bondScheduleMonthly"
+                                      | "bondScheduleQuarterly"
+                                      | "bondScheduleSemiannual"
+                                      | "bondScheduleAnnual",
+                                  )}
+                                </option>
+                              ))}
+                            </Select>
+                          </FormField>
+                          <FormField label={t("bondMaturityDate")} id="tx-bond-maturity">
+                            <Input
+                              id="tx-bond-maturity"
+                              type="date"
+                              value={maturityDate}
+                              onChange={(e) => setMaturityDate(e.target.value)}
+                            />
+                          </FormField>
+                          {floatingRate && (
+                            <BondRateScheduleEditor
+                              value={rateSchedule}
+                              onChange={setRateSchedule}
+                              t={tb}
+                              idPrefix="tx-bond-rate"
+                            />
+                          )}
+                          <p className="col-span-2 text-xs text-text-2">{t("bondNote")}</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

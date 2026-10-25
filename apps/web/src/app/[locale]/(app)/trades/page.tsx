@@ -83,6 +83,7 @@ export default async function TradesPage({
                 current={method}
                 labelAverage={t("methodAverage")}
                 labelFifo={t("methodFifo")}
+                aria-label={t("methodGroup")}
               />
               <TradesPageCommands current={method} />
             </>
