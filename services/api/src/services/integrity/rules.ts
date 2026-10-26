@@ -8,13 +8,16 @@ import { Decimal } from "decimal.js";
 // identity that fees/taxes/boundaries legitimately break (e.g. value − contributed =
 // unrealized + realized + income) would report false positives on real data; leave it out.
 
-export type RuleId =
-  | "NW_SUM_PORTFOLIOS"
-  | "GAIN_MATCHES_TOTALS"
-  | "HOLDINGS_SUM"
-  | "NW_COMPOSITION"
-  | "FX_MISSING_DISCLOSED"
-  | "VALUED_AT_COST_NO_GAIN";
+export const RULE_IDS = [
+  "NW_SUM_PORTFOLIOS",
+  "GAIN_MATCHES_TOTALS",
+  "HOLDINGS_SUM",
+  "NW_COMPOSITION",
+  "FX_MISSING_DISCLOSED",
+  "VALUED_AT_COST_NO_GAIN",
+] as const;
+
+export type RuleId = (typeof RULE_IDS)[number];
 
 export interface Finding {
   rule: RuleId;

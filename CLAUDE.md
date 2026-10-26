@@ -290,6 +290,10 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   tools are offered only to write-scoped credentials (`createTools(client, { write })`).
 - **Tests** live in each workspace's `test/`. The API uses an embedded **PGlite**
   Postgres (`pglite://` URLs) so tests need no external DB; `app.inject()` for routes.
+- **Analysis integrity** (`docs/integrity.md`): hand-derived golden ledgers (`services/api/test/integrity/`,
+  expected values are never pasted from a run), cross-endpoint invariants (`services/api/src/services/integrity/`),
+  metamorphic relations, and `GET /me/integrity` / `npm run integrity` to run the invariants read-only against
+  real data. A new derived figure gets a ledger; a new rule must follow from a documented definition.
 - Config is read from `app.config` (typed in `services/api/src/plugins/env.ts`), not
   `process.env` directly. After editing the Drizzle schema (`packages/db/src/schema/*.ts`),
   run `npm run db:generate --workspace @portfolio/db` and commit the migration under

@@ -18,6 +18,7 @@ import { authPlugin, isReadOnlyPat, type AuthPluginOptions } from "./plugins/aut
 import { rootRoute } from "./routes/root.js";
 import { healthRoute } from "./routes/health.js";
 import { meRoute } from "./routes/me.js";
+import { integrityRoute } from "./routes/integrity.js";
 import { portfoliosRoute } from "./routes/portfolios.js";
 import { accountHoldersRoute } from "./routes/account-holders.js";
 import { transactionsRoute } from "./routes/transactions.js";
@@ -359,6 +360,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(healthRoute);
   await app.register(authRoute);
   await app.register(meRoute);
+  await app.register(integrityRoute);
   await app.register(portfoliosRoute);
   await app.register(accountHoldersRoute);
   await app.register(transactionsRoute);
