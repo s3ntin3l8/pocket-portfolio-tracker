@@ -16,6 +16,7 @@ import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
 import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
 import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
+import { deTaxSlice, deTaxSliceExpected } from "./ledgers/de-tax-slice.js";
 import { anomalies, anomaliesExpected } from "./ledgers/anomalies.js";
 import { metaBase, metaBaseExpected } from "./ledgers/meta-base.js";
 import { multiBase, multiBaseExpected } from "./ledgers/multi-base.js";
@@ -258,8 +259,8 @@ describe("anomalies", () => {
   });
 });
 
-// The route reports tax amounts to the cent; the hand-derived tax (e.g. 92.3125) is compared to
-// within half a cent. Everything else is exact.
+// The route reports the tax to the cent; the hand-derived tax (e.g. 92.3125) is compared to
+// within half a cent. Every other figure here is exact, so a sub-cent engine error is visible.
 const CENT = "0.005";
 
 describe.each([
@@ -277,17 +278,44 @@ describe.each([
     const u = t.allowanceUsage;
     expect(t.regime).toBe("DE");
     expect(u.taxRate).toBe("0.26375");
-    expectDecimal(u.stockPot.netGainLoss, e.stockPot, "stockPot", CENT);
-    expectDecimal(u.generalPot.netGainLoss, e.generalPot, "generalPot", CENT);
-    expectDecimal(u.usedYtd, e.allowanceUsed, "usedYtd", CENT);
-    expectDecimal(u.taxableExcess, e.taxableExcess, "taxableExcess", CENT);
+    expectDecimal(u.stockPot.netGainLoss, e.stockPot, "stockPot");
+    expectDecimal(u.generalPot.netGainLoss, e.generalPot, "generalPot");
+    expectDecimal(u.usedYtd, e.allowanceUsed, "usedYtd");
+    expectDecimal(u.taxableExcess, e.taxableExcess, "taxableExcess");
     expectDecimal(u.estimatedTax, e.estimatedTax, "estimatedTax", CENT);
-    expectDecimal(u.remaining, "0", "remaining", CENT);
+    expectDecimal(u.remaining, "0", "remaining");
     expectDecimal(
       new Decimal(u.usedYtd).add(u.taxableExcess),
       e.taxableBeforeAllowance,
       "usedYtd + taxableExcess = pots counted",
-      CENT,
     );
+  });
+});
+
+describe("de-tax-slice: the depot's slice, not the holder's cap, is the allowance", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(deTaxSlice.asOf) });
+    l = await loadLedger(app, sign, deTaxSlice);
+  }, 60_000);
+
+  it("nets against the 400 slice and taxes the excess at the holder's explicit rate", async () => {
+    const e = deTaxSliceExpected;
+    const t = await get(l, `/portfolios/${l.portfolioIds.depot}/tax?year=${e.year}`);
+    const u = t.allowanceUsage;
+    expect(u.taxRate).toBe(e.taxRate);
+    expectDecimal(u.allowanceAnnual, e.allowanceAnnual, "allowanceAnnual");
+    expectDecimal(u.stockPot.netGainLoss, e.stockPot, "stockPot");
+    expectDecimal(u.usedYtd, e.allowanceUsed, "usedYtd");
+    expectDecimal(u.taxableExcess, e.taxableExcess, "taxableExcess");
+    expectDecimal(u.estimatedTax, e.estimatedTax, "estimatedTax", CENT);
+  });
+
+  it("warns that the slices (400 + 800) exceed the holder's cap (1000), without changing the tax", async () => {
+    const e = deTaxSliceExpected;
+    const t = await get(l, `/portfolios/${l.portfolioIds.depot}/tax?year=${e.year}`);
+    expectDecimal(t.holderDistribution.holderAllowanceCap, e.holderAllowanceCap, "cap");
+    expectDecimal(t.holderDistribution.totalAllocated, e.totalAllocated, "totalAllocated");
+    expect(t.holderDistribution.overAllocated).toBe(true);
   });
 });

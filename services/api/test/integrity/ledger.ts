@@ -139,6 +139,8 @@ export async function loadLedger(
 
   const portfolioIds: Record<string, string> = {};
   for (const [key, { holder, ...p }] of Object.entries(ledger.portfolios)) {
+    if (holder && !holderIds[holder])
+      throw new Error(`portfolio ${key}: unknown holder "${holder}"`);
     const payload = { ...p, ...(holder ? { accountHolderId: holderIds[holder]! } : {}) };
     const res = await app.inject({ method: "POST", url: "/portfolios", headers, payload });
     expect(res.statusCode, `create portfolio ${key}`).toBe(201);
