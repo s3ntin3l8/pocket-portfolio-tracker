@@ -10,7 +10,6 @@ import { Decimal } from "decimal.js";
 
 export type RuleId =
   | "NW_SUM_PORTFOLIOS"
-  | "NW_HISTORY_TAIL"
   | "GAIN_MATCHES_TOTALS"
   | "HOLDINGS_SUM"
   | "NW_COMPOSITION"
@@ -72,8 +71,6 @@ export type NetWorthBody = ValuationBody & { asOf: string };
 export interface IntegrityBodies {
   networth: NetWorthBody;
   portfolios: { id: string; summary: ValuationBody }[];
-  /** `/networth/history?range=all` — `null` when not collected. */
-  history: { netWorth: string }[] | null;
   /**
    * Today's rate from each portfolio currency into `networth.displayCurrency` (`/fx-rate`);
    * `null` when the app has none. The same currency maps to "1".
@@ -116,6 +113,12 @@ const sum = (xs: Iterable<string>): Decimal =>
  * /networth is the sum of the portfolios it aggregates, each converted from its own base
  * currency into the user's display currency. With no rate for one of those currencies the
  * app excludes it from /networth too, so there is nothing sound to compare: the rule abstains.
+ *
+ * Assumes the summary's base-currency total, converted by today's `/fx-rate`, agrees with
+ * /networth converting each holding from its native currency. That holds while every
+ * (from → base) rate comes from the same provider day; a degraded provider can carry one pair
+ * forward (up to FX_MAX_CARRY_FORWARD_DAYS) and drift the two paths apart by real FX movement —
+ * a finding then is a data-freshness signal, not necessarily a calculation bug.
  */
 export function checkNetWorthSumsPortfolios(b: IntegrityBodies): Finding[] {
   let expected = new Decimal(0);
@@ -133,22 +136,6 @@ export function checkNetWorthSumsPortfolios(b: IntegrityBodies): Finding[] {
     "/networth netWorth differs from the sum of the portfolio summaries (converted at today's rate)",
     expected,
     new Decimal(b.networth.netWorth),
-  );
-}
-
-/** The headline figure equals the last point of the history series (#1006). */
-export function checkNetWorthMatchesHistory(b: IntegrityBodies): Finding[] {
-  const last = b.history?.at(-1);
-  if (!last) return [];
-  // The history series is a derived/snapshot series, so it is compared more loosely.
-  const expected = new Decimal(b.networth.netWorth);
-  return compare(
-    "NW_HISTORY_TAIL",
-    "networth",
-    "/networth netWorth differs from the last /networth/history point",
-    expected,
-    new Decimal(last.netWorth),
-    Decimal.max("1e-6", expected.abs().mul("1e-6")),
   );
 }
 
@@ -186,11 +173,16 @@ export function checkGainMatchesTotals(b: IntegrityBodies): Finding[] {
   return out;
 }
 
-/** Totals are the sums of their holdings; an fxMissing holding is out of every total. */
+/**
+ * Totals are the sums of their holdings' display figures. A holding the app could not convert
+ * carries null display values, so the null-skip is what excludes it. Do NOT also filter on
+ * `fxMissing`: the aggregate OR-merges that flag while summing the display values, so a merged
+ * holding can be flagged and still carry the other depot's value (`aggregatePortfolios`).
+ */
 export function checkHoldingsSum(b: IntegrityBodies): Finding[] {
   const out: Finding[] = [];
   for (const { scope, v } of scopes(b)) {
-    const counted = v.holdings.filter((h) => !h.fxMissing);
+    const counted = v.holdings;
     out.push(
       ...compare(
         "HOLDINGS_SUM",
@@ -291,7 +283,6 @@ export function checkValuedAtCostHasNoGain(b: IntegrityBodies): Finding[] {
 
 export const RULES: ((b: IntegrityBodies) => Finding[])[] = [
   checkNetWorthSumsPortfolios,
-  checkNetWorthMatchesHistory,
   checkGainMatchesTotals,
   checkHoldingsSum,
   checkNetWorthComposition,

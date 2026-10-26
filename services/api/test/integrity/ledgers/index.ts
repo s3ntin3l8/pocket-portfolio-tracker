@@ -6,6 +6,7 @@ import { split } from "./split.js";
 import { usdFx } from "./usd-fx.js";
 import { degraded } from "./degraded.js";
 import { fxCarry, fxStale } from "./fx-carry.js";
+import { multiBase } from "./multi-base.js";
 
 /** Every golden ledger; the invariant suite must hold on all of them. */
 export const allLedgers: Ledger[] = [
@@ -17,4 +18,5 @@ export const allLedgers: Ledger[] = [
   degraded,
   fxCarry,
   fxStale,
+  multiBase,
 ];

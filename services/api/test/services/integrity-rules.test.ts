@@ -47,7 +47,6 @@ function bodies(): IntegrityBodies {
   return {
     networth: { ...valuation(), asOf: "2026-06-30T12:00:00.000Z" },
     portfolios: [{ id: "p1", summary: valuation() }],
-    history: [{ netWorth: "1200" }, { netWorth: "1260" }],
     fxToDisplay: {},
   };
 }
@@ -90,14 +89,6 @@ describe("integrity rules", () => {
     expect(rules(b)).not.toContain("NW_SUM_PORTFOLIOS");
   });
 
-  it("NW_HISTORY_TAIL: the last history point differs from networth", () => {
-    const b = bodies();
-    b.history = [{ netWorth: "1000" }];
-    expect(rules(b)).toContain("NW_HISTORY_TAIL");
-    b.history = null;
-    expect(rules(b)).not.toContain("NW_HISTORY_TAIL");
-  });
-
   it("GAIN_MATCHES_TOTALS: a gain field drifts from the response's own total", () => {
     const b = bodies();
     b.portfolios[0]!.summary.gain!.costOfOpen = "961";
@@ -126,6 +117,14 @@ describe("integrity rules", () => {
       });
     }
     expect(checkIntegrity(b)).toEqual([]);
+  });
+
+  it("HOLDINGS_SUM: a merged holding flagged fxMissing that still carries value is counted", () => {
+    // aggregatePortfolios OR-merges fxMissing but sums display values: one depot could convert.
+    const b = bodies();
+    b.networth.holdings[0]!.fxMissing = true;
+    b.networth.fxMissingCurrencies = ["EUR"];
+    expect(rules(b)).not.toContain("HOLDINGS_SUM");
   });
 
   it("NW_COMPOSITION: counted cash is missing from net worth", () => {

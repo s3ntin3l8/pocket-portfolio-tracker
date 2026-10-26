@@ -1,5 +1,36 @@
 import type { IntegrityBodies, NetWorthBody, ValuationBody } from "./rules.js";
 
+const REQUIRED_STRINGS = [
+  "displayCurrency",
+  "netWorth",
+  "totalCost",
+  "totalMarketValue",
+  "totalUnrealizedPnL",
+  "totalRealizedPnL",
+  "totalIncome",
+  "totalLiabilities",
+] as const;
+
+/**
+ * Response validation is off in production for these routes, so a renamed or dropped field
+ * would otherwise surface as a TypeError deep inside a rule. Fail here instead, naming the
+ * endpoint and the field, and default the collections the rules iterate.
+ */
+function asValuation(body: unknown, what: string): ValuationBody {
+  const b = body as Record<string, unknown> | null;
+  for (const key of REQUIRED_STRINGS) {
+    if (typeof b?.[key] !== "string") {
+      throw new Error(`${what}: expected a string "${key}", got ${JSON.stringify(b?.[key])}`);
+    }
+  }
+  return {
+    ...(b as unknown as ValuationBody),
+    cashDisplay: (b!.cashDisplay as Record<string, string> | undefined) ?? {},
+    holdings: (b!.holdings as ValuationBody["holdings"] | undefined) ?? [],
+    fxMissingCurrencies: (b!.fxMissingCurrencies as string[] | undefined) ?? [],
+  };
+}
+
 /**
  * Fetch the response bodies the rules read. `get` returns the parsed JSON of a GET and throws
  * on a non-200, so a failing endpoint is a loud failure, not an empty (vacuously passing) rule.
@@ -10,12 +41,12 @@ export async function collectBodies(
   get: (url: string) => Promise<unknown>,
 ): Promise<IntegrityBodies> {
   const portfolioList = (await get("/portfolios")) as { id: string }[];
-  const [networth, history, summaries] = await Promise.all([
-    get("/networth") as Promise<NetWorthBody>,
-    get("/networth/history?range=all") as Promise<{ netWorth: string }[]>,
+  const [networth, summaries] = await Promise.all([
+    get("/networth").then((b) => asValuation(b, "/networth") as NetWorthBody),
     Promise.all(
       portfolioList.map(
-        async (p) => [p.id, (await get(`/portfolios/${p.id}/summary`)) as ValuationBody] as const,
+        async (p) =>
+          [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
       ),
     ),
   ]);
@@ -31,5 +62,5 @@ export async function collectBodies(
     const r = (await get(`/fx-rate?from=${from}&to=${to}&date=${date}`)) as { rate: string | null };
     fxToDisplay[from] = r.rate;
   }
-  return { networth, history, portfolios, fxToDisplay };
+  return { networth, portfolios, fxToDisplay };
 }
