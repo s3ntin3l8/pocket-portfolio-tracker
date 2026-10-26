@@ -7,6 +7,7 @@ import {
   fxRates,
   instruments,
   lastPrices,
+  portfolioSnapshots,
   transactions,
   users,
 } from "@portfolio/db";
@@ -98,6 +99,17 @@ export interface Ledger {
         taxableMarketValue?: string;
       }
   )[];
+  /**
+   * Stored daily snapshots (what the snapshot job writes), in the portfolio's base currency.
+   * Only the history endpoints read them; they are not derived from `transactions`.
+   */
+  snapshots?: {
+    portfolio: string;
+    date: string;
+    netWorth: string;
+    marketValue: string;
+    effectiveFlow?: string;
+  }[];
   transactions: LedgerTx[];
 }
 
@@ -222,22 +234,36 @@ export async function loadLedger(
     });
   }
 
-  await app.db.insert(transactions).values(
-    ledger.transactions.map((t) => ({
-      portfolioId: need(portfolioIds, t.portfolio, "transaction portfolio"),
-      instrumentId: t.instrument
-        ? need(instrumentIds, t.instrument, "transaction instrument")
-        : null,
-      type: t.type,
-      quantity: t.quantity ?? "0",
-      price: t.price ?? "0",
-      fees: t.fees ?? "0",
-      tax: t.tax ?? null,
-      kind: t.kind ?? null,
-      currency: t.currency,
-      executedAt: new Date(t.at),
-    })),
-  );
+  for (const sn of ledger.snapshots ?? []) {
+    await app.db.insert(portfolioSnapshots).values({
+      portfolioId: need(portfolioIds, sn.portfolio, "snapshot portfolio"),
+      date: sn.date,
+      netWorth: sn.netWorth,
+      marketValue: sn.marketValue,
+      effectiveFlow: sn.effectiveFlow ?? "0",
+      currency: ledger.portfolios[sn.portfolio]!.baseCurrency,
+    });
+  }
+
+  // A snapshot-only scenario has no transactions; drizzle rejects an empty `values([])`.
+  if (ledger.transactions.length > 0) {
+    await app.db.insert(transactions).values(
+      ledger.transactions.map((t) => ({
+        portfolioId: need(portfolioIds, t.portfolio, "transaction portfolio"),
+        instrumentId: t.instrument
+          ? need(instrumentIds, t.instrument, "transaction instrument")
+          : null,
+        type: t.type,
+        quantity: t.quantity ?? "0",
+        price: t.price ?? "0",
+        fees: t.fees ?? "0",
+        tax: t.tax ?? null,
+        kind: t.kind ?? null,
+        currency: t.currency,
+        executedAt: new Date(t.at),
+      })),
+    );
+  }
 
   return { headers, portfolioIds, instrumentIds };
 }

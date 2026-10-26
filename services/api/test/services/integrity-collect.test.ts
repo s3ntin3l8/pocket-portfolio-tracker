@@ -22,13 +22,21 @@ const valuation = (over: Record<string, unknown> = {}) => ({
 });
 
 function getter(
-  over: { networth?: Record<string, unknown>; portfolios?: unknown; trades?: unknown } = {},
+  over: {
+    networth?: Record<string, unknown>;
+    portfolios?: unknown;
+    trades?: unknown;
+    history?: unknown;
+  } = {},
 ) {
   return async (url: string): Promise<unknown> => {
     if (url.endsWith("/contributions")) return { displayCurrency: "EUR", netContributed: "100" };
     if (url.endsWith("/trades"))
       return over.trades ?? { displayCurrency: "EUR", totalRealized: "0" };
     if (url.endsWith("/anomalies")) return { anomalies: [] };
+    if (url.endsWith("/history?range=all")) {
+      return over.history ?? [{ date: "2026-06-30", netWorth: "100", marketValue: "100" }];
+    }
     if (url === "/portfolios") return over.portfolios ?? [{ id: "p1" }];
     if (url === "/networth") return valuation(over.networth);
     if (url === "/portfolios/p1/summary") return valuation();
@@ -84,6 +92,34 @@ describe("collectBodies", () => {
   it("names a missing field of a parity endpoint", async () => {
     await expect(collectBodies(getter({ trades: { displayCurrency: "EUR" } }))).rejects.toThrow(
       /\/trades: expected a string "totalRealized"/,
+    );
+  });
+
+  it("collects the aggregate history, and each portfolio's when all are in the display currency", async () => {
+    const b = await collectBodies(getter());
+    expect(b.networthHistory).toEqual([
+      { date: "2026-06-30", netWorth: "100", marketValue: "100" },
+    ]);
+    expect(b.portfolios[0]!.history).toHaveLength(1);
+  });
+
+  it("skips the per-portfolio histories when a portfolio is in another currency", async () => {
+    const get = async (url: string): Promise<unknown> => {
+      if (url === "/portfolios/p1/summary") return valuation({ displayCurrency: "USD" });
+      if (url.startsWith("/fx-rate")) return { rate: "0.9" };
+      if (url === "/portfolios/p1/history?range=all") throw new Error("must not be fetched");
+      return getter()(url);
+    };
+    const b = await collectBodies(get);
+    expect(b.portfolios[0]!.history).toBeNull();
+  });
+
+  it("names a malformed history point", async () => {
+    await expect(
+      collectBodies(getter({ history: [{ date: "2026-06-30", netWorth: "1" }] })),
+    ).rejects.toThrow(/history\[0\]: expected a string "marketValue"/);
+    await expect(collectBodies(getter({ history: { oops: true } }))).rejects.toThrow(
+      /history: expected an array/,
     );
   });
 });

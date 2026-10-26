@@ -1,6 +1,12 @@
 import { mapPool } from "../../lib/promise-pool.js";
 import { PORTFOLIO_VALUATION_CONCURRENCY } from "../../routes/transactions/shared/helpers.js";
-import type { IntegrityBodies, NetWorthBody, ParityBodies, ValuationBody } from "./rules.js";
+import type {
+  HistoryPoint,
+  IntegrityBodies,
+  NetWorthBody,
+  ParityBodies,
+  ValuationBody,
+} from "./rules.js";
 
 const REQUIRED_STRINGS = [
   "displayCurrency",
@@ -77,6 +83,22 @@ function needStrings<K extends string>(
   return b as Record<K, string>;
 }
 
+/**
+ * A history series: an array of points that each carry a date and the two values. No rule reads
+ * `marketValue` today (the aggregate's `marketValue` carries a gap leg forward by design, see
+ * `checkHistorySumsPortfolios`); it is required on purpose, as an endpoint-contract check, so a
+ * renamed or dropped field fails by name instead of a rule silently comparing nothing later.
+ */
+function asHistory(body: unknown, what: string): HistoryPoint[] {
+  if (!Array.isArray(body)) {
+    throw new Error(`${what}: expected an array, got ${JSON.stringify(body)}`);
+  }
+  return body.map((pt, i) => {
+    const v = needStrings(pt, ["date", "netWorth", "marketValue"], `${what}[${i}]`);
+    return { date: v.date, netWorth: v.netWorth, marketValue: v.marketValue };
+  });
+}
+
 /** The parity endpoints for one scope: `base` is `/networth` or `/portfolios/:id`. */
 async function collectParity(
   get: (url: string) => Promise<unknown>,
@@ -106,9 +128,10 @@ async function collectParity(
  * caller's own auth — the same rule code runs against the same serialized responses.
  *
  * Cost: per portfolio this is the summary plus the contributions, trades and anomalies
- * endpoints, and the aggregate adds the same three, all drawn from the caller's own rate-limit
- * bucket and valuation work (`/portfolios/:id/contributions` has no derivation cache). On a big
- * account a 429/502 from here is this fan-out, not a data problem.
+ * endpoints (and its history series when every portfolio is in the display currency), and the
+ * aggregate adds the same three plus `/networth/history`, all drawn from the caller's own
+ * rate-limit bucket and valuation work (`/portfolios/:id/contributions` has no derivation
+ * cache). On a big account a 429/502 from here is this fan-out, not a data problem.
  */
 export async function collectBodies(
   get: (url: string) => Promise<unknown>,
@@ -146,5 +169,23 @@ export async function collectBodies(
     const r = (await get(`/fx-rate?from=${from}&to=${to}&date=${date}`)) as { rate: string | null };
     fxToDisplay[from] = r.rate;
   }
-  return { networth, networthParity, portfolios, fxToDisplay };
+
+  const networthHistory = asHistory(await get("/networth/history?range=all"), "/networth/history");
+  // Summing the per-portfolio series is only exact when no currency conversion is involved.
+  const singleCurrency = portfolios.every((p) => p.summary.displayCurrency === to);
+  const histories = singleCurrency
+    ? await mapPool(portfolios, PORTFOLIO_VALUATION_CONCURRENCY, async (p) =>
+        asHistory(
+          await get(`/portfolios/${p.id}/history?range=all`),
+          `/portfolios/${p.id}/history`,
+        ),
+      )
+    : null;
+  return {
+    networth,
+    networthParity,
+    networthHistory,
+    portfolios: portfolios.map((p, i) => ({ ...p, history: histories ? histories[i]! : null })),
+    fxToDisplay,
+  };
 }
