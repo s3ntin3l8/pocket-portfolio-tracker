@@ -414,31 +414,60 @@ describe("mixed-boundary", () => {
 
 describe("loadLedger", () => {
   // Several target columns are nullable, so an unknown symbolic key must fail loudly instead of
-  // inserting NULL and leaving a scenario that silently no longer tests what it claims to.
-  const bad = (over: Record<string, unknown>) =>
-    ({
-      ...eurBasic,
-      name: `bad-key-${Math.random().toString(36).slice(2)}`,
-      ...over,
-    }) as typeof eurBasic;
+  // inserting NULL and leaving a scenario that silently no longer tests what it claims to. One
+  // case per lookup site, each with its own message.
+  const unique = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2)}`;
+  const mergerCa = merger.corporateActions![0]! as Extract<
+    NonNullable<typeof merger.corporateActions>[number],
+    { type: "merger" }
+  >;
 
-  it("rejects a transaction that names an unknown instrument", async () => {
-    vi.useFakeTimers({ toFake: ["Date"], now: new Date(eurBasic.asOf) });
-    const l = bad({
-      transactions: [{ ...eurBasic.transactions[0]!, instrument: "nope" }],
-    });
-    await expect(loadLedger(app, sign, l)).rejects.toThrow(/unknown transaction instrument "nope"/);
-  });
-
-  it("rejects a merger row that names an unknown target", async () => {
-    vi.useFakeTimers({ toFake: ["Date"], now: new Date(merger.asOf) });
-    const l = bad({
-      ...merger,
-      name: `bad-target-${Math.random().toString(36).slice(2)}`,
-      corporateActions: [{ ...merger.corporateActions![0]!, target: "nope" }],
-    });
-    await expect(loadLedger(app, sign, l)).rejects.toThrow(
-      /unknown merger target instrument "nope"/,
+  it.each([
+    [
+      "transaction instrument",
+      () => ({
+        ...eurBasic,
+        name: unique("bad-tx-instrument"),
+        transactions: [{ ...eurBasic.transactions[0]!, instrument: "nope" }],
+      }),
+    ],
+    [
+      "transaction portfolio",
+      () => ({
+        ...eurBasic,
+        name: unique("bad-tx-portfolio"),
+        transactions: [{ ...eurBasic.transactions[0]!, portfolio: "nope" }],
+      }),
+    ],
+    [
+      "corporate action instrument",
+      () => ({
+        ...merger,
+        name: unique("bad-ca-instrument"),
+        corporateActions: [{ ...mergerCa, instrument: "nope" }],
+      }),
+    ],
+    [
+      "merger portfolio",
+      () => ({
+        ...merger,
+        name: unique("bad-ca-portfolio"),
+        corporateActions: [{ ...mergerCa, portfolio: "nope" }],
+      }),
+    ],
+    [
+      "merger target instrument",
+      () => ({
+        ...merger,
+        name: unique("bad-ca-target"),
+        corporateActions: [{ ...mergerCa, target: "nope" }],
+      }),
+    ],
+  ])("rejects an unknown %s", async (what, build) => {
+    const ledger = build() as typeof merger;
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(ledger.asOf) });
+    await expect(loadLedger(app, sign, ledger)).rejects.toThrow(
+      new RegExp(`unknown ${what} "nope"`),
     );
   });
 });
