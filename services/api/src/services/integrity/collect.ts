@@ -85,7 +85,7 @@ function needStrings<K extends string>(
 
 /**
  * A history series: an array of points that each carry a date and the two values. No rule reads
- * `marketValue` today (the aggregate's carries a gap leg forward by design, see
+ * `marketValue` today (the aggregate's `marketValue` carries a gap leg forward by design, see
  * `checkHistorySumsPortfolios`); it is required on purpose, as an endpoint-contract check, so a
  * renamed or dropped field fails by name instead of a rule silently comparing nothing later.
  */
