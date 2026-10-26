@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair } from "jose";
-import type { CoreTransaction, PortfolioSummary } from "@portfolio/core";
+import { summarizePortfolio, type CoreTransaction } from "@portfolio/core";
 import { instruments } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
@@ -21,14 +21,6 @@ afterAll(async () => {
   await app.close();
   await closeDb();
   delete process.env.RATE_LIMIT_MAX;
-});
-
-const holding = (instrumentId: string, over: Record<string, unknown> = {}) => ({
-  instrumentId,
-  quantity: "10",
-  marketValueDisplay: "1000",
-  costBasisDisplay: "800",
-  ...over,
 });
 
 describe("buildIncomeStats yields", () => {
@@ -59,14 +51,34 @@ describe("buildIncomeStats yields", () => {
       currency: "EUR",
       executedAt: recent,
     });
+    // A real, complete summary (both holdings priced, value 1000 and cost 800 each), then one
+    // holding's display cost nulled. A value without a cost is not reachable from the route today
+    // (a no-rate holding has neither), which is exactly why the filter clause is easy to delete
+    // unnoticed. Typed end to end: `costBasisDisplay` is nullable, so no cast is needed.
+    const buy = (instrumentId: string): CoreTransaction => ({
+      instrumentId,
+      type: "buy",
+      quantity: "10",
+      price: "80",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2025-01-10T10:00:00.000Z"),
+    });
+    const priced = summarizePortfolio({
+      transactions: [buy(withCost.id), buy(noCost.id)],
+      prices: {
+        [withCost.id]: { price: "100", currency: "EUR" },
+        [noCost.id]: { price: "100", currency: "EUR" },
+      },
+      displayCurrency: "EUR",
+      fx: (from, to) => (from === to ? "1" : null),
+    });
     const summary = {
-      holdings: [
-        holding(withCost.id),
-        // A value but no cost: not reachable from the route today (a no-rate holding has neither),
-        // which is exactly why the clause is easy to delete unnoticed.
-        holding(noCost.id, { costBasisDisplay: null }),
-      ],
-    } as unknown as PortfolioSummary;
+      ...priced,
+      holdings: priced.holdings.map((h) =>
+        h.instrumentId === noCost.id ? { ...h, costBasisDisplay: null } : h,
+      ),
+    };
 
     const stats = await buildIncomeStats(
       app,
