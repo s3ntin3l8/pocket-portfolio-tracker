@@ -119,6 +119,7 @@ describe("transfers", () => {
 
   it("the aggregate is the sum of the depots (a transfer is net zero)", async () => {
     const nw = await get(l, "/networth");
+    expect(nw.gain.boundary).toBe("outside");
     expectDecimal(nw.netWorth, transfersExpected.all.value, "netWorth", ROUNDING);
     expectGain(nw.gain, transfersExpected.all, "gain[all]");
   });
@@ -329,6 +330,27 @@ describe("merger", () => {
     l = await loadLedger(app, sign, merger);
   }, 60_000);
 
+  // First on purpose: derivations are cached per request key, so a later test could be served
+  // a cached result and never re-run the engine path whose stderr this watches.
+  it("agrees with its corporate-action row: the pair's proceeds and basis equal the taxable market value", async () => {
+    // The engine cross-checks a pre-priced pair against the merger row's `taxableMarketValue` and
+    // writes a structured warning to stderr on a mismatch (it never fails the request). A
+    // consistent ledger must stay silent; with the row at a wrong value this emits warnings.
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    }) as never);
+    try {
+      for (const view of ["summary", "holdings", "trades"]) {
+        await get(l, `/portfolios/${l.portfolioIds.depot}/${view}`);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+    expect(writes.filter((w) => w.includes("merger_importer"))).toEqual([]);
+  });
+
   it("realizes the step-up on the sale leg, carries the new basis, and stays contribution-neutral", async () => {
     const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
     expect(s.gain.boundary).toBe("outside");
@@ -376,9 +398,15 @@ describe("mixed-boundary", () => {
 });
 
 describe("aggregate boundary on single-boundary ledgers", () => {
-  it("cash-inside: /networth carries the inside boundary and the same figures", async () => {
+  // Each ledger needs its own clock and user; the cash-inside one is loaded here under a
+  // second user so it does not collide with the portfolio-level describe above.
+  let l: LoadedLedger;
+  beforeAll(async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date(cashInside.asOf) });
-    const l = await loadLedger(app, sign, cashInside, "aggregate-cash-inside");
+    l = await loadLedger(app, sign, cashInside, "aggregate-cash-inside");
+  }, 60_000);
+
+  it("cash-inside: /networth carries the inside boundary and the same figures", async () => {
     const nw = await get(l, "/networth");
     expect(nw.gain.boundary).toBe("inside");
     expectDecimal(nw.netWorth, cashInsideExpected.value, "netWorth", ROUNDING);

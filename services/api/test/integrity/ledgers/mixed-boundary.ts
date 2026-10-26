@@ -48,12 +48,22 @@ export const mixedBoundary: Ledger = {
 };
 
 export const mixedBoundaryExpected = {
-  savings: { boundary: "inside", value: "1000", netContributed: "1000" },
+  savings: {
+    boundary: "inside",
+    value: "1000",
+    costOfOpen: "0",
+    unrealized: "0",
+    realized: "0",
+    income: "0",
+    netContributed: "1000",
+  },
   depot: {
     boundary: "outside",
     value: "1100",
     costOfOpen: "1000",
     unrealized: "100",
+    realized: "0",
+    income: "0",
     netContributed: "1000",
   },
   all: {
@@ -61,6 +71,8 @@ export const mixedBoundaryExpected = {
     value: "2100",
     costOfOpen: "1000",
     unrealized: "100",
+    realized: "0",
+    income: "0",
     netContributed: "2000",
   },
 };

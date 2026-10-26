@@ -80,8 +80,24 @@ export interface Ledger {
   instruments: Record<string, LedgerInstrument>;
   /** `1 base = rate quote` on `date` (e.g. USD→EUR 0.9 means 1 USD = 0.9 EUR). */
   fx?: { base: string; quote: string; rate: string; date: string }[];
-  /** Share-count corporate actions; `ratio` "4" is a 4:1 split (quantity × 4). */
-  corporateActions?: { instrument: string; type: "split"; ratio: string; exDate: string }[];
+  /**
+   * Corporate actions. A split's `ratio` "4" is 4:1 (quantity × 4). A merger is what
+   * `POST /portfolios/:id/mergers` commits next to its paired legs: `ratio` is old shares per
+   * new share, `ratioTo` its reciprocal, `taxableMarketValue` set only for a taxable merger.
+   */
+  corporateActions?: (
+    | { instrument: string; type: "split"; ratio: string; exDate: string }
+    | {
+        instrument: string;
+        type: "merger";
+        portfolio: string;
+        target: string;
+        ratio: string;
+        ratioTo: string;
+        exDate: string;
+        taxableMarketValue?: string;
+      }
+  )[];
   transactions: LedgerTx[];
 }
 
@@ -185,6 +201,14 @@ export async function loadLedger(
       type: c.type,
       ratio: c.ratio,
       exDate: c.exDate,
+      ...(c.type === "merger"
+        ? {
+            portfolioId: portfolioIds[c.portfolio]!,
+            targetInstrumentId: instrumentIds[c.target]!,
+            ratioTo: c.ratioTo,
+            taxableMarketValue: c.taxableMarketValue ?? null,
+          }
+        : {}),
     });
   }
 

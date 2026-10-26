@@ -30,6 +30,20 @@ export const merger: Ledger = {
       price: "90",
     },
   },
+  // The corporate-action row the route commits atomically with the legs (`ratio` is old shares
+  // per new share: 10 old for 20 new = 0.5; `ratioTo` is its reciprocal).
+  corporateActions: [
+    {
+      instrument: "a",
+      type: "merger",
+      portfolio: "depot",
+      target: "b",
+      ratio: "0.5",
+      ratioTo: "2",
+      exDate: "2025-06-01",
+      taxableMarketValue: "1500",
+    },
+  ],
   transactions: [
     {
       portfolio: "depot",
