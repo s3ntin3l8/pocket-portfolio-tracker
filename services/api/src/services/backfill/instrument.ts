@@ -6,7 +6,7 @@ import { instruments, scrapedQuotes } from "@portfolio/db";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { buybackKeyFor, isBuybackGoldMarket } from "../scrapers/store.js";
-import { firstHeldDateFor, isManualPriceBond } from "./shared.js";
+import { firstHeldDateFor, isManualPriceBond, priceGapRemains } from "./shared.js";
 
 export interface InstrumentChunkData {
   portfolioId: string;
@@ -250,14 +250,31 @@ export async function fetchInstrumentPrices(
     })),
   );
 
+  // Candles with a hole longer than the carry-forward window left in the series are still
+  // a miss (see priceGapRemains) — count it for the dead-feed cooldown instead of
+  // resetting, but this is not an error.
+  const gapRemains = await priceGapRemains(
+    db,
+    instrumentId,
+    chunkStart,
+    [...instrPrices.keys()],
+    chunkEnd, // a chunked run only owns its own window; don't call the stretch after it a gap
+  );
   await db
     .update(instruments)
-    .set({
-      priceFeedMissCount: 0,
-      priceFeedLastMissAt: null,
-      priceFeedErrorCount: 0,
-      priceFeedLastErrorAt: null,
-    })
+    .set(
+      gapRemains
+        ? {
+            priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
+            priceFeedLastMissAt: new Date(),
+          }
+        : {
+            priceFeedMissCount: 0,
+            priceFeedLastMissAt: null,
+            priceFeedErrorCount: 0,
+            priceFeedLastErrorAt: null,
+          },
+    )
     .where(eq(instruments.id, instrumentId));
 
   return { instrumentId, days, truncated, unpriced: false };
