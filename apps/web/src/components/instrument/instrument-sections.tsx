@@ -274,9 +274,12 @@ export async function InstrumentPositionSection({ id, locale }: SectionProps) {
   const hasPosition = holding !== null && Number(holding.quantity) !== 0;
   const pnlDisplay =
     holding?.unrealizedPnLDisplay != null ? Number(holding.unrealizedPnLDisplay) : null;
-  const costBasisDisplay = holding ? Number(holding.costBasisDisplay) : 0;
+  const costBasisDisplay =
+    holding?.costBasisDisplay != null ? Number(holding.costBasisDisplay) : null;
   const pnlPct =
-    pnlDisplay !== null && costBasisDisplay !== 0 ? pnlDisplay / costBasisDisplay : undefined;
+    pnlDisplay !== null && costBasisDisplay !== null && costBasisDisplay !== 0
+      ? pnlDisplay / costBasisDisplay
+      : undefined;
   const qtyFmt = new Intl.NumberFormat(locale, { maximumFractionDigits: 8 });
 
   // This position's market value ÷ the total market value of every holding in the active

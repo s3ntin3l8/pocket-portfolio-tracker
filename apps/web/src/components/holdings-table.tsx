@@ -48,8 +48,10 @@ function computeRowValues(h: HoldingValuation, currency: string, locale: string)
   const unavailable = pnlUnavailable(h);
   const pnl =
     !unavailable && h.unrealizedPnLDisplay !== null ? Number(h.unrealizedPnLDisplay) : null;
-  const costBasis = Number(h.costBasisDisplay);
-  const pct = pnl !== null && costBasis !== 0 ? (pnl / costBasis) * 100 : null;
+  // Null cost (an fxMissing row): there is no display-currency cost to take a percentage of.
+  const costBasis = h.costBasisDisplay === null ? null : Number(h.costBasisDisplay);
+  const pct =
+    pnl !== null && costBasis !== null && costBasis !== 0 ? (pnl / costBasis) * 100 : null;
   const native = (n: number) => formatMoney(n, h.currency ?? currency, locale);
   const display = (n: number) => formatMoney(n, currency, locale);
   return { pnl, pct, native, display };
@@ -122,7 +124,10 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
     (acc, h) => {
       if (h.marketValueDisplay !== null) acc.value += Number(h.marketValueDisplay);
       if (h.unrealizedPnLDisplay !== null) acc.pnl += Number(h.unrealizedPnLDisplay);
-      acc.cost += Number(h.costBasisDisplay);
+      // An fxMissing row has no display-currency cost: it stays out of the cost total (and so
+      // out of the percentage denominator) like it stays out of value and P&L.
+      // The flag is the authority (an older API still sent the native amount here).
+      if (!h.fxMissing && h.costBasisDisplay !== null) acc.cost += Number(h.costBasisDisplay);
       return acc;
     },
     {

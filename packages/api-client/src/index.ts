@@ -1163,8 +1163,8 @@ export interface HoldingValuation extends Holding {
   unrealizedPnL: string | null;
   /** Market value FX-converted to the display currency (null when unpriced). */
   marketValueDisplay: string | null;
-  /** Cost basis FX-converted to the display currency. */
-  costBasisDisplay: string;
+  /** Cost basis FX-converted to the display currency; null when the holding is `fxMissing`. */
+  costBasisDisplay: string | null;
   /** Unrealized P&L in the display currency (null when unpriced). */
   unrealizedPnLDisplay: string | null;
   /**

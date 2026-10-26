@@ -99,7 +99,9 @@ export function registerSparplanRoutes(app: FastifyInstance) {
       for (const h of summary.holdings) {
         if (h.marketValueDisplay !== null) {
           valueByInstrument.set(h.instrumentId, h.marketValueDisplay);
-        } else {
+        } else if (h.costBasisDisplay !== null) {
+          // Unpriced: weighted at cost. An `fxMissing` holding has neither figure in the display
+          // currency, so it carries no weight (its native cost must not stand in for one).
           valueByInstrument.set(h.instrumentId, h.costBasisDisplay);
         }
       }

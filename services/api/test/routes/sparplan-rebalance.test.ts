@@ -256,6 +256,67 @@ describe("sparplan rebalancing (Phase B)", () => {
     expect(Math.abs(totalSplit - Number(body.activeMonthlyTotalDisplay))).toBeLessThan(1);
   });
 
+  it("GET /portfolios/:id/sparplan gives a no-FX-rate holding no weight (its native cost is not a EUR amount)", async () => {
+    const t = await token("rb-fxmissing-1");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const pf = await createPortfolio(t, "Depot FX");
+    const mk = async (symbol: string, currency: string) =>
+      (
+        await app.db
+          .insert(instruments)
+          .values({ symbol, market: "XETRA", assetClass: "equity", currency, name: symbol })
+          .returning()
+      )[0]!;
+    const eur = await mk("RB-FXM-EUR", "EUR");
+    const cad = await mk("RB-FXM-CAD", "CAD");
+
+    // Both unpriced, so both are weighted at cost: 10 x 100 EUR = 1000 EUR, and 3 x 10 CAD (30 CAD)
+    // for which the app has no CAD->EUR rate. 30 must not be read as 30 EUR.
+    await postTx(t, pf, {
+      type: "buy",
+      instrumentId: eur.id,
+      quantity: "10",
+      price: "100",
+      currency: "EUR",
+      executedAt: "2026-01-10T10:00:00.000Z",
+    });
+    await postTx(t, pf, {
+      type: "buy",
+      instrumentId: cad.id,
+      quantity: "3",
+      price: "10",
+      currency: "CAD",
+      executedAt: "2026-01-10T10:00:00.000Z",
+    });
+    const put = await app.inject({
+      method: "PUT",
+      url: `/portfolios/${pf}/targets`,
+      headers: auth(t),
+      payload: {
+        dimension: "instrument",
+        targets: [
+          { key: eur.id, targetPct: 50 },
+          { key: cad.id, targetPct: 50 },
+        ],
+      },
+    });
+    expect(put.statusCode).toBe(200);
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${pf}/sparplan`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const drift = res.json().drift as { key: string; actualPct: number; actualValue: string }[];
+    const cadRow = drift.find((d) => d.key === cad.id)!;
+    const eurRow = drift.find((d) => d.key === eur.id)!;
+    // Weighted at nothing: not 30 / 1030 = 2.9%, which is what the native cost produced.
+    expect(cadRow.actualValue).toBe("0");
+    expect(cadRow.actualPct).toBe(0);
+    expect(eurRow.actualPct).toBe(100);
+  });
+
   it("GET /portfolios/:id/sparplan shows under-target drift when holding is imbalanced", async () => {
     const t = await token("rb-imbalanced-1");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) });

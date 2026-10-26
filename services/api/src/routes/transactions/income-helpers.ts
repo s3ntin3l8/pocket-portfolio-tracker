@@ -90,6 +90,7 @@ export async function buildIncomeStats(
     .filter(
       (h) =>
         h.marketValueDisplay !== null &&
+        h.costBasisDisplay !== null &&
         Number(h.marketValueDisplay) !== 0 &&
         Number(trailing[h.instrumentId] ?? 0) > 0,
     )
@@ -97,7 +98,7 @@ export async function buildIncomeStats(
       const trailingIncome = trailing[h.instrumentId] ?? "0";
       const im = meta.get(h.instrumentId);
       const marketValue = h.marketValueDisplay as string;
-      const costBasis = h.costBasisDisplay;
+      const costBasis = h.costBasisDisplay as string;
       return {
         instrumentId: h.instrumentId,
         symbol: im?.symbol ?? "—",

@@ -294,12 +294,43 @@ describe("HoldingsTable", () => {
       const noFx: HoldingValuation = {
         ...makeHolding("FXLESS", "10", "100"),
         marketValueDisplay: null,
+        costBasisDisplay: null,
         unrealizedPnLDisplay: null,
         fxMissing: true,
       };
       renderTable({ rows: [noFx, makeHolding("AAPL", "10", "1500")] });
       expect(screen.getAllByText("No FX rate").length).toBeGreaterThan(0);
       expect(screen.getAllByText(/1 holding with no exchange rate/).length).toBeGreaterThan(0);
+    });
+
+    describe("footer cost and percentage (#1161)", () => {
+      // One priced row: value 1000, cost 900, P&L +100 -> +11.11% on its own cost.
+      const priced: HoldingValuation = {
+        ...makeHolding("PRICED", "10", "90"),
+        marketValueDisplay: "1000",
+        costBasisDisplay: "900",
+        unrealizedPnLDisplay: "100",
+      };
+      const noFx = (costBasisDisplay: string | null): HoldingValuation => ({
+        ...makeHolding("FXLESS", "10", "90"),
+        marketValueDisplay: null,
+        costBasisDisplay,
+        unrealizedPnLDisplay: null,
+        fxMissing: true,
+      });
+      const footerText = () => totalRowsText().join(" | ");
+
+      it("leaves a no-rate row (null display cost) out of the percentage denominator", () => {
+        renderTable({ rows: [priced, noFx(null)] });
+        expect(footerText()).toMatch(/11\.11%/);
+      });
+
+      it("also ignores a no-rate row's cost when an older API still sent the native amount", () => {
+        // 900 of foreign cost must not land in a display-currency total: 100 / (900 + 900) = 5.56%.
+        renderTable({ rows: [priced, noFx("900")] });
+        expect(footerText()).toMatch(/11\.11%/);
+        expect(footerText()).not.toMatch(/5\.56%/);
+      });
     });
 
     it("does not badge a holding whose FX resolved", () => {
@@ -338,6 +369,7 @@ describe("HoldingsTable", () => {
       const noFx: HoldingValuation = {
         ...makeHolding("FXLESS", "10", "100"),
         marketValueDisplay: null,
+        costBasisDisplay: null,
         unrealizedPnLDisplay: null,
         fxMissing: true,
       };
