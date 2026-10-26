@@ -2,10 +2,11 @@
  * A candle carries the provider's own currency, which can differ from the instrument's
  * declared one — a USD-priced UCITS line on Xetra is declared EUR. The backfill must
  * (1) persist the candle's currency, (2) convert it with a real USD→EUR rate when
- * writing snapshots, and (3) when that rate is missing, skip the portfolio and warn
- * (the FX preflight) instead of throwing after the price rows are already committed.
+ * writing snapshots, and (3) when that rate is missing, exclude just that instrument's
+ * prices (valued at cost) and warn, instead of throwing after the price rows are already
+ * committed. A missing declared/transaction currency still skips the whole portfolio.
  */
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   fxRates,
@@ -111,10 +112,79 @@ describe("backfill — candle currency differs from the instrument's declared cu
     expect(Number(day!.marketValue)).toBe(20);
   });
 
-  it("skips the portfolio with a warning when the USD→EUR rate is missing, rather than throwing", async () => {
-    const { db, pf, svc } = await seed("nofx");
+  it("values only the unconvertible instrument at cost when its price currency has no rate", async () => {
+    const { db, pf } = await seed("nofx");
     // fx_rates is global: drop the rate the previous case seeded.
     await db.delete(fxRates).where(eq(fxRates.base, "USD"));
+    // A second EUR-priced holding in the same portfolio must keep getting snapshots.
+    const [eurInstr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "CCYEUR",
+        market: "XETRA",
+        assetClass: "etf",
+        currency: "EUR",
+        name: "Candle currency eur",
+      })
+      .returning();
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: eurInstr.id,
+      type: "buy",
+      quantity: "1",
+      price: "10",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date(`${START}T10:00:00.000Z`),
+    });
+    const eurProvider: MarketDataProvider = {
+      name: "eur-candles",
+      supports: () => true,
+      getQuote: async () => null,
+      getHistoryFrom: async (ref, fromDate) =>
+        ref.symbol !== "CCYEUR"
+          ? []
+          : DAYS.filter((d) => d >= fromDate).map((date) => ({
+              date,
+              close: "12",
+              currency: "EUR",
+            })),
+    };
+    const both = new MarketDataService([new UsdCandleProvider("CCYNOFX"), eurProvider]);
+
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      await backfillPortfolioHistory(db, both, 10_000, pf.id);
+      const warned = stderr.mock.calls.map((c) => String(c[0])).join("");
+      expect(warned).toContain("instrument excluded from pricing");
+      expect(warned).toContain('"currencies":["USD"]');
+    } finally {
+      stderr.mockRestore();
+    }
+
+    const snaps = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, pf.id));
+    const day = snaps.find((s) => s.date === "2026-08-03");
+    expect(day, "snapshot must still be written").toBeDefined();
+    // EUR holding at market (1 × 12) + the USD-quoting holding at cost (2 × 9).
+    expect(Number(day!.marketValue)).toBe(30);
+  });
+
+  it("still skips the portfolio when a transaction currency has no rate", async () => {
+    const { db, pf, instr, svc } = await seed("txfx");
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      type: "buy",
+      quantity: "1",
+      price: "10",
+      fees: "0",
+      currency: "GBP",
+      executedAt: new Date(`${START}T11:00:00.000Z`),
+    });
+    await db.delete(fxRates).where(eq(fxRates.base, "GBP"));
 
     await expect(backfillPortfolioHistory(db, svc, 10_000, pf.id)).resolves.toBeDefined();
 

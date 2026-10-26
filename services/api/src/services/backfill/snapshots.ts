@@ -87,7 +87,7 @@ export async function buildFlowDateFn(db: DB, instrIds: string[]): Promise<FlowD
 export async function writeSnapshotSeries(
   db: DB,
   ctx: BackfillContext,
-  rawPrices: RawPriceMap,
+  allRawPrices: RawPriceMap,
   flowDateOf: FlowDateFn,
 ): Promise<number> {
   const { portfolioId, txRows, cashCounted, startDate, today, instrRows, instrById, coreCas } = ctx;
@@ -106,7 +106,7 @@ export async function writeSnapshotSeries(
   // instrument's declared one (a USD-priced line declared EUR) — it needs a rate too, or
   // convert() throws mid-run and the preflight below can't see the gap.
   const priceCurrencies = [
-    ...new Set([...rawPrices.values()].flatMap((m) => [...m.values()].map((p) => p.currency))),
+    ...new Set([...allRawPrices.values()].flatMap((m) => [...m.values()].map((p) => p.currency))),
   ];
   const allCcys = [...new Set([...allCurrencies, ...txCurrencies, ...priceCurrencies])];
 
@@ -121,10 +121,16 @@ export async function writeSnapshotSeries(
 
   // Missing FX (audit B2): never write a 1:1 value. getFxRatesForDates carries a rate
   // forward/back over the whole grid, so a currency is either convertible on every day
-  // or on none — a missing one means every day's value is incomplete, so the run writes
-  // nothing (existing snapshots stay as they were) and logs once for the run, not per day.
-  const fxMissing = allCcys.filter(
-    (c) => c && c !== baseCurrency && !dateGrid.some((day) => fxByDate.get(day)?.[c]),
+  // or on none. A missing declared/transaction currency makes every day's value
+  // incomplete, so the run writes nothing (existing snapshots stay as they were) and logs
+  // once for the run, not per day.
+  const unconvertible = new Set(
+    allCcys.filter(
+      (c) => c && c !== baseCurrency && !dateGrid.some((day) => fxByDate.get(day)?.[c]),
+    ),
+  );
+  const fxMissing = [...unconvertible].filter(
+    (c) => allCurrencies.includes(c) || txCurrencies.includes(c),
   );
   if (fxMissing.length > 0) {
     process.stderr.write(
@@ -138,6 +144,31 @@ export async function writeSnapshotSeries(
       }) + "\n",
     );
     return 0;
+  }
+
+  // A currency missing only on some instrument's price rows (a provider quoting in a
+  // currency the FX source can't publish) excludes just that instrument's prices: it then
+  // has no priced history and falls to the cost-basis path, instead of freezing the
+  // snapshots of every other holding in the portfolio (#1179).
+  const rawPrices: RawPriceMap = new Map();
+  const excluded: { instrumentId: string; currencies: string[] }[] = [];
+  for (const [instrId, dateMap] of allRawPrices) {
+    const bad = [
+      ...new Set([...dateMap.values()].map((p) => p.currency).filter((c) => unconvertible.has(c))),
+    ];
+    if (bad.length > 0) excluded.push({ instrumentId: instrId, currencies: bad.sort() });
+    else rawPrices.set(instrId, dateMap);
+  }
+  if (excluded.length > 0) {
+    process.stderr.write(
+      JSON.stringify({
+        level: "warn",
+        msg: "backfill: instrument excluded from pricing, FX rate missing",
+        portfolioId,
+        baseCurrency,
+        instruments: excluded,
+      }) + "\n",
+    );
   }
 
   function kindOf(instrId: string): PriceSeriesKind {
@@ -244,7 +275,7 @@ export async function writeSnapshotSeries(
     const fx = fxAt(flow.date);
     // Same cash/liabilities definition the live valuation writes into this row
     // (audit B6): cash only when inside the boundary AND tracked as of that day, loans
-    // subtracted. FX is all-or-nothing for the run (checked above), so every currency
+    // subtracted. FX is all-or-nothing for the run (checked above), so every remaining currency
     // converts here.
     const { convertibleCash, liabilities } = netWorthInputs({
       transactions: txByTime.slice(0, txUpTo),

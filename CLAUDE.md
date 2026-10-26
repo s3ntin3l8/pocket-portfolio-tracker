@@ -178,7 +178,9 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   `fxAvailable`/`tryConvert` — and the response is a 200 carrying `fxMissingCurrencies` (top-level
   on object responses, plus the `x-fx-missing-currencies` header on every shape; cached
   derivations replay it). The web shows `FxMissingBanner` when it's non-empty. The daily/intraday
-  snapshot jobs and the backfill skip a portfolio rather than persist a partial value (#816).
+  snapshot jobs and the backfill skip a portfolio rather than persist a partial value (#816) — except a
+  currency missing only on one instrument's price rows, which drops just that instrument's prices (valued
+  at cost, #1179).
   `convert()` still throws `FxRateMissingError` as a last resort — reaching it is a bug (logged).
   Never add a `?? "1"` fallback.
   **A read-scoped PAT loads FX from cached rates only** (audit A7): no provider fetch, no
