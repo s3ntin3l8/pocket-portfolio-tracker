@@ -7,6 +7,8 @@ import type { Ledger } from "../ledger.js";
 //
 // Value = 10 × 100 USD × 0.90 = 900 EUR, converted at today's rate (the valuation's date).
 // Cost is converted at the same rate, so a flat price shows no unrealized gain: 900 − 900 = 0.
+// The contribution walk converts at today's rate too (not the 0.80 flow-date rate), so with the
+// depot's cash outside the boundary, net contributed = 1000 USD × 0.90 = 900.
 export const usdFx: Ledger = {
   name: "usd-fx",
   asOf: "2026-06-30T12:00:00.000Z",
@@ -39,4 +41,9 @@ export const usdFx: Ledger = {
   ],
 };
 
-export const usdFxExpected = { value: "900", costOfOpen: "900", unrealized: "0" };
+export const usdFxExpected = {
+  value: "900",
+  costOfOpen: "900",
+  unrealized: "0",
+  netContributed: "900",
+};

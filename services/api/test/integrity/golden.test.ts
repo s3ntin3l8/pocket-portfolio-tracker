@@ -13,6 +13,7 @@ import { transfers, transfersExpected } from "./ledgers/transfers.js";
 import { split, splitExpected } from "./ledgers/split.js";
 import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
+import { fxCarry, fxCarryExpected, fxStale, fxStaleExpected } from "./ledgers/fx-carry.js";
 
 // Golden ledgers: fixed-date scenarios, hand-derived expectations (see ledger.ts). The clock is
 // frozen at each ledger's `asOf` (Date only, so PGlite/Fastify timers keep running) because route
@@ -144,6 +145,7 @@ describe("usd-fx", () => {
     const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
     expect(s.fxMissingCurrencies).toEqual([]);
     expectDecimal(s.netWorth, usdFxExpected.value, "netWorth", ROUNDING);
+    expect(s.gain.boundary).toBe("outside");
     expectGain(s.gain, usdFxExpected, "gain");
   });
 });
@@ -166,11 +168,31 @@ describe("degraded", () => {
     expect(s.fxMissingCurrencies).toEqual(degradedExpected.fxMissingCurrencies);
     expect(res.headers["x-fx-missing-currencies"]).toContain("CAD");
     expectDecimal(s.netWorth, degradedExpected.netWorth, "netWorth", ROUNDING);
+    for (const [k, v] of Object.entries(degradedExpected.totals)) {
+      expectDecimal(s[k], v, k, ROUNDING);
+    }
 
     const byId = new Map<string, Record<string, unknown>>(
       s.holdings.map((h: { instrumentId: string }) => [h.instrumentId, h]),
     );
     expect(byId.get(l.instrumentIds.noq)?.valuedAtCost).toBe(true);
     expect(byId.get(l.instrumentIds.cad)?.fxMissing).toBe(true);
+  });
+});
+
+describe.each([
+  ["fx-carry (rate 5 days old: carried forward)", fxCarry, fxCarryExpected],
+  ["fx-stale (rate 15 days old: missing, never today's)", fxStale, fxStaleExpected],
+])("%s", (_name, ledger, expected) => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(ledger.asOf) });
+    l = await loadLedger(app, sign, ledger);
+  }, 60_000);
+
+  it("converts only with a rate inside the carry-forward window", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expect(s.fxMissingCurrencies).toEqual(expected.fxMissingCurrencies);
+    expectDecimal(s.netWorth, expected.netWorth, "netWorth", ROUNDING);
   });
 });

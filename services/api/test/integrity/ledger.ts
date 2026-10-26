@@ -137,6 +137,9 @@ export async function loadLedger(
     }
   }
 
+  // `fx_rates` rows are global (unlike instruments, not namespaced per ledger) and persist for
+  // every later scenario in the file. A ledger that needs a pair to be absent or stale must use
+  // a currency no earlier ledger quotes, or it becomes dependent on run order.
   for (const r of ledger.fx ?? []) {
     await app.db.insert(fxRates).values(r);
   }

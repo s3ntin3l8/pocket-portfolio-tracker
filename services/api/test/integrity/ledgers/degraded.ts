@@ -6,7 +6,8 @@ import type { Ledger } from "../ledger.js";
 //   CADCO  CAD, quote 12, but no CAD→EUR rate: excluded from every total (flagged fxMissing),
 //          and "CAD" is disclosed in fxMissingCurrencies — never treated as 1 CAD = 1 EUR.
 //
-// net worth = 100 (NOQ only).
+// net worth = 100 (NOQ only). A valued-at-cost holding advances cost and market value together
+// (#744), so totalCost = totalMarketValue = 100 and totalUnrealizedPnL = 0.
 export const degraded: Ledger = {
   name: "degraded",
   asOf: "2026-06-30T12:00:00.000Z",
@@ -51,4 +52,8 @@ export const degraded: Ledger = {
   ],
 };
 
-export const degradedExpected = { netWorth: "100", fxMissingCurrencies: ["CAD"] };
+export const degradedExpected = {
+  netWorth: "100",
+  totals: { totalCost: "100", totalMarketValue: "100", totalUnrealizedPnL: "0" },
+  fxMissingCurrencies: ["CAD"],
+};
