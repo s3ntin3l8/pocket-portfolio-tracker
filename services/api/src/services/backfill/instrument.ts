@@ -232,7 +232,8 @@ export async function fetchInstrumentPrices(
   const truncated = candles[0]!.date > firstHeldKey;
   for (const c of candles) {
     if (c.date >= chunkStart && c.date <= chunkEnd) {
-      instrPrices.set(c.date, { close: c.close, currency: instr.currency });
+      // Provider currency wins over the instrument's declared one (see core.ts).
+      instrPrices.set(c.date, { close: c.close, currency: c.currency ?? instr.currency });
     }
   }
 
