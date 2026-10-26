@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Decimal } from "decimal.js";
+import { eq } from "drizzle-orm";
+import { corporateActions } from "@portfolio/db";
 import { closeDb } from "../../src/db/client.js";
 import {
   buildIntegrityApp,
@@ -336,6 +338,19 @@ describe("merger", () => {
     // The engine cross-checks a pre-priced pair against the merger row's `taxableMarketValue` and
     // writes a structured warning to stderr on a mismatch (it never fails the request). A
     // consistent ledger must stay silent; with the row at a wrong value this emits warnings.
+    // Guard the premise: the cross-check below is only meaningful if the row is really there.
+    const rows = await app.db
+      .select()
+      .from(corporateActions)
+      .where(eq(corporateActions.instrumentId, l.instrumentIds.a!));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      type: "merger",
+      targetInstrumentId: l.instrumentIds.b,
+      portfolioId: l.portfolioIds.depot,
+      taxableMarketValue: "1500",
+    });
+
     const writes: string[] = [];
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
       writes.push(String(chunk));
@@ -394,6 +409,37 @@ describe("mixed-boundary", () => {
     expect(nw.gain.boundary).toBe(boundary);
     expectGain(nw.gain, figures, "gain[all]");
     expectDecimal(nw.netWorth, figures.value, "netWorth", ROUNDING);
+  });
+});
+
+describe("loadLedger", () => {
+  // Several target columns are nullable, so an unknown symbolic key must fail loudly instead of
+  // inserting NULL and leaving a scenario that silently no longer tests what it claims to.
+  const bad = (over: Record<string, unknown>) =>
+    ({
+      ...eurBasic,
+      name: `bad-key-${Math.random().toString(36).slice(2)}`,
+      ...over,
+    }) as typeof eurBasic;
+
+  it("rejects a transaction that names an unknown instrument", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(eurBasic.asOf) });
+    const l = bad({
+      transactions: [{ ...eurBasic.transactions[0]!, instrument: "nope" }],
+    });
+    await expect(loadLedger(app, sign, l)).rejects.toThrow(/unknown transaction instrument "nope"/);
+  });
+
+  it("rejects a merger row that names an unknown target", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(merger.asOf) });
+    const l = bad({
+      ...merger,
+      name: `bad-target-${Math.random().toString(36).slice(2)}`,
+      corporateActions: [{ ...merger.corporateActions![0]!, target: "nope" }],
+    });
+    await expect(loadLedger(app, sign, l)).rejects.toThrow(
+      /unknown merger target instrument "nope"/,
+    );
   });
 });
 

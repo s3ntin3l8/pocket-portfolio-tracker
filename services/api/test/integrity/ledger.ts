@@ -128,6 +128,16 @@ export async function buildIntegrityApp() {
   return { app, sign };
 }
 
+/**
+ * Resolve a symbolic key. Several target columns are nullable, so a typo'd key would otherwise
+ * insert NULL and the scenario would silently stop exercising what it was written for.
+ */
+function need(ids: Record<string, string>, key: string, what: string): string {
+  const id = ids[key];
+  if (!id) throw new Error(`ledger: unknown ${what} "${key}"`);
+  return id;
+}
+
 /** Insert a ledger for a fresh user; the caller must have frozen the clock at `ledger.asOf`. */
 export async function loadLedger(
   app: App,
@@ -197,14 +207,14 @@ export async function loadLedger(
   }
   for (const c of ledger.corporateActions ?? []) {
     await app.db.insert(corporateActions).values({
-      instrumentId: instrumentIds[c.instrument]!,
+      instrumentId: need(instrumentIds, c.instrument, "corporate action instrument"),
       type: c.type,
       ratio: c.ratio,
       exDate: c.exDate,
       ...(c.type === "merger"
         ? {
-            portfolioId: portfolioIds[c.portfolio]!,
-            targetInstrumentId: instrumentIds[c.target]!,
+            portfolioId: need(portfolioIds, c.portfolio, "merger portfolio"),
+            targetInstrumentId: need(instrumentIds, c.target, "merger target instrument"),
             ratioTo: c.ratioTo,
             taxableMarketValue: c.taxableMarketValue ?? null,
           }
@@ -214,8 +224,10 @@ export async function loadLedger(
 
   await app.db.insert(transactions).values(
     ledger.transactions.map((t) => ({
-      portfolioId: portfolioIds[t.portfolio]!,
-      instrumentId: t.instrument ? instrumentIds[t.instrument]! : null,
+      portfolioId: need(portfolioIds, t.portfolio, "transaction portfolio"),
+      instrumentId: t.instrument
+        ? need(instrumentIds, t.instrument, "transaction instrument")
+        : null,
       type: t.type,
       quantity: t.quantity ?? "0",
       price: t.price ?? "0",
