@@ -46,6 +46,8 @@ export interface LedgerTx {
   price?: string;
   fees?: string;
   tax?: string;
+  /** Sub-type tag, e.g. "merger" on both legs of a fund merger pair. */
+  kind?: string;
   currency: string;
   at: string;
 }
@@ -195,6 +197,7 @@ export async function loadLedger(
       price: t.price ?? "0",
       fees: t.fees ?? "0",
       tax: t.tax ?? null,
+      kind: t.kind ?? null,
       currency: t.currency,
       executedAt: new Date(t.at),
     })),

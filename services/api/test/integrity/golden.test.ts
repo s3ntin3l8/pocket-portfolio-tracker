@@ -16,6 +16,8 @@ import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
 import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
 import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
+import { merger, mergerExpected } from "./ledgers/merger.js";
+import { mixedBoundary, mixedBoundaryExpected } from "./ledgers/mixed-boundary.js";
 import { deTaxSlice, deTaxSliceExpected } from "./ledgers/de-tax-slice.js";
 import { anomalies, anomaliesExpected } from "./ledgers/anomalies.js";
 import { metaBase, metaBaseExpected } from "./ledgers/meta-base.js";
@@ -317,5 +319,69 @@ describe("de-tax-slice: the depot's slice, not the holder's cap, is the allowanc
     expectDecimal(t.holderDistribution.holderAllowanceCap, e.holderAllowanceCap, "cap");
     expectDecimal(t.holderDistribution.totalAllocated, e.totalAllocated, "totalAllocated");
     expect(t.holderDistribution.overAllocated).toBe(true);
+  });
+});
+
+describe("merger", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(merger.asOf) });
+    l = await loadLedger(app, sign, merger);
+  }, 60_000);
+
+  it("realizes the step-up on the sale leg, carries the new basis, and stays contribution-neutral", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expect(s.gain.boundary).toBe("outside");
+    expectGain(s.gain, mergerExpected, "gain");
+  });
+
+  it("opens the new fund and leaves the old one closed with the realized step-up", async () => {
+    const h = await get(l, `/portfolios/${l.portfolioIds.depot}/holdings`);
+    const by = new Map<string, { quantity: string; realizedPnL: string }>(
+      h.holdings.map((x: { instrumentId: string; quantity: string; realizedPnL: string }) => [
+        x.instrumentId,
+        x,
+      ]),
+    );
+    expectDecimal(by.get(l.instrumentIds.b!)!.quantity, "20", "FUNDB quantity");
+    // The closed position stays listed (it carries the realized P&L): 10 × 150 − 1,000 = 500.
+    expectDecimal(by.get(l.instrumentIds.a!)!.quantity, "0", "FUNDA quantity");
+    expectDecimal(by.get(l.instrumentIds.a!)!.realizedPnL, "500", "FUNDA realized");
+  });
+});
+
+describe("mixed-boundary", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(mixedBoundary.asOf) });
+    l = await loadLedger(app, sign, mixedBoundary);
+  }, 60_000);
+
+  it("keeps each portfolio on its own boundary", async () => {
+    for (const key of ["savings", "depot"] as const) {
+      const { boundary, ...figures } = mixedBoundaryExpected[key];
+      const s = await get(l, `/portfolios/${l.portfolioIds[key]}/summary`);
+      expect(s.gain.boundary, `${key} boundary`).toBe(boundary);
+      expectGain(s.gain, figures, `gain[${key}]`);
+    }
+  });
+
+  it("sums the same-boundary pairs and reports the aggregate as mixed", async () => {
+    const { boundary, ...figures } = mixedBoundaryExpected.all;
+    const nw = await get(l, "/networth");
+    expect(nw.gain.boundary).toBe(boundary);
+    expectGain(nw.gain, figures, "gain[all]");
+    expectDecimal(nw.netWorth, figures.value, "netWorth", ROUNDING);
+  });
+});
+
+describe("aggregate boundary on single-boundary ledgers", () => {
+  it("cash-inside: /networth carries the inside boundary and the same figures", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(cashInside.asOf) });
+    const l = await loadLedger(app, sign, cashInside, "aggregate-cash-inside");
+    const nw = await get(l, "/networth");
+    expect(nw.gain.boundary).toBe("inside");
+    expectDecimal(nw.netWorth, cashInsideExpected.value, "netWorth", ROUNDING);
+    expectGain(nw.gain, cashInsideExpected, "gain[all]");
   });
 });
