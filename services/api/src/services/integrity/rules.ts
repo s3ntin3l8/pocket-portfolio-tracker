@@ -432,31 +432,31 @@ export function checkHistoryOrdered(b: IntegrityBodies): Finding[] {
 }
 
 /**
- * The aggregate history at a date is the sum of that date's portfolio snapshots, each converted
- * at that date's rate. When every portfolio is already in the display currency no conversion
- * is involved, so the aggregate must equal the plain sum of the per-portfolio series (a
- * portfolio contributes only on the dates it has a snapshot). Abstains when any portfolio is in
- * another currency or its history was not collected.
+ * The aggregate history's `netWorth` at a date is the plain sum of that date's portfolio
+ * snapshots (a portfolio contributes only on the dates it has one), each converted at that
+ * date's rate; with every portfolio already in the display currency no conversion is involved.
+ * Abstains when any portfolio is in another currency or its history was not collected.
+ *
+ * Only `netWorth` is compared. The aggregate's `marketValue` comes from `aggregateValueFlows`,
+ * which by design carries a leg's last known value forward on a date it has no row for (and
+ * substitutes one it judges implausible), so it is NOT a plain per-date sum: on an ordinary
+ * account with a mid-series gap (e.g. a portfolio skipped for a missing FX rate) the two differ.
  */
 export function checkHistorySumsPortfolios(b: IntegrityBodies): Finding[] {
   if (b.portfolios.length === 0 || b.portfolios.some((p) => p.history === null)) return [];
   if (b.portfolios.some((p) => p.summary.displayCurrency !== b.networth.displayCurrency)) return [];
 
-  const expected = new Map<string, { netWorth: Decimal; marketValue: Decimal }>();
+  const expected = new Map<string, Decimal>();
   for (const p of b.portfolios) {
     for (const pt of p.history!) {
-      const e = expected.get(pt.date) ?? { netWorth: new Decimal(0), marketValue: new Decimal(0) };
-      e.netWorth = e.netWorth.add(pt.netWorth);
-      e.marketValue = e.marketValue.add(pt.marketValue);
-      expected.set(pt.date, e);
+      expected.set(pt.date, (expected.get(pt.date) ?? new Decimal(0)).add(pt.netWorth));
     }
   }
   const actual = new Map(b.networthHistory.map((pt) => [pt.date, pt]));
   const dates = [...new Set([...expected.keys(), ...actual.keys()])].sort();
 
   const out: Finding[] = [];
-  // Capped by differing DATES (a date can carry a netWorth and a marketValue finding), so a
-  // systematic defect does not bury the report in hundreds of rows.
+  // Capped by differing DATES, so a systematic defect does not bury the report in hundreds of rows.
   let datesListed = 0;
   let skipped = 0;
   const push = (f: Finding[]) => {
@@ -485,22 +485,15 @@ export function checkHistorySumsPortfolios(b: IntegrityBodies): Finding[] {
       ]);
       continue;
     }
-    push([
-      ...compare(
+    push(
+      compare(
         "HISTORY_SUMS_PORTFOLIOS",
         "networth",
         `${date}: aggregate netWorth differs from the sum of the portfolio histories`,
-        e.netWorth,
+        e,
         new Decimal(a.netWorth),
       ),
-      ...compare(
-        "HISTORY_SUMS_PORTFOLIOS",
-        "networth",
-        `${date}: aggregate marketValue differs from the sum of the portfolio histories`,
-        e.marketValue,
-        new Decimal(a.marketValue),
-      ),
-    ]);
+    );
   }
   if (skipped > 0) {
     out.push({

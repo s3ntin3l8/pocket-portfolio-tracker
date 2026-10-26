@@ -423,12 +423,11 @@ describe("history", () => {
   const points = (body: { date: string; netWorth: string; marketValue: string }[]) =>
     body.map((p) => ({ date: p.date, netWorth: p.netWorth, marketValue: p.marketValue }));
 
-  it("the aggregate sums each date's snapshots; a portfolio counts only where it has one", async () => {
+  it("the aggregate netWorth sums each date's snapshots; a portfolio counts only where it has one, and a hole is not filled", async () => {
     const agg = points(await get(l, "/networth/history?range=all"));
-    expect(agg.map((p) => p.date)).toEqual(historyExpected.aggregate.map((p) => p.date));
-    for (const [i, e] of historyExpected.aggregate.entries()) {
+    expect(agg.map((p) => p.date)).toEqual(historyExpected.aggregateNetWorth.map((p) => p.date));
+    for (const [i, e] of historyExpected.aggregateNetWorth.entries()) {
       expectDecimal(agg[i]!.netWorth, e.netWorth, `${e.date} netWorth`);
-      expectDecimal(agg[i]!.marketValue, e.marketValue, `${e.date} marketValue`);
     }
   });
 
@@ -437,6 +436,7 @@ describe("history", () => {
     expect(b.map((p) => p.date)).toEqual(historyExpected.b.map((p) => p.date));
     for (const [i, e] of historyExpected.b.entries()) {
       expectDecimal(b[i]!.netWorth, e.netWorth, `${e.date} netWorth`);
+      expectDecimal(b[i]!.marketValue, e.marketValue, `${e.date} marketValue`);
     }
   });
 });

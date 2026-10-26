@@ -123,9 +123,10 @@ async function collectParity(
  * caller's own auth — the same rule code runs against the same serialized responses.
  *
  * Cost: per portfolio this is the summary plus the contributions, trades and anomalies
- * endpoints, and the aggregate adds the same three, all drawn from the caller's own rate-limit
- * bucket and valuation work (`/portfolios/:id/contributions` has no derivation cache). On a big
- * account a 429/502 from here is this fan-out, not a data problem.
+ * endpoints (and its history series when every portfolio is in the display currency), and the
+ * aggregate adds the same three plus `/networth/history`, all drawn from the caller's own
+ * rate-limit bucket and valuation work (`/portfolios/:id/contributions` has no derivation
+ * cache). On a big account a 429/502 from here is this fan-out, not a data problem.
  */
 export async function collectBodies(
   get: (url: string) => Promise<unknown>,

@@ -289,6 +289,24 @@ describe("integrity rules", () => {
     expect(rules(b)).toContain("HISTORY_SUMS_PORTFOLIOS");
   });
 
+  it("HISTORY_SUMS_PORTFOLIOS: marketValue is not compared (the aggregate carries a gap leg forward)", () => {
+    // p1 has no row on the 29th; the aggregate carries its last marketValue forward by design,
+    // so it differs from the plain per-date sum while netWorth still equals it.
+    const b = bodies();
+    b.portfolios.push({
+      id: "p2",
+      summary: valuation(),
+      parity: parity(),
+      history: [{ date: "2026-06-29", netWorth: "500", marketValue: "500" }],
+    });
+    b.portfolios[0]!.history = [{ date: "2026-06-30", netWorth: "1260", marketValue: "1260" }];
+    b.networthHistory = [
+      { date: "2026-06-29", netWorth: "500", marketValue: "1700" }, // 500 + p1's 1200 carried
+      { date: "2026-06-30", netWorth: "1260", marketValue: "1260" },
+    ];
+    expect(rules(b)).not.toContain("HISTORY_SUMS_PORTFOLIOS");
+  });
+
   it("HISTORY_SUMS_PORTFOLIOS: a date only one side has is a finding", () => {
     const b = bodies();
     b.networthHistory.pop();
@@ -314,8 +332,8 @@ describe("integrity rules", () => {
     b.networthHistory = dates.map((date) => ({ date, netWorth: "1", marketValue: "1" }));
     b.portfolios[0]!.history = dates.map((date) => ({ date, netWorth: "2", marketValue: "2" }));
     const hist = checkIntegrity(b).filter((x) => x.rule === "HISTORY_SUMS_PORTFOLIOS");
-    // 5 listed dates x (netWorth + marketValue), then the count of the other 4 dates.
-    expect(hist).toHaveLength(11);
+    // 5 listed dates, then the count of the other 4 dates.
+    expect(hist).toHaveLength(6);
     expect(hist.at(-1)!.actual).toBe("4 more date(s) differ");
   });
 });
