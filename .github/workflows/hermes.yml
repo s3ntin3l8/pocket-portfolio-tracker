@@ -7,7 +7,7 @@ name: Hermes (review)
 #      an issue) any time you want another look -- including every follow-up
 #      after the initial auto-review.
 # Both call the same reusable workflow (s3ntin3l8/.github/.github/workflows/
-# hermes-review.yml@main) with a different `mode`, gated by github.event_name
+# hermes-review.yml@8957219ed8c28f90559cff917853542102011458 # main @ 2026-10-25
 # so each job only runs for its own trigger.
 #
 # IMPORTANT: do NOT add `synchronize` back. It re-triggers a fresh review on
@@ -27,7 +27,8 @@ name: Hermes (review)
 # own head ref, so a fork PR can edit or delete the `head.repo.full_name` guard
 # below (or re-point `uses:`). That guard is therefore NOT the trust boundary; it
 # only catches accidents. The real control is the repo setting Settings ->
-# Actions -> General -> "Require approval for all outside collaborators", which
+# Actions -> General -> "Require approval for all outside collaborators"
+# (tracked in s3ntin3l8/.github#139), which
 # must stay on: the runner (filesystem, LAN access) is what is at stake, not the
 # token (fork PRs get no secrets and a read-only token). The on-demand path is
 # unaffected: `issue_comment` always runs the DEFAULT BRANCH's copy of this file,
@@ -65,7 +66,7 @@ jobs:
       !startsWith(github.event.pull_request.head.ref, 'mullion/task-')
     permissions:
       contents: read # all gh calls in the callee use the Hermes App token
-    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@8957219ed8c28f90559cff917853542102011458 # main @ 2026-10-25
     with:
       mode: auto # review on trigger, no @mention needed
       mention-trigger: s3ntin3l8-hermes
@@ -89,7 +90,7 @@ jobs:
       contains(fromJSON('["MEMBER", "OWNER", "COLLABORATOR"]'), github.event.comment.author_association)
     permissions:
       contents: read # all gh calls in the callee use the Hermes App token
-    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@8957219ed8c28f90559cff917853542102011458 # main @ 2026-10-25
     with:
       mention-trigger: s3ntin3l8-hermes # mode: on-demand is the reusable workflow's default
       # See the auto-review job above: poll the run instead of firing and
