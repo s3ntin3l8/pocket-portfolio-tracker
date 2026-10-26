@@ -1,6 +1,7 @@
 import { upsertPriceRows } from "./price-upsert.js";
 import { eq, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
+import { MAX_PRICE_CARRY_FORWARD_DAYS } from "@portfolio/core";
 import { instruments, scrapedQuotes } from "@portfolio/db";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
@@ -199,6 +200,7 @@ export async function fetchInstrumentPrices(
     // (`allowMaxFallback: !opts.tailOnly`).
     candles = await marketData.getHistoryFrom(ref, chunkStart, {
       allowMaxFallback: !tailOnly,
+      gapFillDays: MAX_PRICE_CARRY_FORWARD_DAYS, // see core.ts
     });
   } catch (err) {
     fetchError = err instanceof Error ? err : new Error(String(err));

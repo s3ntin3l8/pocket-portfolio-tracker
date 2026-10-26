@@ -2,7 +2,7 @@ import { upsertPriceRows } from "./price-upsert.js";
 import { and, eq, gte, inArray, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { instruments, prices, scrapedQuotes } from "@portfolio/db";
-import { toDateKey } from "@portfolio/core";
+import { MAX_PRICE_CARRY_FORWARD_DAYS, toDateKey } from "@portfolio/core";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { BUYBACK_GOLD_MARKETS, isBuybackGoldMarket } from "../scrapers/store.js";
@@ -197,6 +197,9 @@ export async function backfillPortfolioHistory(
     try {
       candles = await marketData.getHistoryFrom(ref, fetchFrom, {
         allowMaxFallback: !opts.tailOnly,
+        // A hole longer than the carry-forward window would value the holding at 0/cost
+        // for the gap, so patch it from the fallback providers (e.g. JustETF).
+        gapFillDays: MAX_PRICE_CARRY_FORWARD_DAYS,
       });
     } catch (err) {
       // Issue #749 — a throw here (network error, rate limit, auth failure) is a

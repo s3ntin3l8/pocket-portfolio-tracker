@@ -6,6 +6,7 @@ import {
   isIsin,
   isWkn,
   FixtureProvider,
+  findGaps,
   MarketDataError,
   MarketDataService,
   TwelveDataProvider,
@@ -483,6 +484,117 @@ describe("MarketDataService", () => {
         currency: "EUR",
       }),
     ).toBeNull();
+  });
+
+  describe("getHistoryFrom gap-fill across providers", () => {
+    const etf = { symbol: "MWOF", market: "XETRA", assetClass: "etf" as const, currency: "EUR" };
+    const day = (n: number) => new Date(Date.UTC(2026, 7, n)).toISOString().slice(0, 10);
+
+    const primary: MarketDataProvider = {
+      name: "primary",
+      supports: () => true,
+      // Aug 1–5, then a 25-day hole, then Aug 31 – Sep 2. Native USD.
+      getHistoryFrom: async () =>
+        [1, 2, 3, 4, 5, 31, 32, 33].map((n) => ({ date: day(n), close: "100", currency: "USD" })),
+    };
+    const fallback = (calls: string[], stamp?: string): MarketDataProvider => ({
+      name: "fallback",
+      supports: () => true,
+      getHistoryFrom: async (r, from) => {
+        calls.push(`${from}|${r.currency}`);
+        // Covers everything, including days the primary already has (must not override).
+        return Array.from({ length: 33 }, (_, i) => ({
+          date: day(i + 1),
+          close: "7",
+          currency: stamp ?? r.currency,
+        })).filter((c) => c.date >= from);
+      },
+    });
+
+    it("patches a hole longer than gapFillDays from a later provider, primary wins on overlap", async () => {
+      const calls: string[] = [];
+      const svc = new MarketDataService([primary, fallback(calls)]);
+      const candles = await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      const byDate = new Map(candles.map((c) => [c.date, c]));
+      // The hole (Aug 6 – Aug 30) is filled by the fallback, in the primary's currency…
+      expect(byDate.get(day(6))).toMatchObject({ close: "7", currency: "USD" });
+      expect(byDate.get(day(30))).toMatchObject({ close: "7", currency: "USD" });
+      // …and the primary's candles are untouched.
+      expect(byDate.get(day(3))).toMatchObject({ close: "100", currency: "USD" });
+      expect(byDate.get(day(31))).toMatchObject({ close: "100", currency: "USD" });
+      expect(calls).toEqual([`${day(6)}|USD`]); // asked only from the first hole, in USD
+      expect(candles.map((c) => c.date)).toEqual([...candles.map((c) => c.date)].sort());
+    });
+
+    it("does nothing without gapFillDays or when the primary has no long hole", async () => {
+      const calls: string[] = [];
+      const svc = new MarketDataService([primary, fallback(calls)]);
+      expect(await svc.getHistoryFrom(etf, day(1))).toHaveLength(8);
+      expect(calls).toEqual([]);
+      // A threshold above the 26-day hole (and today is far past Sep 2, so the trailing
+      // stretch is also a "gap" — use a huge threshold to ignore both).
+      expect(await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10_000 })).toHaveLength(8);
+      expect(calls).toEqual([]);
+    });
+
+    it("drops fallback candles in a different currency so the series stays single-currency", async () => {
+      const svc = new MarketDataService([primary, fallback([], "EUR")]);
+      const candles = await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      expect(candles).toHaveLength(8);
+      expect(new Set(candles.map((c) => c.currency))).toEqual(new Set(["USD"]));
+    });
+
+    it("does not re-ask a fallback that added nothing for the same hole", async () => {
+      const calls: string[] = [];
+      const empty: MarketDataProvider = {
+        name: "empty",
+        supports: () => true,
+        getHistoryFrom: async (_r, from) => {
+          calls.push(from);
+          return [];
+        },
+      };
+      const svc = new MarketDataService([primary, empty]);
+      await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      expect(calls).toEqual([day(6)]);
+    });
+
+    it("backs off a fallback that throws instead of re-asking it on every call", async () => {
+      let asks = 0;
+      const blocked: MarketDataProvider = {
+        name: "blocked",
+        supports: () => true,
+        getHistoryFrom: async () => {
+          asks++;
+          throw new Error("429");
+        },
+      };
+      const errors: string[] = [];
+      const svc = new MarketDataService([primary, blocked], {
+        onProviderError: (p) => errors.push(p),
+      });
+      await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      expect(asks).toBe(1);
+      expect(errors).toEqual(["blocked"]);
+    });
+
+    it("returns the primary series when the fallback throws", async () => {
+      const boom: MarketDataProvider = {
+        name: "boom",
+        supports: () => true,
+        getHistoryFrom: async () => {
+          throw new Error("503");
+        },
+      };
+      const errors: string[] = [];
+      const svc = new MarketDataService([primary, boom], {
+        onProviderError: (p) => errors.push(p),
+      });
+      expect(await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 })).toHaveLength(8);
+      expect(errors).toContain("boom");
+    });
   });
 
   describe("getHistoryFrom max-range fallback (#737)", () => {
@@ -3316,5 +3428,35 @@ describe("FixtureProvider quote timestamp", () => {
       bbca,
     );
     expect(fixed!.asOf).toBe("2026-02-08T00:00:00.000Z");
+  });
+});
+
+describe("findGaps", () => {
+  it("returns nothing for no dates", () => {
+    expect(findGaps([], "2026-09-01", 10)).toEqual([]);
+  });
+
+  it("treats a stretch of exactly minGapDays as no gap, one more as a gap (inclusive window)", () => {
+    // 10 days apart → not a gap at threshold 10; 11 days apart → gap Aug 2 … Aug 11.
+    expect(findGaps(["2026-08-01", "2026-08-11"], "2026-08-11", 10)).toEqual([]);
+    expect(findGaps(["2026-08-01", "2026-08-12"], "2026-08-12", 10)).toEqual([
+      { from: "2026-08-02", to: "2026-08-11" },
+    ]);
+  });
+
+  it("includes the stretch from the last candle to today, ending on today", () => {
+    expect(findGaps(["2026-08-01"], "2026-08-20", 10)).toEqual([
+      { from: "2026-08-02", to: "2026-08-20" },
+    ]);
+  });
+
+  it("does not count the stretch before the first candle", () => {
+    expect(findGaps(["2026-08-20"], "2026-08-21", 10)).toEqual([]);
+  });
+
+  it("sorts and dedupes unsorted input", () => {
+    expect(findGaps(["2026-08-20", "2026-08-01", "2026-08-01"], "2026-08-20", 10)).toEqual([
+      { from: "2026-08-02", to: "2026-08-19" },
+    ]);
   });
 });

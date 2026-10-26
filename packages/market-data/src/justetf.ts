@@ -1,15 +1,24 @@
 import { PROVIDER_FETCH_TIMEOUT_MS } from "./http.js";
+import { MarketDataError } from "./types.js";
 import type {
   AssetClass,
+  Candle,
   InstrumentProfile,
   InstrumentRef,
   MarketDataProvider,
   Quote,
 } from "./types.js";
 
+/** Currencies JustETF's chart endpoint can quote an ETF in. */
+const JUSTETF_CURRENCIES = new Set(["EUR", "USD", "GBP", "CHF"]);
+const JUSTETF_USER_AGENT =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36";
+
 /**
  * JustETF provider for European ETF country allocation.
  * Scrapes JustETF website for country allocation data.
+ *
+ * Also serves daily price history (`getHistoryFrom`) as a last-resort fallback.
  *
  * Only supports European UCITS ETFs with ISIN codes.
  * Rate limited to 1 request per second.
@@ -50,6 +59,52 @@ export class JustEtfProvider implements MarketDataProvider {
       console.warn(`[justetf] failed to fetch country allocation for ${ref.isin}:`, err);
       return null;
     }
+  }
+
+  /**
+   * Daily closes from `fromDate` to today, from JustETF's performance-chart endpoint.
+   * A history *fallback* only (it is registered after the quote providers): it keeps an
+   * ETF whose primary feed has a hole priced, e.g. a Xetra line Yahoo has no candles for.
+   *
+   * The chart is requested in the instrument's declared currency (JustETF converts) and
+   * the candles are stamped with it. JustETF repeats Friday's value on Sat/Sun; those
+   * rows aren't trading days and no other provider emits them, so they are dropped.
+   * Returns [] for a non-ETF, a bad ISIN, an unsupported currency or a 404; any other HTTP
+   * failure throws.
+   */
+  async getHistoryFrom(ref: InstrumentRef, fromDate: string): Promise<Candle[]> {
+    if (ref.assetClass !== "etf" || !ref.isin || !this.isValidIsin(ref.isin)) return [];
+    if (!JUSTETF_CURRENCIES.has(ref.currency)) return [];
+
+    await this.rateLimit();
+    const to = new Date().toISOString().slice(0, 10);
+    const url =
+      `https://www.justetf.com/api/etfs/${ref.isin.trim().toUpperCase()}/performance-chart` +
+      `?locale=en&currency=${ref.currency}&valuesType=MARKET_VALUE&reduceData=false` +
+      `&includeDividends=false&dateFrom=${fromDate}&dateTo=${to}`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS),
+      headers: { "User-Agent": JUSTETF_USER_AGENT, Accept: "application/json" },
+    });
+    if (res.status === 404) return [];
+    // Anything else (UA block, 429, a rejected currency → 500) is a failure, not "no
+    // candles": throw so the service's onProviderError hook fires like every other provider.
+    if (!res.ok)
+      throw new MarketDataError(`JustETF ${res.status} for ${ref.isin}`, this.name, res.status);
+
+    const body = (await res.json()) as {
+      series?: { date?: string; value?: { raw?: number } }[];
+    } | null;
+    const candles: Candle[] = [];
+    for (const point of body?.series ?? []) {
+      const raw = point.value?.raw;
+      if (!point.date || typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) continue;
+      if (point.date < fromDate) continue;
+      const dow = new Date(`${point.date}T00:00:00.000Z`).getUTCDay();
+      if (dow === 0 || dow === 6) continue;
+      candles.push({ date: point.date, close: String(raw), currency: ref.currency });
+    }
+    return candles;
   }
 
   /**
