@@ -560,6 +560,26 @@ describe("MarketDataService", () => {
       expect(calls).toEqual([day(6)]);
     });
 
+    it("backs off a fallback that throws instead of re-asking it on every call", async () => {
+      let asks = 0;
+      const blocked: MarketDataProvider = {
+        name: "blocked",
+        supports: () => true,
+        getHistoryFrom: async () => {
+          asks++;
+          throw new Error("429");
+        },
+      };
+      const errors: string[] = [];
+      const svc = new MarketDataService([primary, blocked], {
+        onProviderError: (p) => errors.push(p),
+      });
+      await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      expect(asks).toBe(1);
+      expect(errors).toEqual(["blocked"]);
+    });
+
     it("returns the primary series when the fallback throws", async () => {
       const boom: MarketDataProvider = {
         name: "boom",

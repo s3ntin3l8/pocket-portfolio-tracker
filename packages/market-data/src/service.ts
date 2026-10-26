@@ -190,7 +190,9 @@ export class MarketDataService {
         }
       } catch (err) {
         this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
-        continue;
+        // A blocked/429 fallback is the normal failure shape of a scraped endpoint: back
+        // off like an empty fill instead of re-asking on every call.
+        added = 0;
       }
       if (added === 0) {
         if (this.emptyFills.size >= MAX_EMPTY_FILL_MEMO) this.emptyFills.clear();
