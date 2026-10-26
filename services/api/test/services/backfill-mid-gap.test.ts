@@ -293,6 +293,35 @@ describe("fetchInstrumentPrices — a fetch that leaves a hole open is a miss", 
   });
 });
 
+describe("an empty, non-throwing fetch clears a stale error streak but still counts as a miss", () => {
+  async function counters(db: Awaited<ReturnType<typeof ensureDb>>, id: string) {
+    const [row] = await db
+      .select({ m: instruments.priceFeedMissCount, e: instruments.priceFeedErrorCount })
+      .from(instruments)
+      .where(eq(instruments.id, id));
+    return row;
+  }
+
+  it("fetchInstrumentPrices (sub-job)", async () => {
+    const { db, pf, instr, tag } = await seed({ priceDates: [], errorCount: 3 });
+    const svc = new MarketDataService([new ListProvider(tag.toUpperCase(), [])]);
+    await fetchInstrumentPrices(db, svc, {
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      chunkStart: ago(80),
+      chunkEnd: ago(0),
+    });
+    expect(await counters(db, instr.id)).toEqual({ m: 1, e: 0 });
+  });
+
+  it("backfillPortfolioHistory (inline path)", async () => {
+    const { db, pf, instr, tag } = await seed({ priceDates: [], errorCount: 3 });
+    const svc = new MarketDataService([new ListProvider(tag.toUpperCase(), [])]);
+    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
+    expect(await counters(db, instr.id)).toEqual({ m: 1, e: 0 });
+  });
+});
+
 describe("backfillPortfolioHistory — the inline path grades the series the same way", () => {
   async function missCount(db: Awaited<ReturnType<typeof ensureDb>>, id: string) {
     const [row] = await db
