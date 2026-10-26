@@ -13,6 +13,7 @@ import { transfers, transfersExpected } from "./ledgers/transfers.js";
 import { split, splitExpected } from "./ledgers/split.js";
 import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
+import { multiBase, multiBaseExpected } from "./ledgers/multi-base.js";
 import { fxCarry, fxCarryExpected, fxStale, fxStaleExpected } from "./ledgers/fx-carry.js";
 
 // Golden ledgers: fixed-date scenarios, hand-derived expectations (see ledger.ts). The clock is
@@ -194,5 +195,28 @@ describe.each([
     const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
     expect(s.fxMissingCurrencies).toEqual(expected.fxMissingCurrencies);
     expectDecimal(s.netWorth, expected.netWorth, "netWorth", ROUNDING);
+  });
+});
+
+describe("multi-base", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(multiBase.asOf) });
+    l = await loadLedger(app, sign, multiBase);
+  }, 60_000);
+
+  it("summarises each depot in its own base currency", async () => {
+    const eu = await get(l, `/portfolios/${l.portfolioIds.eu}/summary`);
+    const se = await get(l, `/portfolios/${l.portfolioIds.se}/summary`);
+    expect(eu.displayCurrency).toBe("EUR");
+    expect(se.displayCurrency).toBe("SEK");
+    expectDecimal(eu.netWorth, multiBaseExpected.euSummary, "eu.netWorth", ROUNDING);
+    expectDecimal(se.netWorth, multiBaseExpected.seSummarySek, "se.netWorth", ROUNDING);
+  });
+
+  it("/networth converts the SEK depot at today's rate into the display currency", async () => {
+    const nw = await get(l, "/networth");
+    expect(nw.displayCurrency).toBe("EUR");
+    expectDecimal(nw.netWorth, multiBaseExpected.networth, "netWorth", ROUNDING);
   });
 });
