@@ -23,6 +23,30 @@ function asValuation(body: unknown, what: string): ValuationBody {
       throw new Error(`${what}: expected a string "${key}", got ${JSON.stringify(b?.[key])}`);
     }
   }
+  // A dropped boolean must not read as `false`: `cashTracked` gates whether cash is counted, so
+  // a missing field would silently turn "cash is tracked" into "it isn't" — a false pass.
+  if (typeof b!.cashTracked !== "boolean") {
+    throw new Error(
+      `${what}: expected a boolean "cashTracked", got ${JSON.stringify(b!.cashTracked)}`,
+    );
+  }
+  const gain = b!.gain as Record<string, unknown> | undefined;
+  if (gain != null) {
+    for (const key of [
+      "value",
+      "costOfOpen",
+      "netContributed",
+      "unrealized",
+      "realized",
+      "income",
+    ]) {
+      if (typeof gain[key] !== "string") {
+        throw new Error(
+          `${what}: expected a string "gain.${key}", got ${JSON.stringify(gain[key])}`,
+        );
+      }
+    }
+  }
   return {
     ...(b as unknown as ValuationBody),
     cashDisplay: (b!.cashDisplay as Record<string, string> | undefined) ?? {},
@@ -40,7 +64,10 @@ function asValuation(body: unknown, what: string): ValuationBody {
 export async function collectBodies(
   get: (url: string) => Promise<unknown>,
 ): Promise<IntegrityBodies> {
-  const portfolioList = (await get("/portfolios")) as { id: string }[];
+  const portfolioList = await get("/portfolios");
+  if (!Array.isArray(portfolioList)) {
+    throw new Error(`/portfolios: expected an array, got ${JSON.stringify(portfolioList)}`);
+  }
   const [networth, summaries] = await Promise.all([
     get("/networth").then((b) => asValuation(b, "/networth") as NetWorthBody),
     Promise.all(
@@ -55,6 +82,9 @@ export async function collectBodies(
   // Today's rate (UTC day of the networth response) for every portfolio currency that differs
   // from the display currency — the same cache the valuation reads.
   const to = networth.displayCurrency;
+  if (typeof networth.asOf !== "string") {
+    throw new Error(`/networth: expected a string "asOf", got ${JSON.stringify(networth.asOf)}`);
+  }
   const date = networth.asOf.slice(0, 10);
   const fxToDisplay: Record<string, string | null> = {};
   for (const from of new Set(portfolios.map((p) => p.summary.displayCurrency))) {
