@@ -2534,6 +2534,30 @@ import {
   type AssistantStatus,
 } from "./assistant.js";
 
+/**
+ * One result of the analysis-integrity check (`GET /me/integrity`, docs/integrity.md): a rule
+ * whose cross-endpoint identity did not hold on this user's data. Evidence, not a verdict: it
+ * says which rule broke, on which scope, with expected vs. actual. Amounts are decimal strings.
+ */
+export interface IntegrityFinding {
+  rule: string;
+  /** `"networth"` or `"portfolio:<id>"`. */
+  scope: string;
+  expected: string;
+  actual: string;
+  diff: string;
+  tolerance: string;
+  message: string;
+}
+
+export interface IntegrityReport {
+  checkedAt: string;
+  portfolioCount: number;
+  /** Every rule the check ran, so an empty `findings` is "all of these hold", not "nothing ran". */
+  rulesRun: string[];
+  findings: IntegrityFinding[];
+}
+
 export interface ApiClientConfig {
   baseUrl: string;
   getToken?: () => string | undefined | Promise<string | undefined>;
@@ -2880,6 +2904,12 @@ export function createApiClient(config: ApiClientConfig) {
       );
     },
 
+    /**
+     * Run the integrity invariants over the caller's own data. Values every portfolio, so it
+     * gets the long timeout rather than the default.
+     */
+    getIntegrityReport: () =>
+      request<IntegrityReport>("GET", "/me/integrity", undefined, { timeoutMs: LONG_TIMEOUT_MS }),
     getPreferences: () => request<UserPreferences>("GET", "/me/preferences"),
     putPreferences: (
       prefs: Partial<{

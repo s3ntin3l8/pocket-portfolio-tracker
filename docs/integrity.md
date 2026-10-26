@@ -102,6 +102,16 @@ expected vs. actual. Whether the rule or the number is wrong is for you to decid
 rule's definition above, and if the app is wrong, reproduce it as a golden ledger. Findings
 contain amounts: keep the output local; don't paste it into issues or PRs.
 
+The same check is reachable from two more places, both through the typed client's
+`getIntegrityReport()` (long timeout: it values every portfolio):
+
+- **Settings › Data & connections › Data checks** runs it on demand and lists each finding with
+  the rule's plain-language meaning, its scope and the API's own expected/actual/difference. A
+  failed run is shown as an error, never as "all checks hold".
+- **MCP tool `check_integrity`** (read-only; `docs/mcp.md`) returns up to 20 findings plus a
+  count. Its description tells the model to report them as given and never recompute: a finding
+  is evidence, not a verdict.
+
 Known limit: `NW_SUM_PORTFOLIOS` converts each summary by `/fx-rate` while `/networth` converts
 each holding from its native currency. They agree while every rate comes from the same provider
 day; a degraded FX provider can split them by real FX movement, which is a freshness signal

@@ -865,3 +865,60 @@ describe("listTransactions truncation marker (audit E13)", () => {
     ).toBeNull();
   });
 });
+
+describe("getIntegrityReport", () => {
+  const report = {
+    checkedAt: "2026-06-30T12:00:00.000Z",
+    portfolioCount: 2,
+    rulesRun: ["NW_SUM_PORTFOLIOS"],
+    findings: [],
+  };
+
+  it("GETs /me/integrity and returns the report as is", async () => {
+    let seen: { url: string; init: RequestInit } | undefined;
+    const fetchImpl = mockFetch((url, init) => {
+      seen = { url, init };
+      return { status: 200, body: report };
+    });
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      getToken: () => "tok",
+      fetch: fetchImpl as unknown as typeof fetch,
+    });
+    await expect(client.getIntegrityReport()).resolves.toEqual(report);
+    expect(seen!.url).toBe("http://api.test/me/integrity");
+    expect(seen!.init.method).toBe("GET");
+  });
+
+  it("is not subject to the default request timeout (it values every portfolio)", async () => {
+    // A fetch that takes 60ms and honours the abort signal, against a 10ms default timeout.
+    const slow = vi.fn(
+      (_url: string, init: RequestInit) =>
+        new Promise<Response>((resolve, reject) => {
+          const done = setTimeout(
+            () =>
+              resolve({
+                ok: true,
+                status: 200,
+                json: async () => report,
+                text: async () => JSON.stringify(report),
+              } as Response),
+            60,
+          );
+          init.signal?.addEventListener("abort", () => {
+            clearTimeout(done);
+            reject(new DOMException("aborted", "AbortError"));
+          });
+        }),
+    );
+    const client = createApiClient({
+      baseUrl: "http://api.test",
+      timeoutMs: 10,
+      fetch: slow as unknown as typeof fetch,
+    });
+    // The control: an ordinary read hits the 10ms default and times out.
+    await expect(client.listPortfolios()).rejects.toMatchObject({ status: 408 });
+    // The integrity report uses the long timeout and completes.
+    await expect(client.getIntegrityReport()).resolves.toEqual(report);
+  });
+});

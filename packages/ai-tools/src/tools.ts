@@ -28,6 +28,9 @@ const holderId = id()
   .optional()
   .describe("Account holder id; omit for everyone. Ignored when portfolioId is given.");
 
+/** Findings returned to the model in one call. */
+const MAX_INTEGRITY_FINDINGS = 20;
+
 const BASIS_NOTE =
   "Name the basis of any gain you quote (vs cost of holdings / vs net contributed) and disclose " +
   "valuedAtCost holdings and fxMissingCurrencies exclusions.";
@@ -447,6 +450,33 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     }),
     handler: ({ range: r, portfolioId: id, holderId: h }) =>
       client.getInsights(r, { portfolioId: id, holderId: h }),
+  });
+
+  add({
+    name: "check_integrity",
+    title: "Data integrity check",
+    description:
+      "Run Pocket's own consistency checks over the user's data (e.g. net worth equals the sum of " +
+      "the portfolios, gain figures match their totals, the aggregate and per-portfolio histories " +
+      "agree) and return what broke. Use it when a figure looks wrong or before relying on " +
+      "numbers for a decision. Each finding names a rule, a scope (networth or portfolio:<id>) and " +
+      "expected vs actual: it is EVIDENCE that two figures disagree, not a verdict on which one is " +
+      "wrong, and not advice. Report findings as given; never recompute or adjust the amounts. " +
+      "An empty list means every rule in rulesRun holds. Can be slow on large accounts.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const r = await client.getIntegrityReport();
+      return {
+        checkedAt: r.checkedAt,
+        portfolioCount: r.portfolioCount,
+        rulesRun: r.rulesRun,
+        findingCount: r.findings.length,
+        // A systematic defect can repeat one rule across many scopes; the first few are enough
+        // to act on, and the count says how many there are.
+        findings: r.findings.slice(0, MAX_INTEGRITY_FINDINGS),
+        truncated: r.findings.length > MAX_INTEGRITY_FINDINGS,
+      };
+    },
   });
 
   add({
