@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { Decimal } from "decimal.js";
 import { closeDb } from "../../src/db/client.js";
 import {
   buildIntegrityApp,
@@ -13,6 +14,8 @@ import { transfers, transfersExpected } from "./ledgers/transfers.js";
 import { split, splitExpected } from "./ledgers/split.js";
 import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
+import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
+import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
 import { anomalies, anomaliesExpected } from "./ledgers/anomalies.js";
 import { metaBase, metaBaseExpected } from "./ledgers/meta-base.js";
 import { multiBase, multiBaseExpected } from "./ledgers/multi-base.js";
@@ -251,6 +254,40 @@ describe("anomalies", () => {
     expect(await codes(`/portfolios/${l.portfolioIds.b}/anomalies`)).toEqual(anomaliesExpected.b);
     expect(await codes("/networth/anomalies")).toEqual(
       [...anomaliesExpected.a, ...anomaliesExpected.b].sort(),
+    );
+  });
+});
+
+// The route reports tax amounts to the cent; the hand-derived tax (e.g. 92.3125) is compared to
+// within half a cent. Everything else is exact.
+const CENT = "0.005";
+
+describe.each([
+  ["de-tax: both pots positive, taxable above the allowance", deTax, deTaxExpected],
+  ["de-tax-pots: a stock loss is not netted against general income", deTaxPots, deTaxPotsExpected],
+])("%s", (_name, ledger, e) => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(ledger.asOf) });
+    l = await loadLedger(app, sign, ledger);
+  }, 60_000);
+
+  it("splits the pots, applies the allowance and taxes the excess", async () => {
+    const t = await get(l, `/portfolios/${l.portfolioIds.depot}/tax?year=${e.year}`);
+    const u = t.allowanceUsage;
+    expect(t.regime).toBe("DE");
+    expect(u.taxRate).toBe("0.26375");
+    expectDecimal(u.stockPot.netGainLoss, e.stockPot, "stockPot", CENT);
+    expectDecimal(u.generalPot.netGainLoss, e.generalPot, "generalPot", CENT);
+    expectDecimal(u.usedYtd, e.allowanceUsed, "usedYtd", CENT);
+    expectDecimal(u.taxableExcess, e.taxableExcess, "taxableExcess", CENT);
+    expectDecimal(u.estimatedTax, e.estimatedTax, "estimatedTax", CENT);
+    expectDecimal(u.remaining, "0", "remaining", CENT);
+    expectDecimal(
+      new Decimal(u.usedYtd).add(u.taxableExcess),
+      e.taxableBeforeAllowance,
+      "usedYtd + taxableExcess = pots counted",
+      CENT,
     );
   });
 });

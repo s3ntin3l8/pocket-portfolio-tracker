@@ -55,7 +55,26 @@ export interface Ledger {
   /** The frozen "now" for the whole scenario. */
   asOf: string;
   displayCurrency: string;
-  portfolios: Record<string, { name: string; baseCurrency: string; cashCounted: boolean }>;
+  /**
+   * Account holders (the legal person with the Sparerpauschbetrag). `capitalGainsTaxRate` unset
+   * means the default 26.375% (Abgeltungsteuer + Soli).
+   */
+  holders?: Record<
+    string,
+    { name: string; taxAllowanceAnnual: string; capitalGainsTaxRate?: string }
+  >;
+  portfolios: Record<
+    string,
+    {
+      name: string;
+      baseCurrency: string;
+      cashCounted: boolean;
+      /** Key into `holders`. */
+      holder?: string;
+      /** This depot's Freistellungsauftrag allocation (EUR). */
+      taxAllowanceAnnual?: string;
+    }
+  >;
   instruments: Record<string, LedgerInstrument>;
   /** `1 base = rate quote` on `date` (e.g. USD→EUR 0.9 means 1 USD = 0.9 EUR). */
   fx?: { base: string; quote: string; rate: string; date: string }[];
@@ -106,9 +125,22 @@ export async function loadLedger(
     .set({ displayCurrency: ledger.displayCurrency })
     .where(eq(users.authSub, sub));
 
+  const holderIds: Record<string, string> = {};
+  for (const [key, h] of Object.entries(ledger.holders ?? {})) {
+    const res = await app.inject({
+      method: "POST",
+      url: "/account-holders",
+      headers,
+      payload: { type: "self", taxResidence: "DE", ...h },
+    });
+    expect(res.statusCode, `create holder ${key}`).toBe(201);
+    holderIds[key] = res.json().id as string;
+  }
+
   const portfolioIds: Record<string, string> = {};
-  for (const [key, p] of Object.entries(ledger.portfolios)) {
-    const res = await app.inject({ method: "POST", url: "/portfolios", headers, payload: p });
+  for (const [key, { holder, ...p }] of Object.entries(ledger.portfolios)) {
+    const payload = { ...p, ...(holder ? { accountHolderId: holderIds[holder]! } : {}) };
+    const res = await app.inject({ method: "POST", url: "/portfolios", headers, payload });
     expect(res.statusCode, `create portfolio ${key}`).toBe(201);
     portfolioIds[key] = res.json().id as string;
   }
