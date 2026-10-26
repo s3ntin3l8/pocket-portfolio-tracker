@@ -2,7 +2,14 @@ import { SignJWT, generateKeyPair } from "jose";
 import { eq } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { expect } from "vitest";
-import { instruments, lastPrices, transactions, users } from "@portfolio/db";
+import {
+  corporateActions,
+  fxRates,
+  instruments,
+  lastPrices,
+  transactions,
+  users,
+} from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 
 // A declarative, fixed-date scenario. Every date is absolute and ids are symbolic, so the
@@ -50,6 +57,10 @@ export interface Ledger {
   displayCurrency: string;
   portfolios: Record<string, { name: string; baseCurrency: string; cashCounted: boolean }>;
   instruments: Record<string, LedgerInstrument>;
+  /** `1 base = rate quote` on `date` (e.g. USD→EUR 0.9 means 1 USD = 0.9 EUR). */
+  fx?: { base: string; quote: string; rate: string; date: string }[];
+  /** Share-count corporate actions; `ratio` "4" is a 4:1 split (quantity × 4). */
+  corporateActions?: { instrument: string; type: "split"; ratio: string; exDate: string }[];
   transactions: LedgerTx[];
 }
 
@@ -124,6 +135,18 @@ export async function loadLedger(
         asOf: new Date(ledger.asOf),
       });
     }
+  }
+
+  for (const r of ledger.fx ?? []) {
+    await app.db.insert(fxRates).values(r);
+  }
+  for (const c of ledger.corporateActions ?? []) {
+    await app.db.insert(corporateActions).values({
+      instrumentId: instrumentIds[c.instrument]!,
+      type: c.type,
+      ratio: c.ratio,
+      exDate: c.exDate,
+    });
   }
 
   await app.db.insert(transactions).values(
