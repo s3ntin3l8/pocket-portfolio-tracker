@@ -21,8 +21,14 @@ const valuation = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function getter(over: { networth?: Record<string, unknown>; portfolios?: unknown } = {}) {
+function getter(
+  over: { networth?: Record<string, unknown>; portfolios?: unknown; trades?: unknown } = {},
+) {
   return async (url: string): Promise<unknown> => {
+    if (url.endsWith("/contributions")) return { displayCurrency: "EUR", netContributed: "100" };
+    if (url.endsWith("/trades"))
+      return over.trades ?? { displayCurrency: "EUR", totalRealized: "0" };
+    if (url.endsWith("/anomalies")) return { anomalies: [] };
     if (url === "/portfolios") return over.portfolios ?? [{ id: "p1" }];
     if (url === "/networth") return valuation(over.networth);
     if (url === "/portfolios/p1/summary") return valuation();
@@ -65,6 +71,19 @@ describe("collectBodies", () => {
   it("rejects a non-array portfolio list", async () => {
     await expect(collectBodies(getter({ portfolios: { error: "x" } }))).rejects.toThrow(
       /\/portfolios: expected an array/,
+    );
+  });
+
+  it("collects the parity endpoints for the aggregate and every portfolio", async () => {
+    const b = await collectBodies(getter());
+    expect(b.networthParity.contributions.netContributed).toBe("100");
+    expect(b.portfolios[0]!.parity.trades.totalRealized).toBe("0");
+    expect(b.portfolios[0]!.parity.anomalies.anomalies).toEqual([]);
+  });
+
+  it("names a missing field of a parity endpoint", async () => {
+    await expect(collectBodies(getter({ trades: { displayCurrency: "EUR" } }))).rejects.toThrow(
+      /\/trades: expected a string "totalRealized"/,
     );
   });
 });

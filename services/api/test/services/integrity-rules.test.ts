@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   checkIntegrity,
   type IntegrityBodies,
+  type ParityBodies,
   type RuleId,
   type ValuationBody,
 } from "../../src/services/integrity/index.js";
@@ -43,10 +44,19 @@ function valuation(): ValuationBody {
   };
 }
 
+function parity(): ParityBodies {
+  return {
+    contributions: { displayCurrency: "EUR", netContributed: "960" },
+    trades: { displayCurrency: "EUR", totalRealized: "140" },
+    anomalies: { anomalies: [{ code: "zero_price", transactionId: "t1" }] },
+  };
+}
+
 function bodies(): IntegrityBodies {
   return {
     networth: { ...valuation(), asOf: "2026-06-30T12:00:00.000Z" },
-    portfolios: [{ id: "p1", summary: valuation() }],
+    networthParity: parity(),
+    portfolios: [{ id: "p1", summary: valuation(), parity: parity() }],
     fxToDisplay: {},
   };
 }
@@ -70,6 +80,7 @@ describe("integrity rules", () => {
     b.portfolios.push({
       id: "p2",
       summary: { ...valuation(), displayCurrency: "USD", netWorth: "100" },
+      parity: parity(),
     });
     b.fxToDisplay = { USD: "0.9" };
     b.networth.netWorth = "1350"; // 1260 + 100 × 0.9
@@ -83,6 +94,7 @@ describe("integrity rules", () => {
     b.portfolios.push({
       id: "p2",
       summary: { ...valuation(), displayCurrency: "CAD", netWorth: "100" },
+      parity: parity(),
     });
     b.fxToDisplay = { CAD: null };
     b.networth.netWorth = "5";
@@ -156,5 +168,72 @@ describe("integrity rules", () => {
     expect(rules(b)).toContain("VALUED_AT_COST_NO_GAIN");
     b.networth.holdings[0]!.unrealizedPnLDisplay = null;
     expect(rules(b)).not.toContain("VALUED_AT_COST_NO_GAIN");
+  });
+
+  it("CONTRIB_PARITY: the contributions page differs from gain.netContributed", () => {
+    const b = bodies();
+    b.portfolios[0]!.parity.contributions.netContributed = "961";
+    const f = checkIntegrity(b).find((x) => x.rule === "CONTRIB_PARITY");
+    expect(f).toMatchObject({ scope: "portfolio:p1", expected: "960", actual: "961" });
+  });
+
+  it("CONTRIB_PARITY / REALIZED_PARITY: abstain when the endpoint is in another currency", () => {
+    const b = bodies();
+    b.networthParity.contributions = { displayCurrency: "USD", netContributed: "1" };
+    b.networthParity.trades = { displayCurrency: "USD", totalRealized: "1" };
+    expect(rules(b)).not.toContain("CONTRIB_PARITY");
+    expect(rules(b)).not.toContain("REALIZED_PARITY");
+  });
+
+  it("REALIZED_PARITY: the trade log's realized total differs from the valuation's", () => {
+    const b = bodies();
+    b.networthParity.trades.totalRealized = "139";
+    const f = checkIntegrity(b).find((x) => x.rule === "REALIZED_PARITY");
+    expect(f).toMatchObject({ scope: "networth", expected: "140", actual: "139" });
+  });
+
+  it("ANOMALY_UNION: a portfolio anomaly missing from, or extra in, the aggregate", () => {
+    const missing = bodies();
+    missing.networthParity.anomalies.anomalies = [];
+    expect(rules(missing)).toContain("ANOMALY_UNION");
+
+    const extra = bodies();
+    extra.networthParity.anomalies.anomalies.push({ code: "oversell", transactionId: "t9" });
+    const f = checkIntegrity(extra).find((x) => x.rule === "ANOMALY_UNION");
+    expect(f).toMatchObject({ scope: "networth", diff: "0 missing, 1 extra" });
+  });
+
+  it("ANOMALY_UNION: order and duplicates across portfolios do not matter", () => {
+    const b = bodies();
+    b.portfolios.push({ id: "p2", summary: valuation(), parity: parity() });
+    b.portfolios[1]!.parity.anomalies.anomalies.push({ code: "oversell", transactionId: "t2" });
+    b.networthParity.anomalies.anomalies = [
+      { code: "oversell", transactionId: "t2" },
+      { code: "zero_price", transactionId: "t1" },
+    ];
+    expect(rules(b)).not.toContain("ANOMALY_UNION");
+  });
+
+  it("ANOMALY_UNION: same-code anomalies that differ only in meta are kept apart", () => {
+    // e.g. negative_cash per currency: dropping one of the two in the aggregate must be seen.
+    const two = [
+      { code: "negative_cash", meta: { currency: "EUR" } },
+      { code: "negative_cash", meta: { currency: "USD" } },
+    ];
+    const b = bodies();
+    b.portfolios[0]!.parity.anomalies.anomalies = two;
+    b.networthParity.anomalies.anomalies = [two[0]!];
+    const f = checkIntegrity(b).find((x) => x.rule === "ANOMALY_UNION");
+    expect(f).toMatchObject({ diff: "1 missing, 0 extra" });
+    // ... and meta key order is not part of the identity.
+    b.networthParity.anomalies.anomalies = [
+      { code: "negative_cash", meta: { currency: "EUR" } },
+      { code: "negative_cash", meta: { currency: "USD" } },
+    ];
+    b.portfolios[0]!.parity.anomalies.anomalies = [
+      { code: "negative_cash", meta: { currency: "USD" } },
+      { code: "negative_cash", meta: { currency: "EUR" } },
+    ];
+    expect(rules(b)).not.toContain("ANOMALY_UNION");
   });
 });

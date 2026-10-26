@@ -15,6 +15,9 @@ export const RULE_IDS = [
   "NW_COMPOSITION",
   "FX_MISSING_DISCLOSED",
   "VALUED_AT_COST_NO_GAIN",
+  "CONTRIB_PARITY",
+  "REALIZED_PARITY",
+  "ANOMALY_UNION",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -71,9 +74,27 @@ export interface ValuationBody {
 /** `/networth` also says which instant it was computed for. */
 export type NetWorthBody = ValuationBody & { asOf: string };
 
+export interface AnomalyBody {
+  code?: string;
+  transactionId?: string | null;
+  instrumentId?: string | null;
+  meta?: Record<string, unknown>;
+}
+
+/** The other endpoints that restate a figure the valuation also carries. */
+export interface ParityBodies {
+  /** `/…/contributions`: `netContributed` is `gain.netContributed`. */
+  contributions: { displayCurrency: string; netContributed: string };
+  /** `/…/trades`: `totalRealized` is the valuation's `totalRealizedPnL`. */
+  trades: { displayCurrency: string; totalRealized: string };
+  /** `/…/anomalies`. */
+  anomalies: { anomalies: AnomalyBody[] };
+}
+
 export interface IntegrityBodies {
   networth: NetWorthBody;
-  portfolios: { id: string; summary: ValuationBody }[];
+  networthParity: ParityBodies;
+  portfolios: { id: string; summary: ValuationBody; parity: ParityBodies }[];
   /**
    * Today's rate from each portfolio currency into `networth.displayCurrency` (`/fx-rate`);
    * `null` when the app has none. The same currency maps to "1".
@@ -142,10 +163,10 @@ export function checkNetWorthSumsPortfolios(b: IntegrityBodies): Finding[] {
   );
 }
 
-function scopes(b: IntegrityBodies): { scope: string; v: ValuationBody }[] {
+function scopes(b: IntegrityBodies): { scope: string; v: ValuationBody; parity: ParityBodies }[] {
   return [
-    { scope: "networth", v: b.networth },
-    ...b.portfolios.map((p) => ({ scope: `portfolio:${p.id}`, v: p.summary })),
+    { scope: "networth", v: b.networth, parity: b.networthParity },
+    ...b.portfolios.map((p) => ({ scope: `portfolio:${p.id}`, v: p.summary, parity: p.parity })),
   ];
 }
 
@@ -285,6 +306,82 @@ export function checkValuedAtCostHasNoGain(b: IntegrityBodies): Finding[] {
 }
 
 /**
+ * Two endpoints are only comparable in the same currency; the parity endpoints use the
+ * valuation's display currency, so a differing one means the pair is not comparable (abstain).
+ */
+function sameCurrency(a: string, b: string): boolean {
+  return a === b;
+}
+
+/** The Savings page's net contributed is the gain summary's, on the same boundary. */
+export function checkContributionParity(b: IntegrityBodies): Finding[] {
+  return scopes(b).flatMap(({ scope, v, parity }) =>
+    !v.gain || !sameCurrency(parity.contributions.displayCurrency, v.displayCurrency)
+      ? []
+      : compare(
+          "CONTRIB_PARITY",
+          scope,
+          "contributions netContributed differs from gain.netContributed",
+          new Decimal(v.gain.netContributed),
+          new Decimal(parity.contributions.netContributed),
+        ),
+  );
+}
+
+/**
+ * The trade log's realized total is the valuation's. The collector asks for the trade log's
+ * default method (average cost), which is what the valuation's realized comes from; a `?method=`
+ * (fifo/lifo) would make this comparison meaningless.
+ */
+export function checkRealizedParity(b: IntegrityBodies): Finding[] {
+  return scopes(b).flatMap(({ scope, v, parity }) =>
+    !sameCurrency(parity.trades.displayCurrency, v.displayCurrency)
+      ? []
+      : compare(
+          "REALIZED_PARITY",
+          scope,
+          "trades totalRealized differs from the valuation's totalRealizedPnL",
+          new Decimal(v.totalRealizedPnL),
+          new Decimal(parity.trades.totalRealized),
+        ),
+  );
+}
+
+/**
+ * What makes two anomalies the same one. `meta` is where same-code anomalies differ
+ * (`negative_cash` per currency, `reconciliation_gap` per broker), so it is part of the key;
+ * its keys are sorted so serialisation order cannot matter.
+ */
+const anomalyKey = (a: AnomalyBody): string => {
+  const meta = Object.fromEntries(
+    Object.entries(a.meta ?? {}).sort(([x], [y]) => (x < y ? -1 : 1)),
+  );
+  return `${a.code ?? ""}|${a.transactionId ?? ""}|${a.instrumentId ?? ""}|${JSON.stringify(meta)}`;
+};
+
+/** /networth/anomalies is the union of every portfolio's own anomalies. */
+export function checkAnomalyUnion(b: IntegrityBodies): Finding[] {
+  const expected = new Set(
+    b.portfolios.flatMap((p) => p.parity.anomalies.anomalies.map(anomalyKey)),
+  );
+  const actual = new Set(b.networthParity.anomalies.anomalies.map(anomalyKey));
+  const missing = [...expected].filter((k) => !actual.has(k));
+  const extra = [...actual].filter((k) => !expected.has(k));
+  if (missing.length === 0 && extra.length === 0) return [];
+  return [
+    {
+      rule: "ANOMALY_UNION",
+      scope: "networth",
+      expected: `${expected.size} anomalies (the union of the portfolios')`,
+      actual: `${actual.size} anomalies`,
+      diff: `${missing.length} missing, ${extra.length} extra`,
+      tolerance: "exact",
+      message: "/networth/anomalies is not the union of the per-portfolio anomalies",
+    },
+  ];
+}
+
+/**
  * Keyed by `RuleId` so the compiler enforces that the ids in `RULE_IDS` and the rules that
  * actually run are the same set: a rule added here without an id (or the reverse) is a type
  * error, and `rulesRun` in the report cannot under-report.
@@ -296,6 +393,9 @@ export const RULES: Record<RuleId, (b: IntegrityBodies) => Finding[]> = {
   NW_COMPOSITION: checkNetWorthComposition,
   FX_MISSING_DISCLOSED: checkFxMissingDisclosed,
   VALUED_AT_COST_NO_GAIN: checkValuedAtCostHasNoGain,
+  CONTRIB_PARITY: checkContributionParity,
+  REALIZED_PARITY: checkRealizedParity,
+  ANOMALY_UNION: checkAnomalyUnion,
 };
 
 export function checkIntegrity(b: IntegrityBodies): Finding[] {

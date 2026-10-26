@@ -1,6 +1,6 @@
 import { mapPool } from "../../lib/promise-pool.js";
 import { PORTFOLIO_VALUATION_CONCURRENCY } from "../../routes/transactions/shared/helpers.js";
-import type { IntegrityBodies, NetWorthBody, ValuationBody } from "./rules.js";
+import type { IntegrityBodies, NetWorthBody, ParityBodies, ValuationBody } from "./rules.js";
 
 const REQUIRED_STRINGS = [
   "displayCurrency",
@@ -58,10 +58,57 @@ function asValuation(body: unknown, what: string): ValuationBody {
 }
 
 /**
+ * Check that `body` carries a string for every key and return it typed by exactly those keys.
+ * Building each parity object from this (instead of re-typing with a cast) ties the guard to
+ * the interface: a field added to `ParityBodies` without a guard is a type error, not an
+ * anonymous DecimalError at the first `new Decimal(...)`.
+ */
+function needStrings<K extends string>(
+  body: unknown,
+  keys: readonly K[],
+  what: string,
+): Record<K, string> {
+  const b = body as Record<string, unknown> | null;
+  for (const key of keys) {
+    if (typeof b?.[key] !== "string") {
+      throw new Error(`${what}: expected a string "${key}", got ${JSON.stringify(b?.[key])}`);
+    }
+  }
+  return b as Record<K, string>;
+}
+
+/** The parity endpoints for one scope: `base` is `/networth` or `/portfolios/:id`. */
+async function collectParity(
+  get: (url: string) => Promise<unknown>,
+  base: string,
+): Promise<ParityBodies> {
+  const contributionsBody = await get(`${base}/contributions`);
+  const tradesBody = await get(`${base}/trades`);
+  const anomaliesBody = (await get(`${base}/anomalies`)) as { anomalies?: unknown };
+  if (!Array.isArray(anomaliesBody?.anomalies)) {
+    throw new Error(
+      `${base}/anomalies: expected an "anomalies" array, got ${JSON.stringify(anomaliesBody)}`,
+    );
+  }
+  const contributions = needStrings(
+    contributionsBody,
+    ["displayCurrency", "netContributed"],
+    `${base}/contributions`,
+  );
+  const trades = needStrings(tradesBody, ["displayCurrency", "totalRealized"], `${base}/trades`);
+  return { contributions, trades, anomalies: anomaliesBody as ParityBodies["anomalies"] };
+}
+
+/**
  * Fetch the response bodies the rules read. `get` returns the parsed JSON of a GET and throws
  * on a non-200, so a failing endpoint is a loud failure, not an empty (vacuously passing) rule.
  * Tests pass an `app.inject` wrapper; the real-data report passes an in-process inject with the
  * caller's own auth — the same rule code runs against the same serialized responses.
+ *
+ * Cost: per portfolio this is the summary plus the contributions, trades and anomalies
+ * endpoints, and the aggregate adds the same three, all drawn from the caller's own rate-limit
+ * bucket and valuation work (`/portfolios/:id/contributions` has no derivation cache). On a big
+ * account a 429/502 from here is this fan-out, not a data problem.
  */
 export async function collectBodies(
   get: (url: string) => Promise<unknown>,
@@ -75,12 +122,16 @@ export async function collectBodies(
   const networth = asValuation(await get("/networth"), "/networth") as NetWorthBody;
   // Bounded like the API's own per-portfolio fan-out: every sub-request spends the caller's
   // rate-limit budget, so an unbounded burst on a big account would 429 itself.
-  const summaries = await mapPool(
+  const networthParity = await collectParity(get, "/networth");
+  const portfolios = await mapPool(
     portfolioList as { id: string }[],
     PORTFOLIO_VALUATION_CONCURRENCY,
-    async (p) => [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
+    async (p) => ({
+      id: p.id,
+      summary: asValuation(await get(`/portfolios/${p.id}/summary`), "summary"),
+      parity: await collectParity(get, `/portfolios/${p.id}`),
+    }),
   );
-  const portfolios = summaries.map(([id, summary]) => ({ id, summary }));
 
   // Today's rate (UTC day of the networth response) for every portfolio currency that differs
   // from the display currency — the same cache the valuation reads.
@@ -95,5 +146,5 @@ export async function collectBodies(
     const r = (await get(`/fx-rate?from=${from}&to=${to}&date=${date}`)) as { rate: string | null };
     fxToDisplay[from] = r.rate;
   }
-  return { networth, portfolios, fxToDisplay };
+  return { networth, networthParity, portfolios, fxToDisplay };
 }
