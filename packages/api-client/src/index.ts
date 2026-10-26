@@ -1671,7 +1671,8 @@ export interface GoldHoldingRow {
   pricePerGram: string | null;
   currency: string | null;
   value: string | null;
-  cost: string;
+  /** Display-currency cost; null for an `fxMissing` row (no rate, so no display-currency figure). */
+  cost: string | null;
   unrealized: string | null;
   /** No usable price: valued at cost, so no measured gain. */
   valuedAtCost: boolean;

@@ -325,6 +325,21 @@ describe("HoldingsTable", () => {
         expect(footerText()).toMatch(/11\.11%/);
       });
 
+      it("keeps a merged all-portfolios row's cost, as its value and P&L are counted too", () => {
+        // `/networth` OR-merges fxMissing across depots but sums the display figures of the depots
+        // that could convert, so this row has a value, a cost and a P&L. Dropping its cost would
+        // leave the percentage with a numerator but no denominator.
+        const merged: HoldingValuation = {
+          ...makeHolding("MERGED", "10", "90"),
+          marketValueDisplay: "1000",
+          costBasisDisplay: "900",
+          unrealizedPnLDisplay: "100",
+          fxMissing: true,
+        };
+        renderTable({ rows: [merged] });
+        expect(footerText()).toMatch(/11\.11%/);
+      });
+
       it("also ignores a no-rate row's cost when an older API still sent the native amount", () => {
         // 900 of foreign cost must not land in a display-currency total: 100 / (900 + 900) = 5.56%.
         renderTable({ rows: [priced, noFx("900")] });

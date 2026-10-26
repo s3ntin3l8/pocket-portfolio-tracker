@@ -124,10 +124,14 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
     (acc, h) => {
       if (h.marketValueDisplay !== null) acc.value += Number(h.marketValueDisplay);
       if (h.unrealizedPnLDisplay !== null) acc.pnl += Number(h.unrealizedPnLDisplay);
-      // An fxMissing row has no display-currency cost: it stays out of the cost total (and so
-      // out of the percentage denominator) like it stays out of value and P&L.
-      // The flag is the authority (an older API still sent the native amount here).
-      if (!h.fxMissing && h.costBasisDisplay !== null) acc.cost += Number(h.costBasisDisplay);
+      // Cost joins the total only when the row has a display-currency cost. A no-rate row has
+      // none (null), and an older API still sent the NATIVE amount for it: that row is
+      // recognised by carrying no display value either. A row merged across depots on the
+      // all-portfolios view is also flagged `fxMissing` (the flag is OR-merged) but its display
+      // value, cost and P&L are the sums of the depots that could convert, so it keeps its cost
+      // in step with the value and P&L already counted above.
+      const noDisplayFigures = h.fxMissing && h.marketValueDisplay === null;
+      if (h.costBasisDisplay !== null && !noDisplayFigures) acc.cost += Number(h.costBasisDisplay);
       return acc;
     },
     {

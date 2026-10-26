@@ -16,7 +16,7 @@ import {
   type PortfolioParams,
 } from "./shared.js";
 
-interface GoldHoldingRow {
+export interface GoldHoldingRow {
   portfolioId: string;
   instrumentId: string;
   symbol: string;
