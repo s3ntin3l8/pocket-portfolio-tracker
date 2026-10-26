@@ -217,9 +217,20 @@ the quote priority chain above.
   fundamentals coverage for a ticker.
 - **JustETF** (`justetf.ts`, registry id `"justetf"`) — country-allocation weights for
   European UCITS ETFs, scraped from JustETF's AJAX endpoint keyed by ISIN. **Profile-only,
-  like OpenFIGI**: `supports()` is only used to gate the ISIN-lookup path, `getQuote()`
-  always returns `null`, and it never appears in the pricing chain above. Rate-limited to
-  1 request/second client-side.
+  like OpenFIGI for quotes**: `getQuote()` always returns `null`, so it never appears in the
+  quote chain above. It does serve **history** (`getHistoryFrom`, from its
+  `performance-chart` endpoint, in the instrument's declared currency, weekday rows only) as a
+  gap-filler — see below. Rate-limited to 1 request/second client-side.
+
+### History gap-fill
+
+`MarketDataService.getHistoryFrom` returns the first provider's non-empty series. When the
+caller passes `gapFillDays` (the backfill passes `MAX_PRICE_CARRY_FORWARD_DAYS`), holes in
+that series longer than the threshold — and a stale tail up to today — are patched from the
+providers behind it (for an ETF with an ISIN, ultimately JustETF). The primary wins on
+overlap, each candle keeps its own `currency`, and a failing fallback is skipped. Without
+this, a primary feed that silently skips weeks leaves the holding unpriced for the gap and the
+backfill valuing it at 0/cost there.
 
 ## Admin overrides
 

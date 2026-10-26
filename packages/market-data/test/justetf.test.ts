@@ -282,4 +282,63 @@ describe("JustEtfProvider", () => {
       expect(elapsed).toBeGreaterThanOrEqual(2900);
     });
   });
+  describe("getHistoryFrom", () => {
+    const ref = {
+      symbol: "MWOF",
+      market: "XETRA",
+      assetClass: "etf" as const,
+      currency: "EUR",
+      isin: "IE000CNSFAR2",
+    };
+
+    function mockSeries(series: { date: string; raw: number }[]) {
+      fetchSpy.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({ series: series.map((p) => ({ date: p.date, value: { raw: p.raw } })) }),
+      });
+    }
+
+    it("returns weekday closes stamped with the instrument currency, dropping weekend repeats", async () => {
+      mockSeries([
+        { date: "2026-08-21", raw: 15.84 }, // Fri
+        { date: "2026-08-22", raw: 15.84 }, // Sat
+        { date: "2026-08-23", raw: 15.84 }, // Sun
+        { date: "2026-08-24", raw: 15.85 }, // Mon
+      ]);
+      const candles = await provider.getHistoryFrom(ref, "2026-08-21");
+      expect(candles).toEqual([
+        { date: "2026-08-21", close: "15.84", currency: "EUR" },
+        { date: "2026-08-24", close: "15.85", currency: "EUR" },
+      ]);
+      const url = String(fetchSpy.mock.calls[0]![0]);
+      expect(url).toContain("/etfs/IE000CNSFAR2/performance-chart");
+      expect(url).toContain("currency=EUR");
+      expect(url).toContain("dateFrom=2026-08-21");
+    });
+
+    it("skips rows before fromDate and non-positive/garbage values", async () => {
+      mockSeries([
+        { date: "2026-08-20", raw: 15.8 },
+        { date: "2026-08-21", raw: 0 },
+        { date: "2026-08-24", raw: 15.85 },
+      ]);
+      const candles = await provider.getHistoryFrom(ref, "2026-08-21");
+      expect(candles.map((c) => c.date)).toEqual(["2026-08-24"]);
+    });
+
+    it("returns [] without fetching for a non-ETF, a bad ISIN or an unsupported currency", async () => {
+      expect(await provider.getHistoryFrom({ ...ref, assetClass: "equity" }, "2026-08-21")).toEqual(
+        [],
+      );
+      expect(await provider.getHistoryFrom({ ...ref, isin: "nope" }, "2026-08-21")).toEqual([]);
+      expect(await provider.getHistoryFrom({ ...ref, currency: "IDR" }, "2026-08-21")).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("returns [] on an HTTP error", async () => {
+      fetchSpy.mockResolvedValueOnce({ ok: false, status: 500 });
+      expect(await provider.getHistoryFrom(ref, "2026-08-21")).toEqual([]);
+    });
+  });
 });

@@ -115,15 +115,20 @@ export class MarketDataService {
   async getHistoryFrom(
     ref: InstrumentRef,
     fromDate: string,
-    opts: { allowMaxFallback?: boolean } = {},
+    opts: { allowMaxFallback?: boolean; gapFillDays?: number } = {},
   ): Promise<Candle[]> {
     let lastError: unknown;
-    for (const provider of this.providersFor(ref.assetClass, ref.market)) {
+    const providers = this.providersFor(ref.assetClass, ref.market);
+    for (const [i, provider] of providers.entries()) {
       if (!provider.getHistoryFrom) continue;
       try {
         this.opts.onCall?.(provider.name);
         const candles = (await provider.getHistoryFrom(ref, fromDate)) ?? [];
-        if (candles.length > 0) return candles;
+        if (candles.length > 0) {
+          return opts.gapFillDays === undefined
+            ? candles
+            : this.fillGaps(ref, candles, providers.slice(i + 1), opts.gapFillDays);
+        }
       } catch (err) {
         lastError = err;
         this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
@@ -137,6 +142,39 @@ export class MarketDataService {
     if (opts.allowMaxFallback === false) return [];
     // Fallback: try getHistory with max range if no provider supports getHistoryFrom
     return this.getHistory(ref, "max");
+  }
+
+  /**
+   * The first provider with candles wins `getHistoryFrom`, so a hole in its series (a
+   * feed that silently skipped weeks) is never patched by the providers behind it. Ask the
+   * remaining providers for the holes longer than `minGapDays` and merge by date: the
+   * primary's candles always win on overlap, and each candle keeps its own currency. A
+   * failing fallback is skipped — the primary's series is returned as-is.
+   */
+  private async fillGaps(
+    ref: InstrumentRef,
+    primary: Candle[],
+    fallbacks: MarketDataProvider[],
+    minGapDays: number,
+  ): Promise<Candle[]> {
+    const merged = new Map(primary.map((c) => [c.date, c]));
+    const today = new Date().toISOString().slice(0, 10);
+    for (const provider of fallbacks) {
+      if (!provider.getHistoryFrom) continue;
+      const gaps = findGaps([...merged.keys()].sort(), today, minGapDays);
+      if (gaps.length === 0) break;
+      try {
+        this.opts.onCall?.(provider.name);
+        const extra = (await provider.getHistoryFrom(ref, gaps[0]!.from)) ?? [];
+        for (const c of extra) {
+          if (merged.has(c.date)) continue;
+          if (gaps.some((g) => c.date >= g.from && c.date <= g.to)) merged.set(c.date, c);
+        }
+      } catch (err) {
+        this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
+      }
+    }
+    return [...merged.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
   }
 
   async getDividends(ref: InstrumentRef, fromDate?: string): Promise<DividendEvent[]> {
@@ -340,4 +378,34 @@ export class MarketDataService {
     );
     return out;
   }
+}
+
+const DAY_MS = 86_400_000;
+
+function dayDiff(a: string, b: string): number {
+  return (Date.parse(`${b}T00:00:00.000Z`) - Date.parse(`${a}T00:00:00.000Z`)) / DAY_MS;
+}
+
+function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00.000Z`) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * Inclusive date windows with no candle, for every stretch between consecutive candle
+ * dates (and from the last candle to `today`) longer than `minGapDays`. The window before
+ * the first candle is not a gap — that is the instrument not existing yet.
+ */
+export function findGaps(
+  sortedDates: string[],
+  today: string,
+  minGapDays: number,
+): { from: string; to: string }[] {
+  const gaps: { from: string; to: string }[] = [];
+  for (let i = 1; i <= sortedDates.length; i++) {
+    const prev = sortedDates[i - 1]!;
+    const next = i < sortedDates.length ? sortedDates[i]! : today;
+    if (dayDiff(prev, next) > minGapDays)
+      gaps.push({ from: addDays(prev, 1), to: addDays(next, i < sortedDates.length ? -1 : 0) });
+  }
+  return gaps;
 }

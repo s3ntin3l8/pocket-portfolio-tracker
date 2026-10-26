@@ -485,6 +485,74 @@ describe("MarketDataService", () => {
     ).toBeNull();
   });
 
+  describe("getHistoryFrom gap-fill across providers", () => {
+    const etf = { symbol: "MWOF", market: "XETRA", assetClass: "etf" as const, currency: "EUR" };
+    const day = (n: number) => new Date(Date.UTC(2026, 7, n)).toISOString().slice(0, 10);
+
+    const primary: MarketDataProvider = {
+      name: "primary",
+      supports: () => true,
+      // Aug 1–5, then a 25-day hole, then Aug 31 – Sep 2. Native USD.
+      getHistoryFrom: async () =>
+        [1, 2, 3, 4, 5, 31, 32, 33].map((n) => ({ date: day(n), close: "100", currency: "USD" })),
+    };
+    const fallback = (calls: string[]): MarketDataProvider => ({
+      name: "fallback",
+      supports: () => true,
+      getHistoryFrom: async (_ref, from) => {
+        calls.push(from);
+        // Covers everything, including days the primary already has (must not override).
+        return Array.from({ length: 33 }, (_, i) => ({
+          date: day(i + 1),
+          close: "7",
+          currency: "EUR",
+        })).filter((c) => c.date >= from);
+      },
+    });
+
+    it("patches a hole longer than gapFillDays from a later provider, primary wins on overlap", async () => {
+      const calls: string[] = [];
+      const svc = new MarketDataService([primary, fallback(calls)]);
+      const candles = await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 });
+      const byDate = new Map(candles.map((c) => [c.date, c]));
+      // The hole (Aug 6 – Aug 30) is filled by the fallback, in its own currency…
+      expect(byDate.get(day(6))).toMatchObject({ close: "7", currency: "EUR" });
+      expect(byDate.get(day(30))).toMatchObject({ close: "7", currency: "EUR" });
+      // …and the primary's candles are untouched.
+      expect(byDate.get(day(3))).toMatchObject({ close: "100", currency: "USD" });
+      expect(byDate.get(day(31))).toMatchObject({ close: "100", currency: "USD" });
+      expect(calls).toEqual([day(6)]); // asked only from the first hole
+      expect(candles.map((c) => c.date)).toEqual([...candles.map((c) => c.date)].sort());
+    });
+
+    it("does nothing without gapFillDays or when the primary has no long hole", async () => {
+      const calls: string[] = [];
+      const svc = new MarketDataService([primary, fallback(calls)]);
+      expect(await svc.getHistoryFrom(etf, day(1))).toHaveLength(8);
+      expect(calls).toEqual([]);
+      // A threshold above the 26-day hole (and today is far past Sep 2, so the trailing
+      // stretch is also a "gap" — use a huge threshold to ignore both).
+      expect(await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10_000 })).toHaveLength(8);
+      expect(calls).toEqual([]);
+    });
+
+    it("returns the primary series when the fallback throws", async () => {
+      const boom: MarketDataProvider = {
+        name: "boom",
+        supports: () => true,
+        getHistoryFrom: async () => {
+          throw new Error("503");
+        },
+      };
+      const errors: string[] = [];
+      const svc = new MarketDataService([primary, boom], {
+        onProviderError: (p) => errors.push(p),
+      });
+      expect(await svc.getHistoryFrom(etf, day(1), { gapFillDays: 10 })).toHaveLength(8);
+      expect(errors).toContain("boom");
+    });
+  });
+
   describe("getHistoryFrom max-range fallback (#737)", () => {
     // A provider that implements getHistoryFrom but returns nothing for the requested
     // window — the exact shape a permanently dead (or merely quiet) feed produces.
