@@ -223,10 +223,13 @@ function scopes(b: IntegrityBodies): { scope: string; v: ValuationBody; parity: 
 }
 
 /** GainSummary is built from the same valuation: its fields must be the response's totals. */
-export function checkGainMatchesTotals(b: IntegrityBodies): Finding[] {
+export function checkGainMatchesTotals(b: IntegrityBodies, skip?: Skip): Finding[] {
   const out: Finding[] = [];
   for (const { scope, v } of scopes(b)) {
-    if (!v.gain) continue;
+    if (!v.gain) {
+      skip?.("GAIN_MATCHES_TOTALS", scope, "not_available");
+      continue;
+    }
     const pairs: [string, string, string][] = [
       ["value", v.netWorth, v.gain.value],
       ["costOfOpen", v.totalCost, v.gain.costOfOpen],
@@ -444,13 +447,16 @@ export function checkAnomalyUnion(b: IntegrityBodies): Finding[] {
 const MAX_HISTORY_FINDINGS = 5;
 
 /** Stored snapshots are one row per portfolio and day: a series must be strictly ascending. */
-export function checkHistoryOrdered(b: IntegrityBodies): Finding[] {
+export function checkHistoryOrdered(b: IntegrityBodies, skip?: Skip): Finding[] {
   const series: { scope: string; points: HistoryPoint[] }[] = [
     { scope: "networth", points: b.networthHistory },
-    ...b.portfolios.flatMap((p) =>
-      p.history ? [{ scope: `portfolio:${p.id}`, points: p.history }] : [],
-    ),
   ];
+  for (const p of b.portfolios) {
+    const scope = `portfolio:${p.id}`;
+    // The collector leaves a portfolio's series out when summing needs FX; say so, don't drop it.
+    if (p.history) series.push({ scope, points: p.history });
+    else skip?.("HISTORY_ORDERED", scope, "history_not_collected");
+  }
   const out: Finding[] = [];
   for (const { scope, points } of series) {
     for (let i = 1; i < points.length; i++) {

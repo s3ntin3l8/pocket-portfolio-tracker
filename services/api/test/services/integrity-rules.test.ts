@@ -372,6 +372,7 @@ describe("integrity rules", () => {
     const b = bodies();
     b.portfolios[0]!.history = null;
     expect(runIntegrity(b).abstentions).toEqual([
+      { rule: "HISTORY_ORDERED", scope: "portfolio:p1", reason: "history_not_collected" },
       { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "history_not_collected" },
     ]);
   });
@@ -379,8 +380,15 @@ describe("integrity rules", () => {
   it("a missing gain block abstains on the contribution parity instead of passing it", () => {
     const b = bodies();
     delete b.portfolios[0]!.summary.gain;
-    expect(runIntegrity(b).abstentions).toContainEqual({
+    const { abstentions } = runIntegrity(b);
+    // Both rules that need the gain block say they skipped the scope, not just one of them.
+    expect(abstentions).toContainEqual({
       rule: "CONTRIB_PARITY",
+      scope: "portfolio:p1",
+      reason: "not_available",
+    });
+    expect(abstentions).toContainEqual({
+      rule: "GAIN_MATCHES_TOTALS",
       scope: "portfolio:p1",
       reason: "not_available",
     });

@@ -41,9 +41,20 @@ describe("GET /me/integrity", () => {
     expect(Number.isNaN(Date.parse(body.checkedAt))).toBe(false);
     // The SEK-base depot is not in the display currency, so summing the histories needs FX the
     // check does not do: that rule reports it skipped the data instead of counting as passed.
-    expect(body.abstentions).toEqual([
-      { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },
-    ]);
+    // ... and since the per-portfolio series are not collected either, the ordering check says
+    // so for each portfolio rather than silently covering only the aggregate series.
+    const ids = Object.values(l.portfolioIds);
+    expect(body.abstentions).toHaveLength(3);
+    expect(body.abstentions).toEqual(
+      expect.arrayContaining([
+        { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },
+        ...ids.map((id) => ({
+          rule: "HISTORY_ORDERED",
+          scope: `portfolio:${id}`,
+          reason: "history_not_collected",
+        })),
+      ]),
+    );
   });
 
   it("works with a read-scoped personal access token", async () => {

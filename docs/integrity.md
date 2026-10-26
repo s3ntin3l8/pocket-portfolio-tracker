@@ -103,7 +103,7 @@ needs), `currency_mismatch` (two pages answer in different currencies), `not_ava
 figure is absent from the response), `foreign_currency` / `history_not_collected` (the history
 sum is only checked when every portfolio is in the display currency). `rulesRun` lists every rule
 attempted; `abstentions` lists where one did not compare, and those scopes are **not** known to
-be consistent. All three surfaces show them and none calls a run with skips a full pass.
+be consistent. Every rule that skips data reports it, and all three surfaces show them; none calls a run with skips a full pass.
 
 A finding is **evidence**, not a verdict: it says which rule broke, on which scope, with
 expected vs. actual. Whether the rule or the number is wrong is for you to decide — read the
