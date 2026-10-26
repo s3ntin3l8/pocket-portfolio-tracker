@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing integrity dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
 
 # Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
 # docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
@@ -131,6 +131,9 @@ demo: ## Isolated throwaway instance with the demo dataset (scratch PGlite, clea
 
 screenshots: ## Regenerate README + PWA manifest screenshots from an isolated demo instance
 	node scripts/screenshots.mjs
+
+integrity: ## Run the analysis-integrity invariants against a running API with POCKET_TOKEN (see docs/integrity.md)
+	node scripts/integrity-report.mjs
 
 screenshots-landing: ## Landing-page stills + loop into OUT (default ./landing-shots); needs ffmpeg for the loop
 	node scripts/screenshots.mjs --profile landing --out "$(or $(OUT),landing-shots)"

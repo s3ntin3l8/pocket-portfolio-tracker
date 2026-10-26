@@ -26,6 +26,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "screenshots": "node scripts/screenshots.mjs",
+    "integrity": "node scripts/integrity-report.mjs",
     "demo": "node scripts/demo/instance.mjs"
   },
   "devDependencies": {

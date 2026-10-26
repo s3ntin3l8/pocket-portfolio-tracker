@@ -8,13 +8,16 @@ import { Decimal } from "decimal.js";
 // identity that fees/taxes/boundaries legitimately break (e.g. value − contributed =
 // unrealized + realized + income) would report false positives on real data; leave it out.
 
-export type RuleId =
-  | "NW_SUM_PORTFOLIOS"
-  | "GAIN_MATCHES_TOTALS"
-  | "HOLDINGS_SUM"
-  | "NW_COMPOSITION"
-  | "FX_MISSING_DISCLOSED"
-  | "VALUED_AT_COST_NO_GAIN";
+export const RULE_IDS = [
+  "NW_SUM_PORTFOLIOS",
+  "GAIN_MATCHES_TOTALS",
+  "HOLDINGS_SUM",
+  "NW_COMPOSITION",
+  "FX_MISSING_DISCLOSED",
+  "VALUED_AT_COST_NO_GAIN",
+] as const;
+
+export type RuleId = (typeof RULE_IDS)[number];
 
 export interface Finding {
   rule: RuleId;
@@ -281,15 +284,20 @@ export function checkValuedAtCostHasNoGain(b: IntegrityBodies): Finding[] {
   return out;
 }
 
-export const RULES: ((b: IntegrityBodies) => Finding[])[] = [
-  checkNetWorthSumsPortfolios,
-  checkGainMatchesTotals,
-  checkHoldingsSum,
-  checkNetWorthComposition,
-  checkFxMissingDisclosed,
-  checkValuedAtCostHasNoGain,
-];
+/**
+ * Keyed by `RuleId` so the compiler enforces that the ids in `RULE_IDS` and the rules that
+ * actually run are the same set: a rule added here without an id (or the reverse) is a type
+ * error, and `rulesRun` in the report cannot under-report.
+ */
+export const RULES: Record<RuleId, (b: IntegrityBodies) => Finding[]> = {
+  NW_SUM_PORTFOLIOS: checkNetWorthSumsPortfolios,
+  GAIN_MATCHES_TOTALS: checkGainMatchesTotals,
+  HOLDINGS_SUM: checkHoldingsSum,
+  NW_COMPOSITION: checkNetWorthComposition,
+  FX_MISSING_DISCLOSED: checkFxMissingDisclosed,
+  VALUED_AT_COST_NO_GAIN: checkValuedAtCostHasNoGain,
+};
 
 export function checkIntegrity(b: IntegrityBodies): Finding[] {
-  return RULES.flatMap((rule) => rule(b));
+  return RULE_IDS.flatMap((id) => RULES[id](b));
 }
