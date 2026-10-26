@@ -215,6 +215,19 @@ export function checkNetWorthSumsPortfolios(b: IntegrityBodies, skip?: Skip): Fi
   );
 }
 
+/**
+ * Whether every portfolio is already in the user's display currency. The ONE definition behind
+ * three decisions that must agree: the collector fetches the per-portfolio history series only
+ * when this holds (summing across currencies needs FX), and both history rules explain a missing
+ * series, or a skipped sum, by the same reason when it does not.
+ */
+export function allInDisplayCurrency(
+  displayCurrency: string,
+  portfolios: { summary: { displayCurrency: string } }[],
+): boolean {
+  return portfolios.every((p) => p.summary.displayCurrency === displayCurrency);
+}
+
 function scopes(b: IntegrityBodies): { scope: string; v: ValuationBody; parity: ParityBodies }[] {
   return [
     { scope: "networth", v: b.networth, parity: b.networthParity },
@@ -454,9 +467,7 @@ export function checkHistoryOrdered(b: IntegrityBodies, skip?: Skip): Finding[] 
   // The collector leaves the per-portfolio series out when the account mixes currencies (summing
   // needs FX). Give the same reason as HISTORY_SUMS_PORTFOLIOS, currency first, so one cause is
   // never explained two ways.
-  const mixedCurrencies = b.portfolios.some(
-    (p) => p.summary.displayCurrency !== b.networth.displayCurrency,
-  );
+  const mixedCurrencies = !allInDisplayCurrency(b.networth.displayCurrency, b.portfolios);
   for (const p of b.portfolios) {
     const scope = `portfolio:${p.id}`;
     if (p.history) series.push({ scope, points: p.history });
@@ -501,7 +512,7 @@ export function checkHistorySumsPortfolios(b: IntegrityBodies, skip?: Skip): Fin
   if (b.portfolios.length === 0) return []; // nothing to sum: vacuous, not an abstention
   // Currency first: the collector leaves the per-portfolio series out exactly when a portfolio
   // is in another currency, so "history not collected" would hide the real reason.
-  if (b.portfolios.some((p) => p.summary.displayCurrency !== b.networth.displayCurrency)) {
+  if (!allInDisplayCurrency(b.networth.displayCurrency, b.portfolios)) {
     skip?.("HISTORY_SUMS_PORTFOLIOS", "networth", "foreign_currency");
     return [];
   }
