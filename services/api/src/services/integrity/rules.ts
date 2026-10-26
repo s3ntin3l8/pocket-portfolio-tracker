@@ -284,15 +284,20 @@ export function checkValuedAtCostHasNoGain(b: IntegrityBodies): Finding[] {
   return out;
 }
 
-export const RULES: ((b: IntegrityBodies) => Finding[])[] = [
-  checkNetWorthSumsPortfolios,
-  checkGainMatchesTotals,
-  checkHoldingsSum,
-  checkNetWorthComposition,
-  checkFxMissingDisclosed,
-  checkValuedAtCostHasNoGain,
-];
+/**
+ * Keyed by `RuleId` so the compiler enforces that the ids in `RULE_IDS` and the rules that
+ * actually run are the same set: a rule added here without an id (or the reverse) is a type
+ * error, and `rulesRun` in the report cannot under-report.
+ */
+export const RULES: Record<RuleId, (b: IntegrityBodies) => Finding[]> = {
+  NW_SUM_PORTFOLIOS: checkNetWorthSumsPortfolios,
+  GAIN_MATCHES_TOTALS: checkGainMatchesTotals,
+  HOLDINGS_SUM: checkHoldingsSum,
+  NW_COMPOSITION: checkNetWorthComposition,
+  FX_MISSING_DISCLOSED: checkFxMissingDisclosed,
+  VALUED_AT_COST_NO_GAIN: checkValuedAtCostHasNoGain,
+};
 
 export function checkIntegrity(b: IntegrityBodies): Finding[] {
-  return RULES.flatMap((rule) => rule(b));
+  return RULE_IDS.flatMap((id) => RULES[id](b));
 }

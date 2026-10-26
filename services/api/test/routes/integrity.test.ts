@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { closeDb } from "../../src/db/client.js";
-import { RULE_IDS } from "../../src/services/integrity/index.js";
+import { RULES } from "../../src/services/integrity/index.js";
 import { buildIntegrityApp, loadLedger, type App, type LoadedLedger } from "../integrity/ledger.js";
 import { degraded } from "../integrity/ledgers/degraded.js";
 import { multiBase } from "../integrity/ledgers/multi-base.js";
@@ -34,7 +34,9 @@ describe("GET /me/integrity", () => {
     const body = res.json();
     expect(body.findings).toEqual([]);
     expect(body.portfolioCount).toBe(2);
-    expect(body.rulesRun).toEqual([...RULE_IDS]);
+    // Pinned against the implementations that run, not the id list the report is built from.
+    expect(body.rulesRun).toHaveLength(Object.keys(RULES).length);
+    expect(body.rulesRun).toEqual(Object.keys(RULES));
     expect(Number.isNaN(Date.parse(body.checkedAt))).toBe(false);
   });
 

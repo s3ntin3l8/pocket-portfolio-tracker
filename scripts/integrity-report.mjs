@@ -31,7 +31,11 @@ if (!token) {
 
 let res;
 try {
-  res = await fetch(`${base}/me/integrity`, { headers: { authorization: `Bearer ${token}` } });
+  res = await fetch(`${base}/me/integrity`, {
+    headers: { authorization: `Bearer ${token}` },
+    // Valuing every portfolio can take a while on a big account; a hung connection must not.
+    signal: AbortSignal.timeout(120_000),
+  });
 } catch (err) {
   console.error(`Could not reach ${base}: ${err instanceof Error ? err.message : err}`);
   process.exit(2);
@@ -40,7 +44,20 @@ if (!res.ok) {
   console.error(`GET /me/integrity -> ${res.status}: ${await res.text()}`);
   process.exit(2);
 }
-const report = await res.json();
+let report;
+try {
+  report = await res.json();
+} catch {
+  console.error(
+    `GET /me/integrity -> ${res.status} but the body is not JSON (proxy or error page?).`,
+  );
+  process.exit(2);
+}
+// Exit 1 means "findings"; a malformed report must not be mistaken for one.
+if (!Array.isArray(report?.findings) || !Array.isArray(report?.rulesRun)) {
+  console.error("GET /me/integrity returned an unexpected shape (no findings/rulesRun arrays).");
+  process.exit(2);
+}
 
 if (values.json) {
   console.log(JSON.stringify(report, null, 2));

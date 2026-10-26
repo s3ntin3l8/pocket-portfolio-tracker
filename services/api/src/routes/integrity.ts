@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { checkIntegrity, collectBodies, RULE_IDS } from "../services/integrity/index.js";
+import { checkIntegrity, collectBodies, RULES } from "../services/integrity/index.js";
 
 /**
  * `GET /me/integrity` — runs the cross-endpoint invariants (`services/integrity`) over the
@@ -12,8 +12,8 @@ import { checkIntegrity, collectBodies, RULE_IDS } from "../services/integrity/i
  */
 export async function integrityRoute(app: FastifyInstance) {
   app.get("/me/integrity", { preHandler: app.authenticate }, async (request, reply) => {
-    const authorization = request.headers.authorization;
-    if (!authorization) return reply.code(400).send({ error: "authorization_header_required" });
+    // `app.authenticate` has already rejected anything without a Bearer credential.
+    const authorization = request.headers.authorization as string;
 
     const get = async (url: string): Promise<unknown> => {
       const res = await app.inject({ method: "GET", url, headers: { authorization } });
@@ -37,7 +37,7 @@ export async function integrityRoute(app: FastifyInstance) {
     return {
       checkedAt: new Date().toISOString(),
       portfolioCount: bodies.portfolios.length,
-      rulesRun: [...RULE_IDS],
+      rulesRun: Object.keys(RULES),
       findings: checkIntegrity(bodies),
     };
   });

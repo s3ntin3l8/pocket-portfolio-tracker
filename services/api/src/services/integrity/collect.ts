@@ -1,4 +1,8 @@
+import { mapPool } from "../../lib/promise-pool.js";
 import type { IntegrityBodies, NetWorthBody, ValuationBody } from "./rules.js";
+
+/** Same bound as the routes' per-portfolio valuation fan-out (PORTFOLIO_VALUATION_CONCURRENCY). */
+const SUMMARY_CONCURRENCY = 4;
 
 const REQUIRED_STRINGS = [
   "displayCurrency",
@@ -70,11 +74,13 @@ export async function collectBodies(
   }
   const [networth, summaries] = await Promise.all([
     get("/networth").then((b) => asValuation(b, "/networth") as NetWorthBody),
-    Promise.all(
-      portfolioList.map(
-        async (p) =>
-          [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
-      ),
+    // Bounded like the API's own per-portfolio fan-out: every sub-request spends the caller's
+    // rate-limit budget, so an unbounded burst on a big account would 429 itself.
+    mapPool(
+      portfolioList as { id: string }[],
+      SUMMARY_CONCURRENCY,
+      async (p) =>
+        [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
     ),
   ]);
   const portfolios = summaries.map(([id, summary]) => ({ id, summary }));
