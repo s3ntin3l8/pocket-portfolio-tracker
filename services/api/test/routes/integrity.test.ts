@@ -44,14 +44,15 @@ describe("GET /me/integrity", () => {
     // ... and since the per-portfolio series are not collected either, the ordering check says
     // so for each portfolio rather than silently covering only the aggregate series.
     const ids = Object.values(l.portfolioIds);
-    expect(body.abstentions).toHaveLength(3);
+    expect(body.abstentions).toHaveLength(ids.length + 1);
     expect(body.abstentions).toEqual(
       expect.arrayContaining([
         { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },
         ...ids.map((id) => ({
           rule: "HISTORY_ORDERED",
           scope: `portfolio:${id}`,
-          reason: "history_not_collected",
+          // The same cause as the sum rule's skip, explained the same way.
+          reason: "foreign_currency",
         })),
       ]),
     );

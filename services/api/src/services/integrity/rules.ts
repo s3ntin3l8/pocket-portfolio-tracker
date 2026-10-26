@@ -451,11 +451,21 @@ export function checkHistoryOrdered(b: IntegrityBodies, skip?: Skip): Finding[] 
   const series: { scope: string; points: HistoryPoint[] }[] = [
     { scope: "networth", points: b.networthHistory },
   ];
+  // The collector leaves the per-portfolio series out when the account mixes currencies (summing
+  // needs FX). Give the same reason as HISTORY_SUMS_PORTFOLIOS, currency first, so one cause is
+  // never explained two ways.
+  const mixedCurrencies = b.portfolios.some(
+    (p) => p.summary.displayCurrency !== b.networth.displayCurrency,
+  );
   for (const p of b.portfolios) {
     const scope = `portfolio:${p.id}`;
-    // The collector leaves a portfolio's series out when summing needs FX; say so, don't drop it.
     if (p.history) series.push({ scope, points: p.history });
-    else skip?.("HISTORY_ORDERED", scope, "history_not_collected");
+    else
+      skip?.(
+        "HISTORY_ORDERED",
+        scope,
+        mixedCurrencies ? "foreign_currency" : "history_not_collected",
+      );
   }
   const out: Finding[] = [];
   for (const { scope, points } of series) {

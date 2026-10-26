@@ -362,8 +362,10 @@ describe("integrity rules", () => {
         { rule: "NW_SUM_PORTFOLIOS", scope: "networth", reason: "no_fx_rate" },
         { rule: "CONTRIB_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
         { rule: "REALIZED_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
-        // The foreign currency, not the (consequent) missing series, is the reason given.
+        // The foreign currency, not the (consequent) missing series, is the reason given: by
+        // both history rules, so one cause is not explained two ways.
         { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },
+        { rule: "HISTORY_ORDERED", scope: "portfolio:p2", reason: "foreign_currency" },
       ]),
     );
   });
