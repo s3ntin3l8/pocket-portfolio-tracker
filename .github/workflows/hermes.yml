@@ -7,8 +7,7 @@ name: Hermes (review)
 #      an issue) any time you want another look -- including every follow-up
 #      after the initial auto-review.
 # Both call the same reusable workflow (s3ntin3l8/.github/.github/workflows/
-# hermes-review.yml@8957219ed8c28f90559cff917853542102011458 # main @ 2026-10-25
-# so each job only runs for its own trigger.
+# hermes-review.yml@main), so each job only runs for its own trigger.
 #
 # IMPORTANT: do NOT add `synchronize` back. It re-triggers a fresh review on
 # EVERY subsequent push, which on a PR under active iteration is an unbounded
@@ -66,7 +65,7 @@ jobs:
       !startsWith(github.event.pull_request.head.ref, 'mullion/task-')
     permissions:
       contents: read # all gh calls in the callee use the Hermes App token
-    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@8957219ed8c28f90559cff917853542102011458 # main @ 2026-10-25
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
       mode: auto # review on trigger, no @mention needed
       mention-trigger: s3ntin3l8-hermes
@@ -90,7 +89,7 @@ jobs:
       contains(fromJSON('["MEMBER", "OWNER", "COLLABORATOR"]'), github.event.comment.author_association)
     permissions:
       contents: read # all gh calls in the callee use the Hermes App token
-    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@8957219ed8c28f90559cff917853542102011458 # main @ 2026-10-25
+    uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
       mention-trigger: s3ntin3l8-hermes # mode: on-demand is the reusable workflow's default
       # See the auto-review job above: poll the run instead of firing and
