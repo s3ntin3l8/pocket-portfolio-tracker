@@ -15,6 +15,10 @@ import { transfers, transfersExpected } from "./ledgers/transfers.js";
 // frozen at each ledger's `asOf` (Date only, so PGlite/Fastify timers keep running) because route
 // handlers call `new Date()` and quotes older than the stale window count as missing.
 
+// 1600/15 is not representable: the average-cost pool carries 20 significant digits, so
+// figures derived from it are exact only to ~1e-15 (reported 959.99999999999999998 for 960).
+const ROUNDING = "1e-12";
+
 let app: App;
 let sign: (sub: string) => Promise<string>;
 
@@ -47,24 +51,25 @@ describe("eur-basic", () => {
   it("summary gain figures match the hand-derived ones", async () => {
     const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
     const e = eurBasicExpected;
-    // 1600/15 is not representable: the average-cost pool carries 20 significant digits, so
-    // figures derived from it are exact only to ~1e-15 (reported 959.99999999999999998 for 960).
-    const rounding = "1e-12";
-    expectDecimal(s.gain.value, e.value, "value", rounding);
-    expectDecimal(s.gain.costOfOpen, e.costOfOpen, "costOfOpen", rounding);
-    expectDecimal(s.gain.unrealized, e.unrealized, "unrealized", rounding);
-    expectDecimal(s.gain.realized, e.realized, "realized", rounding);
+    expectDecimal(s.gain.value, e.value, "value", ROUNDING);
+    expectDecimal(s.gain.costOfOpen, e.costOfOpen, "costOfOpen", ROUNDING);
+    expectDecimal(s.gain.unrealized, e.unrealized, "unrealized", ROUNDING);
+    expectDecimal(s.gain.realized, e.realized, "realized", ROUNDING);
     expectDecimal(s.gain.income, e.income, "income");
     expect(s.gain.boundary).toBe("outside");
   });
 
+  it("holds the hand-derived share count", async () => {
+    const h = await get(l, `/portfolios/${l.portfolioIds.depot}/holdings`);
+    expect(h.holdings).toHaveLength(1);
+    expectDecimal(h.holdings[0].quantity, eurBasicExpected.openShares, "openShares");
+  });
+
   it("/networth agrees with the single portfolio", async () => {
     const nw = await get(l, "/networth");
-    expectDecimal(nw.netWorth, eurBasicExpected.value, "netWorth", "1e-12");
+    expectDecimal(nw.netWorth, eurBasicExpected.value, "netWorth", ROUNDING);
   });
 });
-
-const ROUNDING = "1e-12";
 
 function expectGain(gain: Record<string, string>, e: Record<string, string>, label: string) {
   for (const [k, v] of Object.entries(e)) expectDecimal(gain[k], v, `${label}.${k}`, ROUNDING);

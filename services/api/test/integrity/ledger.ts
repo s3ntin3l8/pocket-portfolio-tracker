@@ -2,7 +2,7 @@ import { SignJWT, generateKeyPair } from "jose";
 import { eq } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { expect } from "vitest";
-import { fxRates, instruments, lastPrices, transactions, users } from "@portfolio/db";
+import { instruments, lastPrices, transactions, users } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 
 // A declarative, fixed-date scenario. Every date is absolute and ids are symbolic, so the
@@ -26,6 +26,11 @@ export interface LedgerInstrument {
   price?: string;
 }
 
+/**
+ * `price` is per unit for buy/sell and both transfer legs, but the LUMP SUM for an income row
+ * (dividend/coupon/interest) with no `quantity` — per unit only when a quantity is given (see
+ * `cashFlow` in `packages/core/src/cash.ts`). For deposit/withdrawal it is the amount.
+ */
 export interface LedgerTx {
   portfolio: string;
   type: (typeof transactions.$inferInsert)["type"];
@@ -45,7 +50,6 @@ export interface Ledger {
   displayCurrency: string;
   portfolios: Record<string, { name: string; baseCurrency: string; cashCounted: boolean }>;
   instruments: Record<string, LedgerInstrument>;
-  fx?: { base: string; quote: string; rate: string; date: string }[];
   transactions: LedgerTx[];
 }
 
@@ -84,7 +88,8 @@ export async function loadLedger(
   sub = `ledger-${ledger.name}`,
 ): Promise<LoadedLedger> {
   const headers = { authorization: `Bearer ${await sign(sub)}` };
-  await app.inject({ method: "GET", url: "/me", headers });
+  const me = await app.inject({ method: "GET", url: "/me", headers });
+  expect(me.statusCode, "upsert user via /me").toBe(200);
   await app.db
     .update(users)
     .set({ displayCurrency: ledger.displayCurrency })
@@ -119,10 +124,6 @@ export async function loadLedger(
         asOf: new Date(ledger.asOf),
       });
     }
-  }
-
-  for (const r of ledger.fx ?? []) {
-    await app.db.insert(fxRates).values(r).onConflictDoNothing();
   }
 
   await app.db.insert(transactions).values(
