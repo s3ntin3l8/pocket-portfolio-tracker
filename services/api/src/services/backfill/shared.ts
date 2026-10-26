@@ -1,7 +1,6 @@
-import { eq, and, gte, inArray, isNull, lt, max, or } from "drizzle-orm";
+import { eq, and, inArray, isNull, or, sql } from "drizzle-orm";
 import { corporateActions, instruments, portfolios, prices, transactions } from "@portfolio/db";
 import { MAX_PRICE_CARRY_FORWARD_DAYS, toDateKey } from "@portfolio/core";
-import { findGaps } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 
 /**
@@ -167,20 +166,31 @@ export async function priceGapRemains(
   fetchedDates: string[],
   today: string,
 ): Promise<boolean> {
-  const [anchor] = await db
-    .select({ date: max(prices.date) })
-    .from(prices)
-    .where(and(eq(prices.instrumentId, instrumentId), lt(prices.date, fetchFrom)));
-  const stored = await db
-    .select({ date: prices.date })
-    .from(prices)
-    .where(and(eq(prices.instrumentId, instrumentId), gte(prices.date, fetchFrom)));
-  const dates = [
-    ...new Set([
-      ...(anchor?.date ? [anchor.date] : []),
-      ...stored.map((r) => r.date),
-      ...fetchedDates,
-    ]),
-  ].sort();
-  return findGaps(dates, today, MAX_PRICE_CARRY_FORWARD_DAYS).length > 0;
+  // Graded in SQL (one lag() pass) rather than loading every stored date: a from-inception
+  // heal of a long-lived instrument would otherwise read thousands of rows per run.
+  // Same rule as `findGaps` — interior hole, or last price to `today` — over the stored
+  // window, the run's candle dates and the anchor; nothing before the first date.
+  const fetchedCsv = fetchedDates.join(",");
+  const result = await db.execute<{ gap: boolean }>(sql`
+    with d as (
+      select ${prices.date} as date from ${prices}
+        where ${prices.instrumentId} = ${instrumentId} and ${prices.date} >= ${fetchFrom}
+      union
+      select max(${prices.date}) from ${prices}
+        where ${prices.instrumentId} = ${instrumentId} and ${prices.date} < ${fetchFrom}
+      union
+      select unnest(string_to_array(nullif(${fetchedCsv}, ''), ','))::date
+    ), s as (
+      select date, lag(date) over (order by date) as prev from d where date is not null
+    )
+    select (
+      exists (select 1 from s where prev is not null
+                and (date - prev) > ${MAX_PRICE_CARRY_FORWARD_DAYS}::int)
+      or coalesce(${today}::date - (select max(date) from s) > ${MAX_PRICE_CARRY_FORWARD_DAYS}::int, false)
+    ) as gap
+  `);
+  const rows = Array.isArray(result)
+    ? (result as { gap: boolean }[])
+    : ((result as unknown as { rows: { gap: boolean }[] }).rows ?? []);
+  return rows[0]?.gap === true;
 }
