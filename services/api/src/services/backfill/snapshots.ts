@@ -102,7 +102,13 @@ export async function writeSnapshotSeries(
 
   const allCurrencies = [...new Set(instrRows.map((i) => i.currency))];
   const txCurrencies = [...new Set(txRows.map((r) => r.currency))];
-  const allCcys = [...new Set([...allCurrencies, ...txCurrencies])];
+  // A price row carries the provider's own currency, which can differ from the
+  // instrument's declared one (a USD-priced line declared EUR) — it needs a rate too, or
+  // convert() throws mid-run and the preflight below can't see the gap.
+  const priceCurrencies = [
+    ...new Set([...rawPrices.values()].flatMap((m) => [...m.values()].map((p) => p.currency))),
+  ];
+  const allCcys = [...new Set([...allCurrencies, ...txCurrencies, ...priceCurrencies])];
 
   const [pfRow] = await db
     .select({ baseCurrency: portfolios.baseCurrency })
