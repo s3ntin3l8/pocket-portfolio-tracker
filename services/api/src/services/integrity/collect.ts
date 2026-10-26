@@ -1,6 +1,6 @@
 import { mapPool } from "../../lib/promise-pool.js";
 import { PORTFOLIO_VALUATION_CONCURRENCY } from "../../routes/transactions/shared/helpers.js";
-import type { IntegrityBodies, NetWorthBody, ValuationBody } from "./rules.js";
+import type { IntegrityBodies, NetWorthBody, ParityBodies, ValuationBody } from "./rules.js";
 
 const REQUIRED_STRINGS = [
   "displayCurrency",
@@ -57,6 +57,40 @@ function asValuation(body: unknown, what: string): ValuationBody {
   };
 }
 
+function needStrings(body: unknown, keys: string[], what: string): Record<string, unknown> {
+  const b = body as Record<string, unknown> | null;
+  for (const key of keys) {
+    if (typeof b?.[key] !== "string") {
+      throw new Error(`${what}: expected a string "${key}", got ${JSON.stringify(b?.[key])}`);
+    }
+  }
+  return b!;
+}
+
+/** The parity endpoints for one scope: `base` is `/networth` or `/portfolios/:id`. */
+async function collectParity(
+  get: (url: string) => Promise<unknown>,
+  base: string,
+): Promise<ParityBodies> {
+  const contributions = needStrings(
+    await get(`${base}/contributions`),
+    ["displayCurrency", "netContributed"],
+    `${base}/contributions`,
+  );
+  const trades = needStrings(
+    await get(`${base}/trades`),
+    ["displayCurrency", "totalRealized"],
+    `${base}/trades`,
+  );
+  const anomalies = (await get(`${base}/anomalies`)) as { anomalies?: unknown };
+  if (!Array.isArray(anomalies?.anomalies)) {
+    throw new Error(
+      `${base}/anomalies: expected an "anomalies" array, got ${JSON.stringify(anomalies)}`,
+    );
+  }
+  return { contributions, trades, anomalies } as unknown as ParityBodies;
+}
+
 /**
  * Fetch the response bodies the rules read. `get` returns the parsed JSON of a GET and throws
  * on a non-200, so a failing endpoint is a loud failure, not an empty (vacuously passing) rule.
@@ -75,12 +109,16 @@ export async function collectBodies(
   const networth = asValuation(await get("/networth"), "/networth") as NetWorthBody;
   // Bounded like the API's own per-portfolio fan-out: every sub-request spends the caller's
   // rate-limit budget, so an unbounded burst on a big account would 429 itself.
-  const summaries = await mapPool(
+  const networthParity = await collectParity(get, "/networth");
+  const portfolios = await mapPool(
     portfolioList as { id: string }[],
     PORTFOLIO_VALUATION_CONCURRENCY,
-    async (p) => [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
+    async (p) => ({
+      id: p.id,
+      summary: asValuation(await get(`/portfolios/${p.id}/summary`), "summary"),
+      parity: await collectParity(get, `/portfolios/${p.id}`),
+    }),
   );
-  const portfolios = summaries.map(([id, summary]) => ({ id, summary }));
 
   // Today's rate (UTC day of the networth response) for every portfolio currency that differs
   // from the display currency — the same cache the valuation reads.
@@ -95,5 +133,5 @@ export async function collectBodies(
     const r = (await get(`/fx-rate?from=${from}&to=${to}&date=${date}`)) as { rate: string | null };
     fxToDisplay[from] = r.rate;
   }
-  return { networth, portfolios, fxToDisplay };
+  return { networth, networthParity, portfolios, fxToDisplay };
 }
