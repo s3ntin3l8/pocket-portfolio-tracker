@@ -83,7 +83,12 @@ function needStrings<K extends string>(
   return b as Record<K, string>;
 }
 
-/** A history series: an array of points that each carry a date and the two values. */
+/**
+ * A history series: an array of points that each carry a date and the two values. No rule reads
+ * `marketValue` today (the aggregate's carries a gap leg forward by design, see
+ * `checkHistorySumsPortfolios`); it is required on purpose, as an endpoint-contract check, so a
+ * renamed or dropped field fails by name instead of a rule silently comparing nothing later.
+ */
 function asHistory(body: unknown, what: string): HistoryPoint[] {
   if (!Array.isArray(body)) {
     throw new Error(`${what}: expected an array, got ${JSON.stringify(body)}`);
