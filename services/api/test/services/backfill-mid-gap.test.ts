@@ -47,6 +47,8 @@ async function seed(opts: {
   errorCount?: number;
   /** A manual-priced bond: never fetched from a provider, one `prices` row per reprice. */
   manualBond?: boolean;
+  /** A par bond (face value, no manual price): the backfill writes daily par rows. */
+  parBond?: boolean;
 }) {
   const db = await ensureDb();
   const tag = `midgap${++seq}`;
@@ -63,12 +65,13 @@ async function seed(opts: {
     .values({
       symbol: tag.toUpperCase(),
       market: "XETRA",
-      assetClass: opts.manualBond ? "bond" : "equity",
+      assetClass: opts.manualBond || opts.parBond ? "bond" : "equity",
       currency: "EUR",
       name: tag,
       ...(opts.manualBond
         ? { faceValue: "100", manualPrice: "98", manualPriceAt: new Date() }
         : {}),
+      ...(opts.parBond ? { faceValue: "100" } : {}),
       priceFeedErrorCount: opts.errorCount ?? 0,
       priceFeedMissCount: opts.missCount ?? 0,
       priceFeedLastMissAt: opts.missCount ? new Date() : null,
@@ -153,6 +156,21 @@ describe("backfillStalePortfolios — gaps in the middle of a held instrument's 
   it("never enqueues a manual-priced bond: its reprice rows are holes by construction and no fetch ever records a miss", async () => {
     // Repriced 60, 20 and 0 days ago → two interior "holes", newest price fresh.
     const { db, pf } = await seed({ priceDates: [ago(60), ago(20), ago(0)], manualBond: true });
+    expect((await sweep(db)).filter((c) => c.portfolioId === pf.id)).toEqual([]);
+  });
+
+  it("still heals a par bond's hole: the backfill writes daily par rows, so that heal converges", async () => {
+    const { db, pf } = await seed({
+      priceDates: [...range(80, 60), ...range(40, 0)],
+      parBond: true,
+    });
+    const calls = (await sweep(db)).filter((c) => c.portfolioId === pf.id);
+    expect(calls).toEqual([{ portfolioId: pf.id, fromDate: ago(59), tailOnly: true }]);
+  });
+
+  it("does not re-enqueue a manual-priced bond just because its last reprice is old", async () => {
+    // Newest row 30 days ago: stale by the trailing check, but no fetch can ever refresh it.
+    const { db, pf } = await seed({ priceDates: [ago(60), ago(30)], manualBond: true });
     expect((await sweep(db)).filter((c) => c.portfolioId === pf.id)).toEqual([]);
   });
 

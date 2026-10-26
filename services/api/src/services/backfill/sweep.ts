@@ -18,7 +18,7 @@ import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { toCoreTxns } from "../tx-core.js";
 import { backfillPortfolioHistory, type BackfillResult } from "./core.js";
-import { firstHeldDateFrom } from "./shared.js";
+import { firstHeldDateFrom, isManualPriceBond } from "./shared.js";
 
 export interface SweepResult {
   scanned: number;
@@ -199,6 +199,8 @@ export async function backfillStalePortfolios(
         .select({
           id: instruments.id,
           assetClass: instruments.assetClass,
+          faceValue: instruments.faceValue,
+          manualPrice: instruments.manualPrice,
           priceFeedMissCount: instruments.priceFeedMissCount,
           priceFeedLastMissAt: instruments.priceFeedLastMissAt,
         })
@@ -206,6 +208,14 @@ export async function backfillStalePortfolios(
         .where(inArray(instruments.id, currentlyHeldInstrIds))
     : [];
   const feedHealthByInstr = new Map(feedHealthRows.map((r) => [r.id, r]));
+  // A bond with a manual price (one `prices` row per reprice) or no face value is never
+  // fetched or par-filled by the backfill, so no heal can change its prices and no miss is
+  // ever recorded for the cooldown to engage — healing it would re-run every night. (A
+  // par bond is written daily from the fetch window, so its holes ARE healable.)
+  function isUnhealableBond(instrumentId: string): boolean {
+    const h = feedHealthByInstr.get(instrumentId);
+    return !!h && h.assetClass === "bond" && (isManualPriceBond(h) || !h.faceValue);
+  }
   function isCoolingDownDeadFeed(instrumentId: string): boolean {
     const health = feedHealthByInstr.get(instrumentId);
     if (!health || health.priceFeedMissCount < DEAD_FEED_MISS_THRESHOLD) return false;
@@ -221,7 +231,7 @@ export async function backfillStalePortfolios(
   const worstLatestPriceByPortfolio = new Map<string, string | null>();
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
-      if (isCoolingDownDeadFeed(instrumentId)) continue;
+      if (isCoolingDownDeadFeed(instrumentId) || isUnhealableBond(instrumentId)) continue;
       const latest = latestPriceByInstr.get(instrumentId) ?? null;
       const cur = worstLatestPriceByPortfolio.get(portfolioId);
       if (cur === undefined) {
@@ -293,11 +303,7 @@ export async function backfillStalePortfolios(
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
       const gaps = midGapsByInstr.get(instrumentId);
-      // Bonds are never fetched from a provider: a manual-priced one has one row per
-      // reprice (a hole by construction), a par one is written daily. Healing either
-      // would re-run forever, because no miss is ever recorded for them.
-      if (!gaps || feedHealthByInstr.get(instrumentId)?.assetClass === "bond") continue;
-      if (isCoolingDownDeadFeed(instrumentId)) continue;
+      if (!gaps || isUnhealableBond(instrumentId) || isCoolingDownDeadFeed(instrumentId)) continue;
       const firstHeld = firstHeldDateFrom(txByPortfolio.get(portfolioId) ?? [], instrumentId);
       if (!firstHeld) continue;
       for (const g of gaps) {

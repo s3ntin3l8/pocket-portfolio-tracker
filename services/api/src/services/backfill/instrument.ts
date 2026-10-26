@@ -213,6 +213,9 @@ export async function fetchInstrumentPrices(
       .set({
         priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
         priceFeedLastMissAt: new Date(),
+        // Nothing threw: a stale error streak is not current.
+        priceFeedErrorCount: 0,
+        priceFeedLastErrorAt: null,
       })
       .where(eq(instruments.id, instrumentId));
     return { instrumentId, days: 0, truncated: false, unpriced: true };
