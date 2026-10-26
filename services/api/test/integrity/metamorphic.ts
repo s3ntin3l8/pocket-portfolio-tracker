@@ -79,13 +79,46 @@ const MONEY = [
   "totalRealizedPnL",
   "totalIncome",
   "totalLiabilities",
+  "totalDayChange",
 ] as const;
 const GAIN = ["value", "costOfOpen", "netContributed", "unrealized", "realized", "income"] as const;
 
 function closeTo(actual: unknown, expected: Decimal, label: string) {
+  // Name the field: a renamed or null one would otherwise die as an anonymous DecimalError.
+  expect(actual, `${label}: missing`).not.toBeNull();
+  expect(actual, `${label}: missing`).not.toBeUndefined();
   const tol = Decimal.max("1e-9", expected.abs().mul("1e-9"));
   const diff = new Decimal(String(actual)).sub(expected).abs();
   expect(diff.lte(tol), `${label}: expected ${expected}, got ${String(actual)}`).toBe(true);
+}
+
+const HOLDING_MONEY = ["marketValueDisplay", "unrealizedPnLDisplay", "costBasisDisplay"] as const;
+
+/** The per-holding display figures are what the UI renders: they scale like the totals. */
+function compareHoldings(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+  k: number,
+  label: string,
+) {
+  type H = Record<string, string | null> & {
+    instrumentId: string;
+    instrument?: { symbol?: string } | null;
+  };
+  // A derived scenario has its own instrument rows (symbols are namespaced by ledger name), so
+  // holdings are matched on the symbol with that prefix removed, not on the instrument id.
+  const key = (h: H) => (h.instrument?.symbol ?? h.instrumentId).split(":").pop()!;
+  const ha = (a.holdings as H[] | undefined) ?? [];
+  const hb = new Map(((b.holdings as H[] | undefined) ?? []).map((h) => [key(h), h]));
+  expect(hb.size, `${label}.holdings count`).toBe(ha.length);
+  for (const h of ha) {
+    const other = hb.get(key(h));
+    expect(other, `${label}.holdings[${key(h)}] missing`).toBeDefined();
+    for (const f of HOLDING_MONEY) {
+      if (h[f] == null) expect(other![f], `${label}.holdings.${f}`).toBeNull();
+      else closeTo(other![f], new Decimal(h[f]!).mul(k), `${label}.holdings.${f}`);
+    }
+  }
 }
 
 function compareBody(
@@ -93,7 +126,7 @@ function compareBody(
   b: Record<string, unknown>,
   k: number,
   label: string,
-  opts: { skipXirr?: boolean } = {},
+  opts: { skipXirr?: boolean; requireXirr?: boolean } = {},
 ) {
   for (const f of MONEY) closeTo(b[f], new Decimal(String(a[f])).mul(k), `${label}.${f}`);
   const ga = a.gain as Record<string, string> | undefined;
@@ -104,10 +137,17 @@ function compareBody(
     for (const f of GAIN) closeTo(gb[f], new Decimal(ga[f]!).mul(k), `${label}.gain.${f}`);
   }
   expect(b.fxMissingCurrencies, `${label}.fxMissingCurrencies`).toEqual(a.fxMissingCurrencies);
-  // Rates are scale-free: a ×k ledger earns exactly the same XIRR.
-  if (!opts.skipXirr && "xirr" in a) {
-    if (a.xirr == null || b.xirr == null) expect(b.xirr, `${label}.xirr`).toBe(a.xirr);
-    else expect(b.xirr as number, `${label}.xirr`).toBeCloseTo(a.xirr as number, 9);
+  compareHoldings(a, b, k, label);
+  // Rates are scale-free: a ×k ledger earns exactly the same XIRR. Only /networth carries
+  // one, and its absence is a failure, not a reason to skip: a renamed key must not turn the
+  // "... and the all-time XIRR" check into one that compares nothing.
+  if (opts.requireXirr) {
+    expect(a, `${label}: xirr missing`).toHaveProperty("xirr");
+    expect(b, `${label}: xirr missing`).toHaveProperty("xirr");
+    if (!opts.skipXirr) {
+      if (a.xirr == null || b.xirr == null) expect(b.xirr, `${label}.xirr`).toBe(a.xirr);
+      else expect(b.xirr as number, `${label}.xirr`).toBeCloseTo(a.xirr as number, 9);
+    }
   }
 }
 
@@ -116,7 +156,7 @@ function compareBody(
  * aggregate and, when both scenarios have the same portfolios, per portfolio.
  */
 export function expectScaled(a: Outputs, b: Outputs, k = 1) {
-  compareBody(a.networth, b.networth, k, "networth");
+  compareBody(a.networth, b.networth, k, "networth", { requireXirr: true });
   for (const key of Object.keys(a.perPortfolio)) {
     if (!b.perPortfolio[key]) continue;
     compareBody(a.perPortfolio[key]!, b.perPortfolio[key]!, k, `portfolio[${key}]`);
@@ -125,5 +165,5 @@ export function expectScaled(a: Outputs, b: Outputs, k = 1) {
 
 /** Only the aggregate (scenarios whose portfolio sets differ, e.g. after moving shares). */
 export function expectSameAggregate(a: Outputs, b: Outputs, opts: { skipXirr?: boolean } = {}) {
-  compareBody(a.networth, b.networth, 1, "networth", opts);
+  compareBody(a.networth, b.networth, 1, "networth", { ...opts, requireXirr: true });
 }

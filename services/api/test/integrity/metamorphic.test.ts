@@ -80,6 +80,8 @@ describe("ROUNDTRIP_CASH", () => {
     expectScaled(a, b, 1);
   }, 60_000);
 
+  // Weaker than the cash-inside case: outside the boundary a deposit/withdrawal touches no value,
+  // so dropping one leg is not visible here. It guards the boundary-flow sum only.
   it("... and none outside the boundary either", async () => {
     const { a, b } = await pair(
       metaBase,
@@ -120,12 +122,7 @@ describe("SPLIT_PORTFOLIO", () => {
     ],
   });
 
-  it("moving shares between depots leaves the aggregate value, gains and contribution unchanged", async () => {
-    const { a, b } = await pair(metaBase, moved);
-    expectSameAggregate(a, b, { skipXirr: true });
-  }, 60_000);
-
-  it("... and the all-time XIRR", async () => {
+  it("moving shares between depots leaves the aggregate value, gains, contribution and XIRR unchanged", async () => {
     const { a, b } = await pair(metaBase, moved);
     expectSameAggregate(a, b);
   }, 60_000);

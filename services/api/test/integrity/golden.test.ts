@@ -13,6 +13,7 @@ import { transfers, transfersExpected } from "./ledgers/transfers.js";
 import { split, splitExpected } from "./ledgers/split.js";
 import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
+import { metaBase, metaBaseExpected } from "./ledgers/meta-base.js";
 import { multiBase, multiBaseExpected } from "./ledgers/multi-base.js";
 import { fxCarry, fxCarryExpected, fxStale, fxStaleExpected } from "./ledgers/fx-carry.js";
 
@@ -218,5 +219,19 @@ describe("multi-base", () => {
     const nw = await get(l, "/networth");
     expect(nw.displayCurrency).toBe("EUR");
     expectDecimal(nw.netWorth, multiBaseExpected.networth, "netWorth", ROUNDING);
+  });
+});
+
+describe("meta-base", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(metaBase.asOf) });
+    l = await loadLedger(app, sign, metaBase);
+  }, 60_000);
+
+  it("matches the hand-derived figures the metamorphic relations start from", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.a}/summary`);
+    expect(s.gain.boundary).toBe("outside");
+    expectGain(s.gain, metaBaseExpected, "gain");
   });
 });

@@ -25,6 +25,15 @@ function body(k: number, over: Record<string, unknown> = {}): Record<string, unk
       income: m(30),
     },
     fxMissingCurrencies: [],
+    totalDayChange: m(0),
+    holdings: [
+      {
+        instrumentId: "i1",
+        marketValueDisplay: m(1260),
+        unrealizedPnLDisplay: m(300),
+        costBasisDisplay: m(960),
+      },
+    ],
     xirr: 0.1,
     ...over,
   };
@@ -54,6 +63,29 @@ describe("relation helpers", () => {
     const b = out();
     (b.networth.gain as Record<string, string>).boundary = "inside";
     expect(() => expectScaled(out(), b, 1)).toThrow(/boundary/);
+  });
+
+  it("reject a per-holding figure that did not scale, and a missing field by name", () => {
+    const holding = (v: string) => [
+      {
+        instrumentId: "i1",
+        marketValueDisplay: v,
+        unrealizedPnLDisplay: "300",
+        costBasisDisplay: "960",
+      },
+    ];
+    expect(() => expectScaled(out(), out(1, { holdings: holding("1261") }), 1)).toThrow(
+      /holdings.marketValueDisplay/,
+    );
+    expect(() => expectScaled(out(), out(1, { totalDayChange: undefined }), 1)).toThrow(
+      /totalDayChange: missing/,
+    );
+  });
+
+  it("require an xirr on /networth instead of skipping the check", () => {
+    const b = out();
+    delete b.networth.xirr;
+    expect(() => expectScaled(out(), b, 1)).toThrow(/xirr missing/);
   });
 
   it("reject a changed XIRR unless told to skip it", () => {
