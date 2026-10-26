@@ -31,8 +31,9 @@ import { fxCarry, fxCarryExpected, fxStale, fxStaleExpected } from "./ledgers/fx
 // frozen at each ledger's `asOf` (Date only, so PGlite/Fastify timers keep running) because route
 // handlers call `new Date()` and quotes older than the stale window count as missing.
 
-// 1600/15 is not representable: the average-cost pool carries 20 significant digits, so
-// figures derived from it are exact only to ~1e-15 (reported 959.99999999999999998 for 960).
+// The average-cost pool carries 20 significant digits, so figures derived from it are exact only
+// to ~1e-15 (959.99999999999999998 for 960). Deliberate; see "Average-cost precision" in
+// docs/integrity.md (#1159).
 const ROUNDING = "1e-12";
 
 let app: App;
