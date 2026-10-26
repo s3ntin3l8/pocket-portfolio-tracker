@@ -24,16 +24,14 @@ name: Hermes (review)
 #
 # SECURITY: this repo is public and the reusable workflow runs on a self-hosted
 # runner. For a `pull_request` event, GitHub runs the workflow FILE from the PR's
-# own head ref, i.e. a fork's copy of this file, on whatever runner the `if:`
-# lets it reach. Without the `head.repo.full_name` guard below, any stranger
-# could open a fork PR whose version of auto-review's job runs arbitrary steps
-# on that runner -- fork PRs get no secrets and a read-only token, but the
-# runner itself (its filesystem and LAN access) is the trust boundary, not the
-# token. The on-demand path is unaffected: `issue_comment` always runs the
-# DEFAULT BRANCH's copy of this file, so the author_association gate there is
-# sufficient on its own; a maintainer's @mention on a fork PR still works.
-# (Caveat: the same fork guard is also enforced inside the reusable workflow
-# itself, as defense-in-depth -- belt-and-braces, not redundant.)
+# own head ref, so a fork PR can edit or delete the `head.repo.full_name` guard
+# below (or re-point `uses:`). That guard is therefore NOT the trust boundary; it
+# only catches accidents. The real control is the repo setting Settings ->
+# Actions -> General -> "Require approval for all outside collaborators", which
+# must stay on: the runner (filesystem, LAN access) is what is at stake, not the
+# token (fork PRs get no secrets and a read-only token). The on-demand path is
+# unaffected: `issue_comment` always runs the DEFAULT BRANCH's copy of this file,
+# so the author_association gate there is sufficient on its own.
 on:
   pull_request:
     types: [opened, ready_for_review]
@@ -66,10 +64,7 @@ jobs:
       github.event.pull_request.draft == false &&
       !startsWith(github.event.pull_request.head.ref, 'mullion/task-')
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      checks: write
+      contents: read # all gh calls in the callee use the Hermes App token
     uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
       mode: auto # review on trigger, no @mention needed
@@ -93,10 +88,7 @@ jobs:
       github.actor != 's3ntin3l8-hermes[bot]' &&
       contains(fromJSON('["MEMBER", "OWNER", "COLLABORATOR"]'), github.event.comment.author_association)
     permissions:
-      contents: write
-      pull-requests: write
-      issues: write
-      checks: write
+      contents: read # all gh calls in the callee use the Hermes App token
     uses: s3ntin3l8/.github/.github/workflows/hermes-review.yml@main
     with:
       mention-trigger: s3ntin3l8-hermes # mode: on-demand is the reusable workflow's default
