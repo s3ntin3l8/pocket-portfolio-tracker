@@ -36,6 +36,22 @@ export interface BackfillResult {
   unpriced: string[];
 }
 
+/**
+ * Rows written before candles carried their real currency are labelled with the
+ * instrument's declared one; a tail-only run or a fan-out heal leaves them next to
+ * correctly-labelled fresh rows. Only a forced (from-inception) run rewrites them — say so.
+ */
+function warnIfMixedCurrencies(
+  instr: { id: string; symbol: string; market: string },
+  instrPrices: Map<string, { currency: string }>,
+): void {
+  if (new Set([...instrPrices.values()].map((p) => p.currency)).size > 1) {
+    console.warn(
+      `[backfill] mixed price currencies for instrument ${instr.id} (${instr.symbol}/${instr.market}); run a forced backfill to rewrite older rows`,
+    );
+  }
+}
+
 export async function backfillPortfolioHistory(
   db: DB,
   marketData: MarketDataService,
@@ -306,14 +322,7 @@ export async function backfillPortfolioHistory(
         instrPrices.set(row.date, { close: row.close, currency: row.currency });
       }
     }
-    // Rows written before candles carried their real currency are labelled with the
-    // instrument's declared one; a tail-only run leaves them next to correctly-labelled
-    // fresh rows. Only a forced (from-inception) run rewrites them — say so.
-    if (new Set([...instrPrices.values()].map((p) => p.currency)).size > 1) {
-      console.warn(
-        `[backfill] mixed price currencies for instrument ${instr.id} (${instr.symbol}/${instr.market}); run a forced backfill to rewrite older rows`,
-      );
-    }
+    warnIfMixedCurrencies(instr, instrPrices);
   }
 
   const flowDateOf = await buildFlowDateFn(db, instrIds);
@@ -383,6 +392,7 @@ export async function computeBackfillSnapshots(
     if (instrPrices.size === 0) {
       unpriced.push(instr.id);
     }
+    warnIfMixedCurrencies(instr, instrPrices);
   }
 
   // Refresh dividends (non-fatal)
