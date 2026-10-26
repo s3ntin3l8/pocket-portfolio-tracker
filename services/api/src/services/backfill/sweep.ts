@@ -1,4 +1,4 @@
-import { and, eq, gte, max, min, isNotNull, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, gte, max, min, isNotNull, inArray, isNull, or, sql } from "drizzle-orm";
 import {
   corporateActions,
   instruments,
@@ -14,10 +14,11 @@ import {
   DEAD_FEED_MISS_THRESHOLD,
   type CorporateAction,
 } from "@portfolio/core";
-import { findGaps, type MarketDataService } from "@portfolio/market-data";
+import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { toCoreTxns } from "../tx-core.js";
 import { backfillPortfolioHistory, type BackfillResult } from "./core.js";
+import { firstHeldDateFrom } from "./shared.js";
 
 export interface SweepResult {
   scanned: number;
@@ -60,6 +61,12 @@ function daysBetween(a: string, b: string): number {
   return Math.round(
     (new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) / msPerDay,
   );
+}
+
+function prevDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return toDateKey(d);
 }
 
 function nextDay(date: string): string {
@@ -191,6 +198,7 @@ export async function backfillStalePortfolios(
     ? await db
         .select({
           id: instruments.id,
+          assetClass: instruments.assetClass,
           priceFeedMissCount: instruments.priceFeedMissCount,
           priceFeedLastMissAt: instruments.priceFeedLastMissAt,
         })
@@ -242,40 +250,55 @@ export async function backfillStalePortfolios(
   // so the dead-feed cooldown stops this re-fetching it every night.
   const gapCutoffDate = new Date(`${today}T00:00:00Z`);
   gapCutoffDate.setUTCDate(gapCutoffDate.getUTCDate() - MID_GAP_LOOKBACK_DAYS);
-  const heldPriceRows = currentlyHeldInstrIds.length
+  // One window query for the holes themselves (not every price row for every held
+  // instrument): rows whose previous price date is more than the carry-forward window
+  // earlier. Interior only — the stale tail is isTrailingStale's job.
+  const priceWindow = db
+    .select({
+      instrumentId: prices.instrumentId,
+      date: prices.date,
+      prev: sql<
+        string | null
+      >`lag(${prices.date}) over (partition by ${prices.instrumentId} order by ${prices.date})`.as(
+        "prev",
+      ),
+    })
+    .from(prices)
+    .where(
+      and(
+        inArray(prices.instrumentId, currentlyHeldInstrIds),
+        gte(prices.date, toDateKey(gapCutoffDate)),
+      ),
+    )
+    .as("price_window");
+  const gapRows = currentlyHeldInstrIds.length
     ? await db
-        .select({ instrumentId: prices.instrumentId, date: prices.date })
-        .from(prices)
+        .select({
+          instrumentId: priceWindow.instrumentId,
+          date: priceWindow.date,
+          prev: priceWindow.prev,
+        })
+        .from(priceWindow)
         .where(
-          and(
-            inArray(prices.instrumentId, currentlyHeldInstrIds),
-            gte(prices.date, toDateKey(gapCutoffDate)),
-          ),
+          sql`${priceWindow.prev} is not null and (${priceWindow.date}::date - ${priceWindow.prev}::date) > ${MAX_PRICE_CARRY_FORWARD_DAYS}`,
         )
-        .orderBy(prices.instrumentId, prices.date)
     : [];
-  const priceDatesByInstr = new Map<string, string[]>();
-  for (const r of heldPriceRows) {
-    const list = priceDatesByInstr.get(r.instrumentId) ?? [];
-    list.push(r.date);
-    priceDatesByInstr.set(r.instrumentId, list);
-  }
   const midGapsByInstr = new Map<string, { from: string; to: string }[]>();
-  for (const [instrumentId, dates] of priceDatesByInstr) {
-    // `today` = the newest price date, so only interior holes count (the stale tail is
-    // isTrailingStale's job).
-    const gaps = findGaps(dates, dates[dates.length - 1]!, MAX_PRICE_CARRY_FORWARD_DAYS);
-    if (gaps.length > 0) midGapsByInstr.set(instrumentId, gaps);
+  for (const r of gapRows) {
+    const list = midGapsByInstr.get(r.instrumentId) ?? [];
+    list.push({ from: nextDay(r.prev!), to: prevDay(r.date) });
+    midGapsByInstr.set(r.instrumentId, list);
   }
   const midGapStartByPortfolio = new Map<string, string>();
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
       const gaps = midGapsByInstr.get(instrumentId);
-      if (!gaps || isCoolingDownDeadFeed(instrumentId)) continue;
-      const firstHeld = (txByPortfolio.get(portfolioId) ?? [])
-        .filter((t) => t.instrumentId === instrumentId)
-        .map((t) => toDateKey(t.executedAt))
-        .sort()[0];
+      // Bonds are never fetched from a provider: a manual-priced one has one row per
+      // reprice (a hole by construction), a par one is written daily. Healing either
+      // would re-run forever, because no miss is ever recorded for them.
+      if (!gaps || feedHealthByInstr.get(instrumentId)?.assetClass === "bond") continue;
+      if (isCoolingDownDeadFeed(instrumentId)) continue;
+      const firstHeld = firstHeldDateFrom(txByPortfolio.get(portfolioId) ?? [], instrumentId);
       if (!firstHeld) continue;
       for (const g of gaps) {
         if (g.to < firstHeld) continue;

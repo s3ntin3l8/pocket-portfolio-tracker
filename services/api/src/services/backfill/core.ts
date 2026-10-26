@@ -290,7 +290,11 @@ export async function backfillPortfolioHistory(
                     priceFeedErrorCount: sql`${instruments.priceFeedErrorCount} + 1`,
                     priceFeedLastErrorAt: new Date(),
                   }
-                : {}),
+                : candles.length > 0
+                  ? // Candles came back (just with a hole left): not a throw, so a stale
+                    // error streak is not current — only the miss counter is gap-driven.
+                    { priceFeedErrorCount: 0, priceFeedLastErrorAt: null }
+                  : {}),
             },
       )
       .where(eq(instruments.id, instr.id));

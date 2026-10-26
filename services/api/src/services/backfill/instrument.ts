@@ -267,6 +267,9 @@ export async function fetchInstrumentPrices(
         ? {
             priceFeedMissCount: sql`${instruments.priceFeedMissCount} + 1`,
             priceFeedLastMissAt: new Date(),
+            // The fetch itself didn't throw, so a stale error streak is not current.
+            priceFeedErrorCount: 0,
+            priceFeedLastErrorAt: null,
           }
         : {
             priceFeedMissCount: 0,

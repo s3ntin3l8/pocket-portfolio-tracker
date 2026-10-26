@@ -23,7 +23,11 @@ import {
   type MarketDataProvider,
 } from "@portfolio/market-data";
 import { ensureDb, closeDb } from "../../src/db/client.js";
-import { backfillStalePortfolios, fetchInstrumentPrices } from "../../src/services/backfill.js";
+import {
+  backfillPortfolioHistory,
+  backfillStalePortfolios,
+  fetchInstrumentPrices,
+} from "../../src/services/backfill.js";
 
 const DAY = 86_400_000;
 /** YYYY-MM-DD for `n` days ago (UTC). */
@@ -36,7 +40,14 @@ let seq = 0;
 /** A fully-backfilled EUR portfolio holding one EUR equity bought `heldDaysAgo` days ago,
  *  with `priceDates` already in `prices`. Everything else is fresh, so only a mid-history
  *  gap can make the sweep pick it up. */
-async function seed(opts: { priceDates: string[]; heldDaysAgo?: number; missCount?: number }) {
+async function seed(opts: {
+  priceDates: string[];
+  heldDaysAgo?: number;
+  missCount?: number;
+  errorCount?: number;
+  /** A manual-priced bond: never fetched from a provider, one `prices` row per reprice. */
+  manualBond?: boolean;
+}) {
   const db = await ensureDb();
   const tag = `midgap${++seq}`;
   const [u] = await db
@@ -52,9 +63,13 @@ async function seed(opts: { priceDates: string[]; heldDaysAgo?: number; missCoun
     .values({
       symbol: tag.toUpperCase(),
       market: "XETRA",
-      assetClass: "equity",
+      assetClass: opts.manualBond ? "bond" : "equity",
       currency: "EUR",
       name: tag,
+      ...(opts.manualBond
+        ? { faceValue: "100", manualPrice: "98", manualPriceAt: new Date() }
+        : {}),
+      priceFeedErrorCount: opts.errorCount ?? 0,
       priceFeedMissCount: opts.missCount ?? 0,
       priceFeedLastMissAt: opts.missCount ? new Date() : null,
     })
@@ -132,6 +147,12 @@ describe("backfillStalePortfolios — gaps in the middle of a held instrument's 
       priceDates: [...range(80, 70), ...range(50, 0)],
       heldDaysAgo: 20,
     });
+    expect((await sweep(db)).filter((c) => c.portfolioId === pf.id)).toEqual([]);
+  });
+
+  it("never enqueues a manual-priced bond: its reprice rows are holes by construction and no fetch ever records a miss", async () => {
+    // Repriced 60, 20 and 0 days ago → two interior "holes", newest price fresh.
+    const { db, pf } = await seed({ priceDates: [ago(60), ago(20), ago(0)], manualBond: true });
     expect((await sweep(db)).filter((c) => c.portfolioId === pf.id)).toEqual([]);
   });
 
@@ -218,5 +239,66 @@ describe("fetchInstrumentPrices — a fetch that leaves a hole open is a miss", 
       tailOnly: true,
     });
     expect(await missCount(db, instr.id)).toBe(1);
+  });
+
+  it("does not count a short fetch against an already-contiguous stored series", async () => {
+    // 81 stored daily rows (no hole at all); the provider returns all but 44..31 days ago.
+    const { db, pf, instr, tag } = await seed({ priceDates: range(80, 0) });
+    const svc = new MarketDataService([
+      new ListProvider(tag.toUpperCase(), [...range(80, 45), ...range(30, 0)]),
+    ]);
+    await fetchInstrumentPrices(db, svc, {
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      chunkStart: ago(80),
+      chunkEnd: ago(0),
+    });
+    expect(await missCount(db, instr.id)).toBe(0);
+  });
+
+  it("clears a stale error streak on a fetch that returned candles but left a hole", async () => {
+    const { db, pf, instr, tag } = await seed({ priceDates: [], errorCount: 3 });
+    const svc = new MarketDataService([
+      new ListProvider(tag.toUpperCase(), [...range(80, 60), ...range(40, 0)]),
+    ]);
+    await fetchInstrumentPrices(db, svc, {
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      chunkStart: ago(80),
+      chunkEnd: ago(0),
+    });
+    const [row] = await db
+      .select({ m: instruments.priceFeedMissCount, e: instruments.priceFeedErrorCount })
+      .from(instruments)
+      .where(eq(instruments.id, instr.id));
+    expect(row).toEqual({ m: 1, e: 0 });
+  });
+});
+
+describe("backfillPortfolioHistory — the inline path grades the series the same way", () => {
+  async function missCount(db: Awaited<ReturnType<typeof ensureDb>>, id: string) {
+    const [row] = await db
+      .select({ n: instruments.priceFeedMissCount })
+      .from(instruments)
+      .where(eq(instruments.id, id));
+    return row!.n;
+  }
+
+  it("counts a fetch that leaves a hole as a miss", async () => {
+    const { db, pf, instr, tag } = await seed({ priceDates: [] });
+    const svc = new MarketDataService([
+      new ListProvider(tag.toUpperCase(), [...range(85, 60), ...range(40, 0)]),
+    ]);
+    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
+    expect(await missCount(db, instr.id)).toBe(1);
+  });
+
+  it("does not count a short fetch against an already-contiguous stored series", async () => {
+    const { db, pf, instr, tag } = await seed({ priceDates: range(85, 0) });
+    const svc = new MarketDataService([
+      new ListProvider(tag.toUpperCase(), [...range(85, 45), ...range(30, 0)]),
+    ]);
+    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
+    expect(await missCount(db, instr.id)).toBe(0);
   });
 });
