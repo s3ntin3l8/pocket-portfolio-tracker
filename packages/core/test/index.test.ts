@@ -1100,6 +1100,12 @@ describe("summarizePortfolio — missing FX rate (audit B2)", () => {
     expect(eur.fxMissing).toBe(true);
     expect(eur.marketValueDisplay).toBeNull();
     expect(eur.unrealizedPnLDisplay).toBeNull();
+    // No display-currency cost either (#1161): the native amount must not pass for one. The
+    // native `costBasis`/`costCurrency` still carry it.
+    expect(eur.costBasisDisplay).toBeNull();
+    expect(eur.costBasis).toBe("1000");
+    expect(eur.costCurrency).toBe("EUR");
+    expect(s.totalCost).toBe("10000"); // only the IDR holding
     expect(idr.fxMissing).toBeUndefined();
     expect(s.fxMissingCurrencies).toEqual(["EUR"]);
     // Only the IDR holding counts — not 11,000 + 1,100 (EUR at 1:1).
@@ -1187,6 +1193,9 @@ describe("summarizePortfolio — missing FX rate (audit B2)", () => {
     const agg = aggregatePortfolios([a, b], "IDR");
     expect(agg.fxMissingCurrencies).toEqual(["EUR"]);
     expect(agg.holdings[0].fxMissing).toBe(true);
+    // The merged display cost is the depot that could convert (1 x 100 EUR at 17000), not null
+    // and not the other depot's native amount added on.
+    expect(agg.holdings[0].costBasisDisplay).toBe("1700000");
   });
 });
 

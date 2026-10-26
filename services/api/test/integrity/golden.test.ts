@@ -190,6 +190,10 @@ describe("degraded", () => {
     );
     expect(byId.get(l.instrumentIds.noq)?.valuedAtCost).toBe(true);
     expect(byId.get(l.instrumentIds.cad)?.fxMissing).toBe(true);
+    // No display-currency cost for a holding with no rate (#1161): not the native 30 CAD, which
+    // used to be summed into display-currency cost totals. The at-cost EUR holding still has one.
+    expect(byId.get(l.instrumentIds.cad)?.costBasisDisplay).toBeNull();
+    expect(byId.get(l.instrumentIds.noq)?.costBasisDisplay).toBe("100");
   });
 });
 

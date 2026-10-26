@@ -23,8 +23,13 @@ export interface HoldingValuation extends Holding {
   unrealizedPnL: string | null;
   /** Market value FX-converted to the display currency (null when unpriced). */
   marketValueDisplay: string | null;
-  /** Cost basis FX-converted to the display currency. */
-  costBasisDisplay: string;
+  /**
+   * Cost basis FX-converted to the display currency. Null for an `fxMissing` holding: there is
+   * no sane display-currency figure, and handing out the native amount here is how a foreign
+   * amount ended up summed into a display-currency total (#1161). Typed nullable so every
+   * consumer has to decide what to do with it.
+   */
+  costBasisDisplay: string | null;
   /** Unrealized P&L in the display currency (null when unpriced). */
   unrealizedPnLDisplay: string | null;
   /**
@@ -42,9 +47,10 @@ export interface HoldingValuation extends Holding {
   /**
    * True when this holding's quote or cost currency has no known FX rate into the
    * display currency (audit B2). The display-currency fields (`marketValueDisplay`,
-   * `unrealizedPnLDisplay`) are then null, `costBasisDisplay` stays in the native cost
-   * currency, and the holding is excluded from every display-currency total — a
-   * missing rate is never treated as 1:1. Undefined when FX resolved normally.
+   * `costBasisDisplay`, `unrealizedPnLDisplay`) are then all null (the native `costBasis` and
+   * `costCurrency` still carry the amount), and the holding is excluded from every
+   * display-currency total — a missing rate is never treated as 1:1. Undefined when FX
+   * resolved normally.
    */
   fxMissing?: boolean;
   /** Prior session's close (instrument currency), when known. */
@@ -258,7 +264,7 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
         marketValue: quote ? marketValue(h.quantity, quote.price) : null,
         unrealizedPnL: null,
         marketValueDisplay: null,
-        costBasisDisplay: cbStr,
+        costBasisDisplay: null,
         unrealizedPnLDisplay: null,
         previousClose: quote?.previousClose ?? null,
         dayChange: null,
@@ -522,7 +528,7 @@ export function aggregatePortfolios(
         // Display fields are all in `displayCurrency`, so summing is valid here
         // (unlike the native marketValue/costBasis above).
         marketValueDisplay: addNullable(ex.marketValueDisplay, h.marketValueDisplay),
-        costBasisDisplay: new Decimal(ex.costBasisDisplay).add(h.costBasisDisplay).toString(),
+        costBasisDisplay: addNullable(ex.costBasisDisplay, h.costBasisDisplay),
         unrealizedPnLDisplay: addNullable(ex.unrealizedPnLDisplay, h.unrealizedPnLDisplay),
         // Same instrument → same per-share price/prev-close, so the percentage is
         // shared; quantities sum, so the absolute day change adds.

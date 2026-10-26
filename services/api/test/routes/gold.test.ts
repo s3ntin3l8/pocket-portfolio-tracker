@@ -1,8 +1,10 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, expectTypeOf, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { instruments, loans, transactions } from "@portfolio/db";
 import { FixtureProvider, MarketDataService } from "@portfolio/market-data";
+import type { GoldHoldingRow as ClientGoldHoldingRow } from "@portfolio/api-client";
 import { buildApp } from "../../src/app.js";
+import type { GoldHoldingRow } from "../../src/routes/transactions/gold.js";
 import { closeDb } from "../../src/db/client.js";
 import { overrideMarketData, invalidateMarketData } from "../../src/services/market-data.js";
 
@@ -319,7 +321,7 @@ describe("gold report", () => {
     expect(res.statusCode).toBe(200);
     const body = res.json();
     const usd = body.holdings.find((h: { symbol: string }) => h.symbol === "G24:USDBAR");
-    expect(usd).toMatchObject({ fxMissing: true, value: null, grams: "3" });
+    expect(usd).toMatchObject({ fxMissing: true, value: null, cost: null, grams: "3" });
     // The IDR bar alone: 2 g × 1,200 value on 2,000 cost. The USD bar's native-currency cost
     // (3 × 50) must not leak into any total, and its value was never converted 1:1.
     expect(body.totals.value).toBe("2400");
@@ -353,5 +355,15 @@ describe("gold report", () => {
     });
     expect(res.statusCode).toBe(404);
     expect((await app.inject({ method: "GET", url: "/networth/gold" })).statusCode).toBe(401);
+  });
+});
+
+describe("the api-client's gold row type", () => {
+  // Compile-time (checked by `tsc`): the client's hand-maintained row must describe exactly what
+  // the route serializes, so a nullable field on one side cannot drift on the other (the client
+  // used to say `cost: string` after the route started sending null for a no-rate bar).
+  it("has the same fields, with the same nullability, as the route's row", () => {
+    expectTypeOf<keyof ClientGoldHoldingRow>().toEqualTypeOf<keyof GoldHoldingRow>();
+    expectTypeOf<GoldHoldingRow>().toEqualTypeOf<ClientGoldHoldingRow>();
   });
 });

@@ -98,7 +98,7 @@ export const holdingValuationResponseSchema = z.looseObject({
   marketValue: decimalOutNullable,
   unrealizedPnL: decimalOutNullable,
   marketValueDisplay: decimalOutNullable,
-  costBasisDisplay: decimalOut,
+  costBasisDisplay: decimalOutNullable,
   unrealizedPnLDisplay: decimalOutNullable,
   valuedAtCost: z.boolean().optional(),
   fxMissing: z.boolean().optional(),

@@ -16,7 +16,7 @@ import {
   type PortfolioParams,
 } from "./shared.js";
 
-interface GoldHoldingRow {
+export interface GoldHoldingRow {
   portfolioId: string;
   instrumentId: string;
   symbol: string;
@@ -29,7 +29,7 @@ interface GoldHoldingRow {
   currency: string | null;
   /** Display-currency values; null when unpriced or no FX rate. */
   value: string | null;
-  cost: string;
+  cost: string | null;
   unrealized: string | null;
   /** No usable price: valued at cost, so there is no measured gain. */
   valuedAtCost: boolean;
@@ -103,9 +103,9 @@ async function buildGoldReport(
   let unrealized = new Decimal(0);
   for (const h of holdings) {
     grams = grams.add(h.grams);
-    // Everything below is a display-currency figure: skip rows with no FX rate (their
-    // `costBasisDisplay` stays in the native currency) and unpriced rows entirely.
-    if (h.fxMissing || h.value === null) continue;
+    // Everything below is a display-currency figure: skip rows with no FX rate (their display
+    // value and cost are null) and unpriced rows entirely.
+    if (h.fxMissing || h.value === null || h.cost === null) continue;
     value = value.add(h.value);
     cost = cost.add(h.cost);
     if (!h.valuedAtCost && h.unrealized !== null) {

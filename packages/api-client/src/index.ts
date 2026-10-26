@@ -1163,8 +1163,8 @@ export interface HoldingValuation extends Holding {
   unrealizedPnL: string | null;
   /** Market value FX-converted to the display currency (null when unpriced). */
   marketValueDisplay: string | null;
-  /** Cost basis FX-converted to the display currency. */
-  costBasisDisplay: string;
+  /** Cost basis FX-converted to the display currency; null when the holding is `fxMissing`. */
+  costBasisDisplay: string | null;
   /** Unrealized P&L in the display currency (null when unpriced). */
   unrealizedPnLDisplay: string | null;
   /**
@@ -1671,7 +1671,8 @@ export interface GoldHoldingRow {
   pricePerGram: string | null;
   currency: string | null;
   value: string | null;
-  cost: string;
+  /** Display-currency cost; null for an `fxMissing` row (no rate, so no display-currency figure). */
+  cost: string | null;
   unrealized: string | null;
   /** No usable price: valued at cost, so no measured gain. */
   valuedAtCost: boolean;

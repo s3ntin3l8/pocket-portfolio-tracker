@@ -68,7 +68,8 @@ export interface HoldingBody {
   currency: string | null;
   costCurrency?: string | null;
   marketValueDisplay: string | null;
-  costBasisDisplay: string;
+  /** Null for an fxMissing holding (no display-currency figure). */
+  costBasisDisplay: string | null;
   unrealizedPnLDisplay: string | null;
   valuedAtCost?: boolean;
   fxMissing?: boolean;
