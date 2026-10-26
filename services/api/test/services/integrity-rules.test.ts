@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   checkIntegrity,
+  runIntegrity,
   type IntegrityBodies,
   type ParityBodies,
   type RuleId,
@@ -335,5 +336,69 @@ describe("integrity rules", () => {
     // 5 listed dates, then the count of the other 4 dates.
     expect(hist).toHaveLength(6);
     expect(hist.at(-1)!.actual).toBe("4 more date(s) differ");
+  });
+
+  it("reports no abstentions when every rule could compare everything", () => {
+    expect(runIntegrity(bodies()).abstentions).toEqual([]);
+  });
+
+  it("an abstention is reported, not hidden: no FX rate, another currency, uncollected history", () => {
+    const b = bodies();
+    b.portfolios.push({
+      id: "p2",
+      summary: { ...valuation(), displayCurrency: "CAD" },
+      parity: {
+        ...parity(),
+        contributions: { displayCurrency: "EUR", netContributed: "1" }, // not CAD: not comparable
+        trades: { displayCurrency: "EUR", totalRealized: "1" },
+      },
+      history: null,
+    });
+    b.fxToDisplay = { CAD: null };
+    const { findings, abstentions } = runIntegrity(b);
+    expect(findings).toEqual([]);
+    expect(abstentions).toEqual(
+      expect.arrayContaining([
+        { rule: "NW_SUM_PORTFOLIOS", scope: "networth", reason: "no_fx_rate" },
+        { rule: "CONTRIB_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
+        { rule: "REALIZED_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
+        // The foreign currency, not the (consequent) missing series, is the reason given: by
+        // both history rules, so one cause is not explained two ways.
+        { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },
+        { rule: "HISTORY_ORDERED", scope: "portfolio:p2", reason: "foreign_currency" },
+      ]),
+    );
+  });
+
+  it("an uncollected series in an all-display-currency account is its own reason", () => {
+    const b = bodies();
+    b.portfolios[0]!.history = null;
+    expect(runIntegrity(b).abstentions).toEqual([
+      { rule: "HISTORY_ORDERED", scope: "portfolio:p1", reason: "history_not_collected" },
+      { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "history_not_collected" },
+    ]);
+  });
+
+  it("a missing gain block abstains on the contribution parity instead of passing it", () => {
+    const b = bodies();
+    delete b.portfolios[0]!.summary.gain;
+    const { abstentions } = runIntegrity(b);
+    // Both rules that need the gain block say they skipped the scope, not just one of them.
+    expect(abstentions).toContainEqual({
+      rule: "CONTRIB_PARITY",
+      scope: "portfolio:p1",
+      reason: "not_available",
+    });
+    expect(abstentions).toContainEqual({
+      rule: "GAIN_MATCHES_TOTALS",
+      scope: "portfolio:p1",
+      reason: "not_available",
+    });
+  });
+
+  it("checkIntegrity returns exactly the findings of runIntegrity", () => {
+    const b = bodies();
+    b.networth.netWorth = "1261";
+    expect(checkIntegrity(b)).toEqual(runIntegrity(b).findings);
   });
 });

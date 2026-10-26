@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, it, expect, expectTypeOf, beforeAll, afterAll, vi } from "vitest";
 import { closeDb } from "../../src/db/client.js";
-import { RULES } from "../../src/services/integrity/index.js";
+import type { IntegrityAbstention, IntegrityFinding } from "@portfolio/api-client";
+import { RULES, type Abstention, type Finding } from "../../src/services/integrity/index.js";
 import { buildIntegrityApp, loadLedger, type App, type LoadedLedger } from "../integrity/ledger.js";
 import { degraded } from "../integrity/ledgers/degraded.js";
 import { multiBase } from "../integrity/ledgers/multi-base.js";
@@ -38,6 +39,23 @@ describe("GET /me/integrity", () => {
     expect(body.rulesRun).toHaveLength(Object.keys(RULES).length);
     expect(body.rulesRun).toEqual(Object.keys(RULES));
     expect(Number.isNaN(Date.parse(body.checkedAt))).toBe(false);
+    // The SEK-base depot is not in the display currency, so summing the histories needs FX the
+    // check does not do: that rule reports it skipped the data instead of counting as passed.
+    // ... and since the per-portfolio series are not collected either, the ordering check says
+    // so for each portfolio rather than silently covering only the aggregate series.
+    const ids = Object.values(l.portfolioIds);
+    expect(body.abstentions).toHaveLength(ids.length + 1);
+    expect(body.abstentions).toEqual(
+      expect.arrayContaining([
+        { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },
+        ...ids.map((id) => ({
+          rule: "HISTORY_ORDERED",
+          scope: `portfolio:${id}`,
+          // The same cause as the sum rule's skip, explained the same way.
+          reason: "foreign_currency",
+        })),
+      ]),
+    );
   });
 
   it("works with a read-scoped personal access token", async () => {
@@ -106,5 +124,17 @@ describe("GET /me/integrity on degraded data", () => {
     const res = await app.inject({ method: "GET", url: "/me/integrity", headers: d.headers });
     expect(res.statusCode).toBe(200);
     expect(res.json().findings).toEqual([]);
+  });
+});
+
+describe("the api-client's integrity types", () => {
+  // Compile-time (checked by `tsc`, a no-op at runtime): the client's hand-maintained types must
+  // describe exactly what the route serializes. A renamed or added field on either side fails
+  // `npm run typecheck` here instead of drifting silently.
+  it("have the same fields as the payload the route returns", () => {
+    expectTypeOf<keyof IntegrityFinding>().toEqualTypeOf<keyof Finding>();
+    expectTypeOf<keyof IntegrityAbstention>().toEqualTypeOf<keyof Abstention>();
+    expectTypeOf<Finding>().toExtend<IntegrityFinding>();
+    expectTypeOf<Abstention>().toExtend<IntegrityAbstention>();
   });
 });

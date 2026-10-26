@@ -97,10 +97,29 @@ npm run integrity -- --json
 PAT is enough (it only issues GETs, and loads FX from cached rates like any other read). Exit
 code: `0` no findings, `1` findings, `2` the check could not run.
 
+**"No findings" is not "everything holds".** A rule that cannot compare some data skips it and
+reports an _abstention_ instead: `no_fx_rate` (the app has no rate for a currency the comparison
+needs), `currency_mismatch` (two pages answer in different currencies), `not_available` (the
+figure is absent from the response), `foreign_currency` / `history_not_collected` (the history
+sum is only checked when every portfolio is in the display currency). `rulesRun` lists every rule
+attempted; `abstentions` lists where one did not compare, and those scopes are **not** known to
+be consistent. Every rule that skips data reports it, and all three surfaces show them; none calls a run with skips a full pass.
+
 A finding is **evidence**, not a verdict: it says which rule broke, on which scope, with
 expected vs. actual. Whether the rule or the number is wrong is for you to decide — read the
 rule's definition above, and if the app is wrong, reproduce it as a golden ledger. Findings
 contain amounts: keep the output local; don't paste it into issues or PRs.
+
+The same check is reachable from two more places, both through the typed client's
+`getIntegrityReport()` (long timeout: it values every portfolio):
+
+- **Settings › Data & connections › Data checks** runs it on demand and lists each finding with
+  the rule's plain-language meaning, its scope and the API's own expected/actual/difference. A
+  failed run is shown as an error, and a run that skipped data lists what was skipped instead of
+  showing the green all-clear.
+- **MCP tool `check_integrity`** (read-only; `docs/mcp.md`) returns up to 20 findings plus a
+  count. Its description tells the model to report them as given and never recompute: a finding
+  is evidence, not a verdict.
 
 Known limit: `NW_SUM_PORTFOLIOS` converts each summary by `/fx-rate` while `/networth` converts
 each holding from its native currency. They agree while every rate comes from the same provider

@@ -178,6 +178,23 @@ const client = {
   getPortfolioTargets: rec("getPortfolioTargets", [{ key: "equity", weight: 60 }]),
   getNetworthTargets: rec("getNetworthTargets", [{ key: "equity", weight: 70 }]),
   getInsights: rec("getInsights", { drawdown: {}, ...leaky }),
+  getIntegrityReport: rec("getIntegrityReport", {
+    checkedAt: "2026-06-30T12:00:00.000Z",
+    portfolioCount: 1,
+    rulesRun: ["NW_SUM_PORTFOLIOS", "HOLDINGS_SUM"],
+    findings: [
+      {
+        rule: "NW_SUM_PORTFOLIOS",
+        scope: "networth",
+        expected: "1260",
+        actual: "1261",
+        diff: "1",
+        tolerance: "1.26e-6",
+        message: "/networth netWorth differs from the sum of the portfolio summaries",
+        ...leaky,
+      },
+    ],
+  }),
   searchInstruments: rec("searchInstruments", [
     {
       id: "i1",
@@ -257,6 +274,7 @@ const inputs: Record<string, unknown> = {
   explain_import_duplicates: { importId: I1 },
   get_insights: {},
   lookup_instrument: { q: "abc" },
+  check_integrity: {},
 };
 
 function keysDeep(v: unknown, acc: string[] = []): string[] {
@@ -870,5 +888,117 @@ describe("propose_transactions (draft-only write tool)", () => {
       error: "read_only_token",
       status: 403,
     });
+  });
+});
+
+describe("check_integrity", () => {
+  const finding = (i: number) => ({
+    rule: "HOLDINGS_SUM",
+    scope: `portfolio:${i}`,
+    expected: "1",
+    actual: "2",
+    diff: "1",
+    tolerance: "1e-9",
+    message: "totalMarketValue differs from the sum of the holdings",
+  });
+  const withReport = (findings: unknown[], abstentions?: unknown[]) =>
+    createTools({
+      getIntegrityReport: async () => ({
+        checkedAt: "2026-06-30T12:00:00.000Z",
+        portfolioCount: 2,
+        rulesRun: ["HOLDINGS_SUM"],
+        findings,
+        ...(abstentions ? { abstentions } : {}),
+      }),
+    } as unknown as ApiClient).find((t) => t.name === "check_integrity")!;
+
+  it("returns the findings as given, with what ran and a count", async () => {
+    const out = (await byName("check_integrity").handler({})) as Record<string, unknown>;
+    expect(out).toMatchObject({
+      portfolioCount: 1,
+      rulesRun: ["NW_SUM_PORTFOLIOS", "HOLDINGS_SUM"],
+      findingCount: 1,
+      findingsByRule: { NW_SUM_PORTFOLIOS: 1 },
+      truncated: false,
+    });
+    expect((out.findings as unknown[])[0]).toMatchObject({
+      rule: "NW_SUM_PORTFOLIOS",
+      expected: "1260",
+      actual: "1261",
+    });
+  });
+
+  it("reports no findings as an empty list, with the rules that were checked", async () => {
+    const out = (await withReport([]).handler({})) as Record<string, unknown>;
+    expect(out).toMatchObject({ findingCount: 0, findings: [], truncated: false });
+    expect(out.rulesRun).toEqual(["HOLDINGS_SUM"]);
+  });
+
+  it("returns at most 20 findings but counts them all", async () => {
+    const out = (await withReport(Array.from({ length: 25 }, (_, i) => finding(i))).handler(
+      {},
+    )) as { findingCount: number; findings: unknown[]; truncated: boolean };
+    expect(out.findingCount).toBe(25);
+    expect(out.findings).toHaveLength(20);
+    expect(out.truncated).toBe(true);
+  });
+
+  it("keeps every broken rule visible when one rule fills the cap", async () => {
+    // 25 findings of one rule come first; a later rule's single finding must still be listed,
+    // and findingsByRule counts all of them.
+    const other = { ...finding(0), rule: "HISTORY_ORDERED", scope: "networth" };
+    const out = (await withReport([
+      ...Array.from({ length: 25 }, (_, i) => finding(i)),
+      other,
+    ]).handler({})) as { findings: { rule: string }[]; findingsByRule: Record<string, number> };
+    expect(out.findings).toHaveLength(20);
+    expect(out.findings.some((f) => f.rule === "HISTORY_ORDERED")).toBe(true);
+    expect(out.findingsByRule).toEqual({ HOLDINGS_SUM: 25, HISTORY_ORDERED: 1 });
+  });
+
+  it("reports where a rule skipped data, grouped, so no findings is not read as all clear", async () => {
+    const out = (await withReport(
+      [],
+      [
+        { rule: "NW_SUM_PORTFOLIOS", scope: "networth", reason: "no_fx_rate" },
+        { rule: "CONTRIB_PARITY", scope: "portfolio:a", reason: "currency_mismatch" },
+        { rule: "CONTRIB_PARITY", scope: "portfolio:b", reason: "currency_mismatch" },
+      ],
+    ).handler({})) as { abstentions: unknown };
+    expect(out.abstentions).toEqual([
+      { rule: "NW_SUM_PORTFOLIOS", reason: "no_fx_rate", scopeCount: 1 },
+      { rule: "CONTRIB_PARITY", reason: "currency_mismatch", scopeCount: 2 },
+    ]);
+  });
+
+  it("says abstentions are unreported (null), not none, when the server omits them", async () => {
+    const out = (await withReport([]).handler({})) as { abstentions: unknown };
+    expect(out.abstentions).toBeNull();
+    const withEmpty = (await withReport([], []).handler({})) as { abstentions: unknown };
+    expect(withEmpty.abstentions).toEqual([]);
+  });
+
+  it("tells the model a finding is evidence to report, not a verdict to recompute", () => {
+    const d = byName("check_integrity").description;
+    expect(d).toMatch(/EVIDENCE/);
+    expect(d).toMatch(/not a verdict/);
+    expect(d).toMatch(/never recompute/i);
+  });
+
+  it("does not promise that a rule in rulesRun passed", () => {
+    const d = byName("check_integrity").description;
+    expect(d).not.toMatch(/every rule in rulesRun holds/i);
+    expect(d).toMatch(/no rule reported a mismatch/i);
+    expect(d).toMatch(/abstentions/);
+    expect(d).toMatch(/NOT known to be consistent/);
+  });
+
+  it("turns a failed check into an error code, not a thrown error", async () => {
+    const failing = createTools({
+      getIntegrityReport: async () => {
+        throw new ApiError(502, '{"error":"integrity_collect_failed"}');
+      },
+    } as unknown as ApiClient).find((t) => t.name === "check_integrity")!;
+    expect(await failing.handler({})).toEqual({ error: "integrity_collect_failed", status: 502 });
   });
 });

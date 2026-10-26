@@ -1,5 +1,6 @@
 import { mapPool } from "../../lib/promise-pool.js";
 import { PORTFOLIO_VALUATION_CONCURRENCY } from "../../routes/transactions/shared/helpers.js";
+import { allInDisplayCurrency } from "./rules.js";
 import type {
   HistoryPoint,
   IntegrityBodies,
@@ -172,8 +173,7 @@ export async function collectBodies(
 
   const networthHistory = asHistory(await get("/networth/history?range=all"), "/networth/history");
   // Summing the per-portfolio series is only exact when no currency conversion is involved.
-  const singleCurrency = portfolios.every((p) => p.summary.displayCurrency === to);
-  const histories = singleCurrency
+  const histories = allInDisplayCurrency(to, portfolios)
     ? await mapPool(portfolios, PORTFOLIO_VALUATION_CONCURRENCY, async (p) =>
         asHistory(
           await get(`/portfolios/${p.id}/history?range=all`),

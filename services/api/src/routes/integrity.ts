@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { checkIntegrity, collectBodies, RULES } from "../services/integrity/index.js";
+import { collectBodies, runIntegrity, RULES } from "../services/integrity/index.js";
 
 /**
  * `GET /me/integrity` — runs the cross-endpoint invariants (`services/integrity`) over the
@@ -7,6 +7,8 @@ import { checkIntegrity, collectBodies, RULES } from "../services/integrity/inde
  * the caller's own credential, so it sees exactly what that credential sees (a read-scoped PAT
  * gets cached-only FX, like every other read). A finding names a rule, its scope, and expected
  * vs. actual — evidence for "this looks wrong", not a verdict on which side is wrong.
+ * `abstentions` lists where a rule skipped data instead of comparing it: those scopes are NOT
+ * known to be consistent.
  *
  * Findings carry amounts: they go to the authenticated caller only and are never logged.
  */
@@ -34,11 +36,15 @@ export async function integrityRoute(app: FastifyInstance) {
         detail: err instanceof Error ? err.message : String(err),
       });
     }
+    const { findings, abstentions } = runIntegrity(bodies);
     return {
       checkedAt: new Date().toISOString(),
       portfolioCount: bodies.portfolios.length,
       rulesRun: Object.keys(RULES),
-      findings: checkIntegrity(bodies),
+      findings,
+      // "No findings" is only as strong as this list is short: a rule that skipped data
+      // (no FX rate, another currency, history not collected) compared nothing there.
+      abstentions,
     };
   });
 }

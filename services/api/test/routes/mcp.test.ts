@@ -143,6 +143,7 @@ describe("POST /mcp", () => {
         "get_fsa_allocation",
         "resolve_instrument",
         "explain_import_duplicates",
+        "check_integrity",
       ]),
     );
     expect(tools.length).toBeGreaterThanOrEqual(16);
@@ -168,6 +169,23 @@ describe("POST /mcp", () => {
       arguments: { dimension: "asset_class", newCash: "-1" },
     });
     expect(bad.json().result?.isError ?? !!bad.json().error).toBe(true);
+  });
+
+  it("check_integrity runs the consistency check for the caller only, through a read-scoped token", async () => {
+    const mine = await callTool(ownerPat, "check_integrity");
+    expect(mine.isError).toBe(false);
+    expect(mine.data).toMatchObject({ portfolioCount: 1, findingCount: 0, truncated: false });
+    expect(mine.data.rulesRun.length).toBeGreaterThan(0);
+    // Skips are reported (an array, not absent), and with no findings the per-rule count is empty.
+    expect(Array.isArray(mine.data.abstentions)).toBe(true);
+    expect(mine.data.findingsByRule).toEqual({});
+    // Evidence only: nothing identifying leaks through the report.
+    expect(JSON.stringify(mine.data)).not.toContain("ACCT-SECRET-123");
+    expect(JSON.stringify(mine.data)).not.toContain("DE89370400440532013000");
+
+    // Another user's check counts only their own portfolios.
+    const theirs = await callTool(otherPat, "check_integrity");
+    expect(theirs.data).toMatchObject({ portfolioCount: 1, findingCount: 0 });
   });
 
   it("explain_import_duplicates answers import_not_found for another user's import", async () => {

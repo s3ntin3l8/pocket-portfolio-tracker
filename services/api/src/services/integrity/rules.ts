@@ -24,6 +24,34 @@ export const RULE_IDS = [
 
 export type RuleId = (typeof RULE_IDS)[number];
 
+/**
+ * Why a rule did not evaluate (part of) the data. An abstention is NOT a pass: the rule never
+ * compared anything there, so a report that lists a rule as run must also say where it did not.
+ */
+export type AbstainReason =
+  /** The app has no exchange rate for a currency the comparison needs. */
+  | "no_fx_rate"
+  /** The two endpoints answer in different currencies, so their numbers are not comparable. */
+  | "currency_mismatch"
+  /** The figure the rule compares against is absent from the response. */
+  | "not_available"
+  /** A portfolio is in another currency than the display currency (summing would need FX). */
+  | "foreign_currency"
+  /** The per-portfolio series the rule sums was not collected. */
+  | "history_not_collected";
+
+export interface Abstention {
+  rule: RuleId;
+  /** `"networth"` or `"portfolio:<id>"`. */
+  scope: string;
+  reason: AbstainReason;
+}
+
+/** Called by a rule where it skips a scope instead of comparing it. */
+export type Skip = (rule: RuleId, scope: string, reason: AbstainReason) => void;
+
+export type RuleFn = (b: IntegrityBodies, skip?: Skip) => Finding[];
+
 export interface Finding {
   rule: RuleId;
   /** `"networth"` or `"portfolio:<id>"`. */
@@ -165,14 +193,17 @@ const sum = (xs: Iterable<string>): Decimal =>
  * forward (up to FX_MAX_CARRY_FORWARD_DAYS) and drift the two paths apart by real FX movement —
  * a finding then is a data-freshness signal, not necessarily a calculation bug.
  */
-export function checkNetWorthSumsPortfolios(b: IntegrityBodies): Finding[] {
+export function checkNetWorthSumsPortfolios(b: IntegrityBodies, skip?: Skip): Finding[] {
   let expected = new Decimal(0);
   for (const p of b.portfolios) {
     const rate =
       p.summary.displayCurrency === b.networth.displayCurrency
         ? "1"
         : b.fxToDisplay[p.summary.displayCurrency];
-    if (rate == null) return [];
+    if (rate == null) {
+      skip?.("NW_SUM_PORTFOLIOS", "networth", "no_fx_rate");
+      return [];
+    }
     expected = expected.add(new Decimal(p.summary.netWorth).mul(rate));
   }
   return compare(
@@ -184,6 +215,19 @@ export function checkNetWorthSumsPortfolios(b: IntegrityBodies): Finding[] {
   );
 }
 
+/**
+ * Whether every portfolio is already in the user's display currency. The ONE definition behind
+ * three decisions that must agree: the collector fetches the per-portfolio history series only
+ * when this holds (summing across currencies needs FX), and both history rules explain a missing
+ * series, or a skipped sum, by the same reason when it does not.
+ */
+export function allInDisplayCurrency(
+  displayCurrency: string,
+  portfolios: { summary: { displayCurrency: string } }[],
+): boolean {
+  return portfolios.every((p) => p.summary.displayCurrency === displayCurrency);
+}
+
 function scopes(b: IntegrityBodies): { scope: string; v: ValuationBody; parity: ParityBodies }[] {
   return [
     { scope: "networth", v: b.networth, parity: b.networthParity },
@@ -192,10 +236,13 @@ function scopes(b: IntegrityBodies): { scope: string; v: ValuationBody; parity: 
 }
 
 /** GainSummary is built from the same valuation: its fields must be the response's totals. */
-export function checkGainMatchesTotals(b: IntegrityBodies): Finding[] {
+export function checkGainMatchesTotals(b: IntegrityBodies, skip?: Skip): Finding[] {
   const out: Finding[] = [];
   for (const { scope, v } of scopes(b)) {
-    if (!v.gain) continue;
+    if (!v.gain) {
+      skip?.("GAIN_MATCHES_TOTALS", scope, "not_available");
+      continue;
+    }
     const pairs: [string, string, string][] = [
       ["value", v.netWorth, v.gain.value],
       ["costOfOpen", v.totalCost, v.gain.costOfOpen],
@@ -335,18 +382,24 @@ function sameCurrency(a: string, b: string): boolean {
 }
 
 /** The Savings page's net contributed is the gain summary's, on the same boundary. */
-export function checkContributionParity(b: IntegrityBodies): Finding[] {
-  return scopes(b).flatMap(({ scope, v, parity }) =>
-    !v.gain || !sameCurrency(parity.contributions.displayCurrency, v.displayCurrency)
-      ? []
-      : compare(
-          "CONTRIB_PARITY",
-          scope,
-          "contributions netContributed differs from gain.netContributed",
-          new Decimal(v.gain.netContributed),
-          new Decimal(parity.contributions.netContributed),
-        ),
-  );
+export function checkContributionParity(b: IntegrityBodies, skip?: Skip): Finding[] {
+  return scopes(b).flatMap(({ scope, v, parity }) => {
+    if (!v.gain) {
+      skip?.("CONTRIB_PARITY", scope, "not_available");
+      return [];
+    }
+    if (!sameCurrency(parity.contributions.displayCurrency, v.displayCurrency)) {
+      skip?.("CONTRIB_PARITY", scope, "currency_mismatch");
+      return [];
+    }
+    return compare(
+      "CONTRIB_PARITY",
+      scope,
+      "contributions netContributed differs from gain.netContributed",
+      new Decimal(v.gain.netContributed),
+      new Decimal(parity.contributions.netContributed),
+    );
+  });
 }
 
 /**
@@ -354,18 +407,20 @@ export function checkContributionParity(b: IntegrityBodies): Finding[] {
  * default method (average cost), which is what the valuation's realized comes from; a `?method=`
  * (fifo/lifo) would make this comparison meaningless.
  */
-export function checkRealizedParity(b: IntegrityBodies): Finding[] {
-  return scopes(b).flatMap(({ scope, v, parity }) =>
-    !sameCurrency(parity.trades.displayCurrency, v.displayCurrency)
-      ? []
-      : compare(
-          "REALIZED_PARITY",
-          scope,
-          "trades totalRealized differs from the valuation's totalRealizedPnL",
-          new Decimal(v.totalRealizedPnL),
-          new Decimal(parity.trades.totalRealized),
-        ),
-  );
+export function checkRealizedParity(b: IntegrityBodies, skip?: Skip): Finding[] {
+  return scopes(b).flatMap(({ scope, v, parity }) => {
+    if (!sameCurrency(parity.trades.displayCurrency, v.displayCurrency)) {
+      skip?.("REALIZED_PARITY", scope, "currency_mismatch");
+      return [];
+    }
+    return compare(
+      "REALIZED_PARITY",
+      scope,
+      "trades totalRealized differs from the valuation's totalRealizedPnL",
+      new Decimal(v.totalRealizedPnL),
+      new Decimal(parity.trades.totalRealized),
+    );
+  });
 }
 
 /**
@@ -405,13 +460,24 @@ export function checkAnomalyUnion(b: IntegrityBodies): Finding[] {
 const MAX_HISTORY_FINDINGS = 5;
 
 /** Stored snapshots are one row per portfolio and day: a series must be strictly ascending. */
-export function checkHistoryOrdered(b: IntegrityBodies): Finding[] {
+export function checkHistoryOrdered(b: IntegrityBodies, skip?: Skip): Finding[] {
   const series: { scope: string; points: HistoryPoint[] }[] = [
     { scope: "networth", points: b.networthHistory },
-    ...b.portfolios.flatMap((p) =>
-      p.history ? [{ scope: `portfolio:${p.id}`, points: p.history }] : [],
-    ),
   ];
+  // The collector leaves the per-portfolio series out when the account mixes currencies (summing
+  // needs FX). Give the same reason as HISTORY_SUMS_PORTFOLIOS, currency first, so one cause is
+  // never explained two ways.
+  const mixedCurrencies = !allInDisplayCurrency(b.networth.displayCurrency, b.portfolios);
+  for (const p of b.portfolios) {
+    const scope = `portfolio:${p.id}`;
+    if (p.history) series.push({ scope, points: p.history });
+    else
+      skip?.(
+        "HISTORY_ORDERED",
+        scope,
+        mixedCurrencies ? "foreign_currency" : "history_not_collected",
+      );
+  }
   const out: Finding[] = [];
   for (const { scope, points } of series) {
     for (let i = 1; i < points.length; i++) {
@@ -442,9 +508,18 @@ export function checkHistoryOrdered(b: IntegrityBodies): Finding[] {
  * substitutes one it judges implausible), so it is NOT a plain per-date sum: on an ordinary
  * account with a mid-series gap (e.g. a portfolio skipped for a missing FX rate) the two differ.
  */
-export function checkHistorySumsPortfolios(b: IntegrityBodies): Finding[] {
-  if (b.portfolios.length === 0 || b.portfolios.some((p) => p.history === null)) return [];
-  if (b.portfolios.some((p) => p.summary.displayCurrency !== b.networth.displayCurrency)) return [];
+export function checkHistorySumsPortfolios(b: IntegrityBodies, skip?: Skip): Finding[] {
+  if (b.portfolios.length === 0) return []; // nothing to sum: vacuous, not an abstention
+  // Currency first: the collector leaves the per-portfolio series out exactly when a portfolio
+  // is in another currency, so "history not collected" would hide the real reason.
+  if (!allInDisplayCurrency(b.networth.displayCurrency, b.portfolios)) {
+    skip?.("HISTORY_SUMS_PORTFOLIOS", "networth", "foreign_currency");
+    return [];
+  }
+  if (b.portfolios.some((p) => p.history === null)) {
+    skip?.("HISTORY_SUMS_PORTFOLIOS", "networth", "history_not_collected");
+    return [];
+  }
 
   const expected = new Map<string, Decimal>();
   for (const p of b.portfolios) {
@@ -514,7 +589,7 @@ export function checkHistorySumsPortfolios(b: IntegrityBodies): Finding[] {
  * actually run are the same set: a rule added here without an id (or the reverse) is a type
  * error, and `rulesRun` in the report cannot under-report.
  */
-export const RULES: Record<RuleId, (b: IntegrityBodies) => Finding[]> = {
+export const RULES: Record<RuleId, RuleFn> = {
   NW_SUM_PORTFOLIOS: checkNetWorthSumsPortfolios,
   GAIN_MATCHES_TOTALS: checkGainMatchesTotals,
   HOLDINGS_SUM: checkHoldingsSum,
@@ -528,6 +603,20 @@ export const RULES: Record<RuleId, (b: IntegrityBodies) => Finding[]> = {
   HISTORY_SUMS_PORTFOLIOS: checkHistorySumsPortfolios,
 };
 
+export interface IntegrityResult {
+  findings: Finding[];
+  /** Where a rule skipped data instead of comparing it; absent from `findings` by definition. */
+  abstentions: Abstention[];
+}
+
+/** Run every rule, keeping what each skipped alongside what it found. */
+export function runIntegrity(b: IntegrityBodies): IntegrityResult {
+  const abstentions: Abstention[] = [];
+  const skip: Skip = (rule, scope, reason) => abstentions.push({ rule, scope, reason });
+  const findings = RULE_IDS.flatMap((id) => RULES[id](b, skip));
+  return { findings, abstentions };
+}
+
 export function checkIntegrity(b: IntegrityBodies): Finding[] {
-  return RULE_IDS.flatMap((id) => RULES[id](b));
+  return runIntegrity(b).findings;
 }

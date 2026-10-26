@@ -2534,6 +2534,44 @@ import {
   type AssistantStatus,
 } from "./assistant.js";
 
+/**
+ * One result of the analysis-integrity check (`GET /me/integrity`, docs/integrity.md): a rule
+ * whose cross-endpoint identity did not hold on this user's data. Evidence, not a verdict: it
+ * says which rule broke, on which scope, with expected vs. actual. Amounts are decimal strings.
+ */
+export interface IntegrityFinding {
+  rule: string;
+  /** `"networth"` or `"portfolio:<id>"`. */
+  scope: string;
+  expected: string;
+  actual: string;
+  diff: string;
+  tolerance: string;
+  message: string;
+}
+
+/**
+ * Where a rule skipped data instead of comparing it (`reason`: `no_fx_rate`, `currency_mismatch`,
+ * `not_available`, `foreign_currency`, `history_not_collected`). Those scopes are not known to be
+ * consistent: an abstention is not a pass.
+ */
+export interface IntegrityAbstention {
+  rule: string;
+  /** `"networth"` or `"portfolio:<id>"`. */
+  scope: string;
+  reason: string;
+}
+
+export interface IntegrityReport {
+  checkedAt: string;
+  portfolioCount: number;
+  /** Every rule the check attempted. Read with `abstentions`: a rule can run and still skip data. */
+  rulesRun: string[];
+  findings: IntegrityFinding[];
+  /** Absent from an older API; treat a missing list as "not reported", never as "none". */
+  abstentions?: IntegrityAbstention[];
+}
+
 export interface ApiClientConfig {
   baseUrl: string;
   getToken?: () => string | undefined | Promise<string | undefined>;
@@ -2880,6 +2918,12 @@ export function createApiClient(config: ApiClientConfig) {
       );
     },
 
+    /**
+     * Run the integrity invariants over the caller's own data. Values every portfolio, so it
+     * gets the long timeout rather than the default.
+     */
+    getIntegrityReport: () =>
+      request<IntegrityReport>("GET", "/me/integrity", undefined, { timeoutMs: LONG_TIMEOUT_MS }),
     getPreferences: () => request<UserPreferences>("GET", "/me/preferences"),
     putPreferences: (
       prefs: Partial<{

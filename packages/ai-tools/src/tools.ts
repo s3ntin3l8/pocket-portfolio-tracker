@@ -28,6 +28,42 @@ const holderId = id()
   .optional()
   .describe("Account holder id; omit for everyone. Ignored when portfolioId is given.");
 
+/** Findings returned to the model in one call. */
+const MAX_INTEGRITY_FINDINGS = 20;
+
+function countBy<T>(items: T[], key: (t: T) => string): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const it of items) out[key(it)] = (out[key(it)] ?? 0) + 1;
+  return out;
+}
+
+/**
+ * Up to `limit` findings, taken round-robin across rules. Findings arrive grouped by rule, so a
+ * flat slice could be filled by the first rules on an account with many portfolios and the
+ * model would never see that a later rule broke too.
+ */
+function pickFindings<T extends { rule: string }>(findings: T[], limit: number): T[] {
+  const byRule = new Map<string, T[]>();
+  for (const f of findings) byRule.set(f.rule, [...(byRule.get(f.rule) ?? []), f]);
+  const queues = [...byRule.values()];
+  const out: T[] = [];
+  for (let i = 0; out.length < limit && queues.some((q) => i < q.length); i++) {
+    for (const q of queues) if (i < q.length && out.length < limit) out.push(q[i]!);
+  }
+  return out;
+}
+
+function groupAbstentions(items: { rule: string; scope: string; reason: string }[]) {
+  const groups = new Map<string, { rule: string; reason: string; scopeCount: number }>();
+  for (const a of items) {
+    const k = `${a.rule}|${a.reason}`;
+    const g = groups.get(k) ?? { rule: a.rule, reason: a.reason, scopeCount: 0 };
+    g.scopeCount++;
+    groups.set(k, g);
+  }
+  return [...groups.values()];
+}
+
 const BASIS_NOTE =
   "Name the basis of any gain you quote (vs cost of holdings / vs net contributed) and disclose " +
   "valuedAtCost holdings and fxMissingCurrencies exclusions.";
@@ -447,6 +483,40 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     }),
     handler: ({ range: r, portfolioId: id, holderId: h }) =>
       client.getInsights(r, { portfolioId: id, holderId: h }),
+  });
+
+  add({
+    name: "check_integrity",
+    title: "Data integrity check",
+    description:
+      "Run Pocket's own consistency checks over the user's data (e.g. net worth equals the sum of " +
+      "the portfolios, gain figures match their totals, the aggregate and per-portfolio histories " +
+      "agree) and return what broke. Use it when a figure looks wrong or before relying on " +
+      "numbers for a decision. Each finding names a rule, a scope (networth or portfolio:<id>) and " +
+      "expected vs actual: it is EVIDENCE that two figures disagree, not a verdict on which one is " +
+      "wrong, and not advice. Report findings as given; never recompute or adjust the amounts. " +
+      "No findings means no rule reported a mismatch on the data it could compare. Check " +
+      "abstentions: a rule listed there skipped some data (no exchange rate, another currency, " +
+      "history not collected) and compared nothing there, so those scopes are NOT known to be " +
+      "consistent; abstentions null means the server did not report them. findingsByRule counts " +
+      "every finding per rule even when the list is capped. Can be slow on large accounts.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      const r = await client.getIntegrityReport();
+      return {
+        checkedAt: r.checkedAt,
+        portfolioCount: r.portfolioCount,
+        rulesRun: r.rulesRun,
+        findingCount: r.findings.length,
+        // Every rule's count, not just the listed findings: the cap below must not hide that a
+        // rule broke.
+        findingsByRule: countBy(r.findings, (f) => f.rule),
+        findings: pickFindings(r.findings, MAX_INTEGRITY_FINDINGS),
+        truncated: r.findings.length > MAX_INTEGRITY_FINDINGS,
+        // Where a rule skipped data (grouped; ids stay in the report). null = not reported.
+        abstentions: r.abstentions ? groupAbstentions(r.abstentions) : null,
+      };
+    },
   });
 
   add({

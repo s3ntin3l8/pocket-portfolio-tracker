@@ -67,7 +67,8 @@ if (values.json) {
     `Checked ${portfolioCount} portfolio(s) against ${rulesRun.length} rules at ${checkedAt}.`,
   );
   if (findings.length === 0) {
-    console.log("No findings: every invariant holds on this data.");
+    // Not "everything holds": a rule that skipped data compared nothing there (see below).
+    console.log("No findings: no rule reported a mismatch on the data it could compare.");
   } else {
     console.log(`\n${findings.length} finding(s):\n`);
     for (const f of findings) {
@@ -77,6 +78,24 @@ if (values.json) {
         `    expected ${f.expected}   actual ${f.actual}   diff ${f.diff} (tol ${f.tolerance})\n`,
       );
     }
+  }
+}
+
+// Where a rule skipped data instead of comparing it. Not a failure (the exit code is about
+// findings), but those scopes are not known to be consistent, so they are always listed.
+if (!values.json) {
+  if (!Array.isArray(report.abstentions)) {
+    console.log("\n(This server does not report which comparisons were skipped.)");
+  } else if (report.abstentions.length > 0) {
+    const groups = new Map();
+    for (const a of report.abstentions) {
+      const key = `${a.rule}  ${a.reason}`;
+      groups.set(key, (groups.get(key) ?? 0) + 1);
+    }
+    console.log(
+      `\n${report.abstentions.length} comparison(s) skipped, not known to be consistent:`,
+    );
+    for (const [key, n] of groups) console.log(`  ${key}${n > 1 ? `  (${n} scopes)` : ""}`);
   }
 }
 process.exit(report.findings.length > 0 ? 1 : 0);
