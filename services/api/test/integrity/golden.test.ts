@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { Decimal } from "decimal.js";
+import { eq } from "drizzle-orm";
+import { corporateActions } from "@portfolio/db";
 import { closeDb } from "../../src/db/client.js";
 import {
   buildIntegrityApp,
@@ -16,6 +18,8 @@ import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
 import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
 import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
+import { merger, mergerExpected } from "./ledgers/merger.js";
+import { mixedBoundary, mixedBoundaryExpected } from "./ledgers/mixed-boundary.js";
 import { deTaxSlice, deTaxSliceExpected } from "./ledgers/de-tax-slice.js";
 import { anomalies, anomaliesExpected } from "./ledgers/anomalies.js";
 import { metaBase, metaBaseExpected } from "./ledgers/meta-base.js";
@@ -117,6 +121,7 @@ describe("transfers", () => {
 
   it("the aggregate is the sum of the depots (a transfer is net zero)", async () => {
     const nw = await get(l, "/networth");
+    expect(nw.gain.boundary).toBe("outside");
     expectDecimal(nw.netWorth, transfersExpected.all.value, "netWorth", ROUNDING);
     expectGain(nw.gain, transfersExpected.all, "gain[all]");
   });
@@ -317,5 +322,169 @@ describe("de-tax-slice: the depot's slice, not the holder's cap, is the allowanc
     expectDecimal(t.holderDistribution.holderAllowanceCap, e.holderAllowanceCap, "cap");
     expectDecimal(t.holderDistribution.totalAllocated, e.totalAllocated, "totalAllocated");
     expect(t.holderDistribution.overAllocated).toBe(true);
+  });
+});
+
+describe("merger", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(merger.asOf) });
+    l = await loadLedger(app, sign, merger);
+  }, 60_000);
+
+  // First on purpose: derivations are cached per request key, so a later test could be served
+  // a cached result and never re-run the engine path whose stderr this watches.
+  it("agrees with its corporate-action row: the pair's proceeds and basis equal the taxable market value", async () => {
+    // The engine cross-checks a pre-priced pair against the merger row's `taxableMarketValue` and
+    // writes a structured warning to stderr on a mismatch (it never fails the request). A
+    // consistent ledger must stay silent; with the row at a wrong value this emits warnings.
+    // Guard the premise: the cross-check below is only meaningful if the row is really there.
+    const rows = await app.db
+      .select()
+      .from(corporateActions)
+      .where(eq(corporateActions.instrumentId, l.instrumentIds.a!));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      type: "merger",
+      targetInstrumentId: l.instrumentIds.b,
+      portfolioId: l.portfolioIds.depot,
+      taxableMarketValue: "1500",
+    });
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stderr, "write").mockImplementation(((chunk: unknown) => {
+      writes.push(String(chunk));
+      return true;
+    }) as never);
+    try {
+      for (const view of ["summary", "holdings", "trades"]) {
+        await get(l, `/portfolios/${l.portfolioIds.depot}/${view}`);
+      }
+    } finally {
+      spy.mockRestore();
+    }
+    expect(writes.filter((w) => w.includes("merger_importer"))).toEqual([]);
+  });
+
+  it("realizes the step-up on the sale leg, carries the new basis, and stays contribution-neutral", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expect(s.gain.boundary).toBe("outside");
+    expectGain(s.gain, mergerExpected, "gain");
+  });
+
+  it("opens the new fund and leaves the old one closed with the realized step-up", async () => {
+    const h = await get(l, `/portfolios/${l.portfolioIds.depot}/holdings`);
+    const by = new Map<string, { quantity: string; realizedPnL: string }>(
+      h.holdings.map((x: { instrumentId: string; quantity: string; realizedPnL: string }) => [
+        x.instrumentId,
+        x,
+      ]),
+    );
+    expectDecimal(by.get(l.instrumentIds.b!)!.quantity, "20", "FUNDB quantity");
+    // The closed position stays listed (it carries the realized P&L): 10 × 150 − 1,000 = 500.
+    expectDecimal(by.get(l.instrumentIds.a!)!.quantity, "0", "FUNDA quantity");
+    expectDecimal(by.get(l.instrumentIds.a!)!.realizedPnL, "500", "FUNDA realized");
+  });
+});
+
+describe("mixed-boundary", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(mixedBoundary.asOf) });
+    l = await loadLedger(app, sign, mixedBoundary);
+  }, 60_000);
+
+  it("keeps each portfolio on its own boundary", async () => {
+    for (const key of ["savings", "depot"] as const) {
+      const { boundary, ...figures } = mixedBoundaryExpected[key];
+      const s = await get(l, `/portfolios/${l.portfolioIds[key]}/summary`);
+      expect(s.gain.boundary, `${key} boundary`).toBe(boundary);
+      expectGain(s.gain, figures, `gain[${key}]`);
+    }
+  });
+
+  it("sums the same-boundary pairs and reports the aggregate as mixed", async () => {
+    const { boundary, ...figures } = mixedBoundaryExpected.all;
+    const nw = await get(l, "/networth");
+    expect(nw.gain.boundary).toBe(boundary);
+    expectGain(nw.gain, figures, "gain[all]");
+    expectDecimal(nw.netWorth, figures.value, "netWorth", ROUNDING);
+  });
+});
+
+describe("loadLedger", () => {
+  // Several target columns are nullable, so an unknown symbolic key must fail loudly instead of
+  // inserting NULL and leaving a scenario that silently no longer tests what it claims to. One
+  // case per lookup site, each with its own message.
+  const unique = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2)}`;
+  const mergerCa = merger.corporateActions![0]! as Extract<
+    NonNullable<typeof merger.corporateActions>[number],
+    { type: "merger" }
+  >;
+
+  it.each([
+    [
+      "transaction instrument",
+      () => ({
+        ...eurBasic,
+        name: unique("bad-tx-instrument"),
+        transactions: [{ ...eurBasic.transactions[0]!, instrument: "nope" }],
+      }),
+    ],
+    [
+      "transaction portfolio",
+      () => ({
+        ...eurBasic,
+        name: unique("bad-tx-portfolio"),
+        transactions: [{ ...eurBasic.transactions[0]!, portfolio: "nope" }],
+      }),
+    ],
+    [
+      "corporate action instrument",
+      () => ({
+        ...merger,
+        name: unique("bad-ca-instrument"),
+        corporateActions: [{ ...mergerCa, instrument: "nope" }],
+      }),
+    ],
+    [
+      "merger portfolio",
+      () => ({
+        ...merger,
+        name: unique("bad-ca-portfolio"),
+        corporateActions: [{ ...mergerCa, portfolio: "nope" }],
+      }),
+    ],
+    [
+      "merger target instrument",
+      () => ({
+        ...merger,
+        name: unique("bad-ca-target"),
+        corporateActions: [{ ...mergerCa, target: "nope" }],
+      }),
+    ],
+  ])("rejects an unknown %s", async (what, build) => {
+    const ledger = build() as typeof merger;
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(ledger.asOf) });
+    await expect(loadLedger(app, sign, ledger)).rejects.toThrow(
+      new RegExp(`unknown ${what} "nope"`),
+    );
+  });
+});
+
+describe("aggregate boundary on single-boundary ledgers", () => {
+  // Each ledger needs its own clock and user; the cash-inside one is loaded here under a
+  // second user so it does not collide with the portfolio-level describe above.
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(cashInside.asOf) });
+    l = await loadLedger(app, sign, cashInside, "aggregate-cash-inside");
+  }, 60_000);
+
+  it("cash-inside: /networth carries the inside boundary and the same figures", async () => {
+    const nw = await get(l, "/networth");
+    expect(nw.gain.boundary).toBe("inside");
+    expectDecimal(nw.netWorth, cashInsideExpected.value, "netWorth", ROUNDING);
+    expectGain(nw.gain, cashInsideExpected, "gain[all]");
   });
 });

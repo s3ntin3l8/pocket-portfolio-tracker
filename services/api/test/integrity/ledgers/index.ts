@@ -12,6 +12,8 @@ import { anomalies } from "./anomalies.js";
 import { deTax } from "./de-tax.js";
 import { deTaxPots } from "./de-tax-pots.js";
 import { deTaxSlice } from "./de-tax-slice.js";
+import { merger } from "./merger.js";
+import { mixedBoundary } from "./mixed-boundary.js";
 
 /** Every golden ledger; the invariant suite must hold on all of them. */
 export const allLedgers: Ledger[] = [
@@ -29,4 +31,6 @@ export const allLedgers: Ledger[] = [
   deTax,
   deTaxPots,
   deTaxSlice,
+  merger,
+  mixedBoundary,
 ];

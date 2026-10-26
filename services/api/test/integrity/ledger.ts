@@ -46,6 +46,8 @@ export interface LedgerTx {
   price?: string;
   fees?: string;
   tax?: string;
+  /** Sub-type tag, e.g. "merger" on both legs of a fund merger pair. */
+  kind?: string;
   currency: string;
   at: string;
 }
@@ -78,8 +80,24 @@ export interface Ledger {
   instruments: Record<string, LedgerInstrument>;
   /** `1 base = rate quote` on `date` (e.g. USD→EUR 0.9 means 1 USD = 0.9 EUR). */
   fx?: { base: string; quote: string; rate: string; date: string }[];
-  /** Share-count corporate actions; `ratio` "4" is a 4:1 split (quantity × 4). */
-  corporateActions?: { instrument: string; type: "split"; ratio: string; exDate: string }[];
+  /**
+   * Corporate actions. A split's `ratio` "4" is 4:1 (quantity × 4). A merger is what
+   * `POST /portfolios/:id/mergers` commits next to its paired legs: `ratio` is old shares per
+   * new share, `ratioTo` its reciprocal, `taxableMarketValue` set only for a taxable merger.
+   */
+  corporateActions?: (
+    | { instrument: string; type: "split"; ratio: string; exDate: string }
+    | {
+        instrument: string;
+        type: "merger";
+        portfolio: string;
+        target: string;
+        ratio: string;
+        ratioTo: string;
+        exDate: string;
+        taxableMarketValue?: string;
+      }
+  )[];
   transactions: LedgerTx[];
 }
 
@@ -108,6 +126,16 @@ export async function buildIntegrityApp() {
       .setExpirationTime("1h")
       .sign(kp.privateKey);
   return { app, sign };
+}
+
+/**
+ * Resolve a symbolic key. Several target columns are nullable, so a typo'd key would otherwise
+ * insert NULL and the scenario would silently stop exercising what it was written for.
+ */
+function need(ids: Record<string, string>, key: string, what: string): string {
+  const id = ids[key];
+  if (!id) throw new Error(`ledger: unknown ${what} "${key}"`);
+  return id;
 }
 
 /** Insert a ledger for a fresh user; the caller must have frozen the clock at `ledger.asOf`. */
@@ -179,22 +207,33 @@ export async function loadLedger(
   }
   for (const c of ledger.corporateActions ?? []) {
     await app.db.insert(corporateActions).values({
-      instrumentId: instrumentIds[c.instrument]!,
+      instrumentId: need(instrumentIds, c.instrument, "corporate action instrument"),
       type: c.type,
       ratio: c.ratio,
       exDate: c.exDate,
+      ...(c.type === "merger"
+        ? {
+            portfolioId: need(portfolioIds, c.portfolio, "merger portfolio"),
+            targetInstrumentId: need(instrumentIds, c.target, "merger target instrument"),
+            ratioTo: c.ratioTo,
+            taxableMarketValue: c.taxableMarketValue ?? null,
+          }
+        : {}),
     });
   }
 
   await app.db.insert(transactions).values(
     ledger.transactions.map((t) => ({
-      portfolioId: portfolioIds[t.portfolio]!,
-      instrumentId: t.instrument ? instrumentIds[t.instrument]! : null,
+      portfolioId: need(portfolioIds, t.portfolio, "transaction portfolio"),
+      instrumentId: t.instrument
+        ? need(instrumentIds, t.instrument, "transaction instrument")
+        : null,
       type: t.type,
       quantity: t.quantity ?? "0",
       price: t.price ?? "0",
       fees: t.fees ?? "0",
       tax: t.tax ?? null,
+      kind: t.kind ?? null,
       currency: t.currency,
       executedAt: new Date(t.at),
     })),
