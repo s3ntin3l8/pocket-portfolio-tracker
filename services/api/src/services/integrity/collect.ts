@@ -1,8 +1,6 @@
 import { mapPool } from "../../lib/promise-pool.js";
+import { PORTFOLIO_VALUATION_CONCURRENCY } from "../../routes/transactions/shared/helpers.js";
 import type { IntegrityBodies, NetWorthBody, ValuationBody } from "./rules.js";
-
-/** Same bound as the routes' per-portfolio valuation fan-out (PORTFOLIO_VALUATION_CONCURRENCY). */
-const SUMMARY_CONCURRENCY = 4;
 
 const REQUIRED_STRINGS = [
   "displayCurrency",
@@ -72,17 +70,16 @@ export async function collectBodies(
   if (!Array.isArray(portfolioList)) {
     throw new Error(`/portfolios: expected an array, got ${JSON.stringify(portfolioList)}`);
   }
-  const [networth, summaries] = await Promise.all([
-    get("/networth").then((b) => asValuation(b, "/networth") as NetWorthBody),
-    // Bounded like the API's own per-portfolio fan-out: every sub-request spends the caller's
-    // rate-limit budget, so an unbounded burst on a big account would 429 itself.
-    mapPool(
-      portfolioList as { id: string }[],
-      SUMMARY_CONCURRENCY,
-      async (p) =>
-        [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
-    ),
-  ]);
+  // Sequential on purpose: /networth runs its own PORTFOLIO_VALUATION_CONCURRENCY-wide pool, so
+  // overlapping it with the summaries below would double the peak against the shared DB pool.
+  const networth = asValuation(await get("/networth"), "/networth") as NetWorthBody;
+  // Bounded like the API's own per-portfolio fan-out: every sub-request spends the caller's
+  // rate-limit budget, so an unbounded burst on a big account would 429 itself.
+  const summaries = await mapPool(
+    portfolioList as { id: string }[],
+    PORTFOLIO_VALUATION_CONCURRENCY,
+    async (p) => [p.id, asValuation(await get(`/portfolios/${p.id}/summary`), "summary")] as const,
+  );
   const portfolios = summaries.map(([id, summary]) => ({ id, summary }));
 
   // Today's rate (UTC day of the networth response) for every portfolio currency that differs
