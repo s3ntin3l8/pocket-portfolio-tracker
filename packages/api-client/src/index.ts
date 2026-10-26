@@ -2550,12 +2550,26 @@ export interface IntegrityFinding {
   message: string;
 }
 
+/**
+ * Where a rule skipped data instead of comparing it (`reason`: `no_fx_rate`, `currency_mismatch`,
+ * `not_available`, `foreign_currency`, `history_not_collected`). Those scopes are not known to be
+ * consistent: an abstention is not a pass.
+ */
+export interface IntegrityAbstention {
+  rule: string;
+  /** `"networth"` or `"portfolio:<id>"`. */
+  scope: string;
+  reason: string;
+}
+
 export interface IntegrityReport {
   checkedAt: string;
   portfolioCount: number;
-  /** Every rule the check ran, so an empty `findings` is "all of these hold", not "nothing ran". */
+  /** Every rule the check attempted. Read with `abstentions`: a rule can run and still skip data. */
   rulesRun: string[];
   findings: IntegrityFinding[];
+  /** Absent from an older API; treat a missing list as "not reported", never as "none". */
+  abstentions?: IntegrityAbstention[];
 }
 
 export interface ApiClientConfig {

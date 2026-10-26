@@ -176,6 +176,9 @@ describe("POST /mcp", () => {
     expect(mine.isError).toBe(false);
     expect(mine.data).toMatchObject({ portfolioCount: 1, findingCount: 0, truncated: false });
     expect(mine.data.rulesRun.length).toBeGreaterThan(0);
+    // Skips are reported (an array, not absent), and with no findings the per-rule count is empty.
+    expect(Array.isArray(mine.data.abstentions)).toBe(true);
+    expect(mine.data.findingsByRule).toEqual({});
     // Evidence only: nothing identifying leaks through the report.
     expect(JSON.stringify(mine.data)).not.toContain("ACCT-SECRET-123");
     expect(JSON.stringify(mine.data)).not.toContain("DE89370400440532013000");

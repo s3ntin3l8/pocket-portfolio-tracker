@@ -1423,7 +1423,7 @@
     "integrityRun": "Run checks",
     "integrityRerun": "Run again",
     "integrityRunning": "Checking…",
-    "integrityOk": "All {rules} checks hold across {portfolios, plural, one {# portfolio} other {# portfolios}}.",
+    "integrityOk": "No check found a mismatch ({rules} rules, {portfolios, plural, one {# portfolio} other {# portfolios}}).",
     "integrityFound": "{count, plural, one {# check failed} other {# checks failed}}",
     "integrityCheckedAt": "Checked {when}",
     "integrityError": "The checks could not run. This is not a result — please try again.",
@@ -1442,7 +1442,13 @@
     "integrityRule_REALIZED_PARITY": "The trade log should show the same realized gains as the summary.",
     "integrityRule_ANOMALY_UNION": "The all-portfolios warnings should be the union of each portfolio's warnings.",
     "integrityRule_HISTORY_ORDERED": "The history chart should have one point per day, in order.",
-    "integrityRule_HISTORY_SUMS_PORTFOLIOS": "The history chart's net worth should equal the sum of the portfolios' histories."
+    "integrityRule_HISTORY_SUMS_PORTFOLIOS": "The history chart's net worth should equal the sum of the portfolios' histories.",
+    "integrityNotCompared": "{count, plural, one {# comparison was skipped and is not known to be consistent:} other {# comparisons were skipped and are not known to be consistent:}}",
+    "integrityAbstain_no_fx_rate": "no exchange rate available",
+    "integrityAbstain_currency_mismatch": "the pages report in different currencies",
+    "integrityAbstain_not_available": "figure not available",
+    "integrityAbstain_foreign_currency": "a portfolio is not in your display currency",
+    "integrityAbstain_history_not_collected": "history was not collected"
   },
   "Holdings": {
     "title": "Holdings",

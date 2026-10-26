@@ -1423,7 +1423,7 @@
     "integrityRun": "Jalankan pemeriksaan",
     "integrityRerun": "Jalankan lagi",
     "integrityRunning": "Memeriksa…",
-    "integrityOk": "Semua {rules} pemeriksaan lolos untuk {portfolios, plural, other {# portofolio}}.",
+    "integrityOk": "Tidak ada pemeriksaan yang menemukan selisih ({rules} aturan, {portfolios, plural, other {# portofolio}}).",
     "integrityFound": "{count, plural, other {# pemeriksaan gagal}}",
     "integrityCheckedAt": "Diperiksa {when}",
     "integrityError": "Pemeriksaan tidak dapat dijalankan. Ini bukan hasil — silakan coba lagi.",
@@ -1442,7 +1442,13 @@
     "integrityRule_REALIZED_PARITY": "Log transaksi seharusnya menampilkan keuntungan terealisasi yang sama dengan ringkasan.",
     "integrityRule_ANOMALY_UNION": "Peringatan semua portofolio seharusnya gabungan peringatan tiap portofolio.",
     "integrityRule_HISTORY_ORDERED": "Grafik riwayat seharusnya memiliki satu titik per hari, berurutan.",
-    "integrityRule_HISTORY_SUMS_PORTFOLIOS": "Kekayaan bersih pada grafik riwayat seharusnya sama dengan jumlah riwayat portofolio."
+    "integrityRule_HISTORY_SUMS_PORTFOLIOS": "Kekayaan bersih pada grafik riwayat seharusnya sama dengan jumlah riwayat portofolio.",
+    "integrityNotCompared": "{count, plural, other {# perbandingan dilewati dan belum diketahui konsisten:}}",
+    "integrityAbstain_no_fx_rate": "kurs tidak tersedia",
+    "integrityAbstain_currency_mismatch": "halaman melaporkan dalam mata uang berbeda",
+    "integrityAbstain_not_available": "angka tidak tersedia",
+    "integrityAbstain_foreign_currency": "ada portofolio yang tidak memakai mata uang tampilan Anda",
+    "integrityAbstain_history_not_collected": "riwayat tidak dikumpulkan"
   },
   "Holdings": {
     "title": "Kepemilikan",

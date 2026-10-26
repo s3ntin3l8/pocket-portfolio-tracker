@@ -2,8 +2,13 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ShieldCheck } from "lucide-react";
-import type { ApiClient, IntegrityFinding, IntegrityReport } from "@portfolio/api-client";
+import { Info, ShieldCheck } from "lucide-react";
+import type {
+  ApiClient,
+  IntegrityAbstention,
+  IntegrityFinding,
+  IntegrityReport,
+} from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Spinner } from "@/components/ui/spinner";
@@ -69,7 +74,13 @@ export function IntegrityCheckPanel({ client }: { client: IntegrityCheckClient }
 
         {state.status === "done" && state.report.findings.length === 0 && (
           <p className="flex items-center gap-2 text-sm">
-            <ShieldCheck className="size-4 shrink-0 text-positive" aria-hidden />
+            {/* The green shield is only for "nothing found AND nothing skipped"; an older server
+                that does not report skips, or any skip, gets a neutral icon instead. */}
+            {state.report.abstentions?.length === 0 ? (
+              <ShieldCheck className="size-4 shrink-0 text-success" aria-hidden />
+            ) : (
+              <Info className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+            )}
             {t("integrityOk", {
               rules: state.report.rulesRun.length,
               portfolios: state.report.portfolioCount,
@@ -103,7 +114,38 @@ export function IntegrityCheckPanel({ client }: { client: IntegrityCheckClient }
             </ul>
           </>
         )}
+
+        {state.status === "done" && (state.report.abstentions?.length ?? 0) > 0 && (
+          <Skipped t={t} abstentions={state.report.abstentions!} />
+        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Where a rule skipped data instead of comparing it. Those scopes are not known to be consistent,
+ * so they are listed, never folded into the all-clear.
+ */
+function Skipped({ t, abstentions }: { t: T; abstentions: IntegrityAbstention[] }) {
+  const groups = new Map<string, { rule: string; reason: string; count: number }>();
+  for (const a of abstentions) {
+    const key = `${a.rule}|${a.reason}`;
+    const g = groups.get(key) ?? { rule: a.rule, reason: a.reason, count: 0 };
+    g.count++;
+    groups.set(key, g);
+  }
+  return (
+    <div className="space-y-1 text-xs text-muted-foreground">
+      <p className="font-bold">{t("integrityNotCompared", { count: abstentions.length })}</p>
+      <ul className="list-disc space-y-0.5 pl-5">
+        {[...groups.values()].map((g) => (
+          <li key={`${g.rule}|${g.reason}`}>
+            {ruleName(t, g.rule)} — {reasonText(t, g.reason)}
+            {g.count > 1 ? ` (${g.count})` : ""}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -126,6 +168,18 @@ type T = ReturnType<typeof useTranslations>;
 function ruleText(t: T, f: IntegrityFinding): string {
   const key = `integrityRule_${f.rule}`;
   return t.has(key) ? t(key) : f.message;
+}
+
+/** A rule named for a skip line: its meaning, or its id when the web does not know it yet. */
+function ruleName(t: T, rule: string): string {
+  const key = `integrityRule_${rule}`;
+  return t.has(key) ? t(key) : rule;
+}
+
+/** Why a rule skipped; an unknown reason code from a newer server is shown as is. */
+function reasonText(t: T, reason: string): string {
+  const key = `integrityAbstain_${reason}`;
+  return t.has(key) ? t(key) : reason;
 }
 
 function scopeText(t: T, scope: string): string {
