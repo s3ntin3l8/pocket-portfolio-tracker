@@ -44,14 +44,25 @@ from a documented definition — an identity that fees, taxes or boundaries legi
 real data and is deliberately absent. A live figure is never compared with a stored series
 (`/networth` vs. the last `/networth/history` point is not an invariant).
 
-| Rule                     | Holds because                                                                                                                |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| `NW_SUM_PORTFOLIOS`      | `/networth` = Σ portfolio summaries, each converted at today's rate (abstains if a rate is missing: the app excludes it too) |
-| `GAIN_MATCHES_TOTALS`    | `GainSummary` is built from the same valuation's totals                                                                      |
-| `HOLDINGS_SUM`           | totals are the sums of the holdings' display figures (null = excluded)                                                       |
-| `NW_COMPOSITION`         | net worth = market value + counted cash − liabilities                                                                        |
-| `FX_MISSING_DISCLOSED`   | a holding that couldn't be converted is named in `fxMissingCurrencies`                                                       |
-| `VALUED_AT_COST_NO_GAIN` | a holding valued at cost has no measured gain                                                                                |
+| Rule                      | Holds because                                                                                                                                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `NW_SUM_PORTFOLIOS`       | `/networth` = Σ portfolio summaries, each converted at today's rate (abstains if a rate is missing: the app excludes it too)                                                                                             |
+| `GAIN_MATCHES_TOTALS`     | `GainSummary` is built from the same valuation's totals                                                                                                                                                                  |
+| `HOLDINGS_SUM`            | totals are the sums of the holdings' display figures (null = excluded)                                                                                                                                                   |
+| `NW_COMPOSITION`          | net worth = market value + counted cash − liabilities                                                                                                                                                                    |
+| `FX_MISSING_DISCLOSED`    | a holding that couldn't be converted is named in `fxMissingCurrencies`                                                                                                                                                   |
+| `VALUED_AT_COST_NO_GAIN`  | a holding valued at cost has no measured gain                                                                                                                                                                            |
+| `CONTRIB_PARITY`          | the Savings page's `netContributed` is `gain.netContributed`, on the same boundary (abstains if the endpoint answers in another currency)                                                                                |
+| `REALIZED_PARITY`         | the trade log's `totalRealized` is the valuation's `totalRealizedPnL` (both use the default average-cost method)                                                                                                         |
+| `ANOMALY_UNION`           | `/networth/anomalies` is the union of every portfolio's `/anomalies`, keyed by code, transaction, instrument and `meta`                                                                                                  |
+| `HISTORY_ORDERED`         | every stored-snapshot series (`/networth/history`, `/portfolios/:id/history`) has strictly ascending, unique dates                                                                                                       |
+| `HISTORY_SUMS_PORTFOLIOS` | the aggregate history at a date is the sum of that date's portfolio snapshots (a portfolio counts only on dates it has one); checked only when every portfolio is already in the display currency, otherwise it abstains |
+
+Deliberately absent: an Income-page parity rule (the Income page counts only dividend/coupon
+rows while the summary's income also includes interest, bonus cash and tax debits — a real
+inconsistency tracked in #1167 that would fire on any account with cash interest), and a
+Tax↔Trades Vorabpauschale rule (it depends on year, cost-basis method and the fund's
+Teilfreistellung, so it stays a scenario test: `tax-vorab-estimate-surfaces.test.ts`).
 
 `collectBodies(get)` fetches what the rules read through any `get(url)`; it validates the
 shapes it depends on and fails naming the endpoint and field instead of defaulting into

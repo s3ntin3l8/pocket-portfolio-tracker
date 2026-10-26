@@ -56,7 +56,21 @@ function bodies(): IntegrityBodies {
   return {
     networth: { ...valuation(), asOf: "2026-06-30T12:00:00.000Z" },
     networthParity: parity(),
-    portfolios: [{ id: "p1", summary: valuation(), parity: parity() }],
+    networthHistory: [
+      { date: "2026-06-29", netWorth: "1200", marketValue: "1200" },
+      { date: "2026-06-30", netWorth: "1260", marketValue: "1260" },
+    ],
+    portfolios: [
+      {
+        id: "p1",
+        summary: valuation(),
+        parity: parity(),
+        history: [
+          { date: "2026-06-29", netWorth: "1200", marketValue: "1200" },
+          { date: "2026-06-30", netWorth: "1260", marketValue: "1260" },
+        ],
+      },
+    ],
     fxToDisplay: {},
   };
 }
@@ -81,6 +95,7 @@ describe("integrity rules", () => {
       id: "p2",
       summary: { ...valuation(), displayCurrency: "USD", netWorth: "100" },
       parity: parity(),
+      history: null,
     });
     b.fxToDisplay = { USD: "0.9" };
     b.networth.netWorth = "1350"; // 1260 + 100 × 0.9
@@ -95,6 +110,7 @@ describe("integrity rules", () => {
       id: "p2",
       summary: { ...valuation(), displayCurrency: "CAD", netWorth: "100" },
       parity: parity(),
+      history: null,
     });
     b.fxToDisplay = { CAD: null };
     b.networth.netWorth = "5";
@@ -205,7 +221,7 @@ describe("integrity rules", () => {
 
   it("ANOMALY_UNION: order and duplicates across portfolios do not matter", () => {
     const b = bodies();
-    b.portfolios.push({ id: "p2", summary: valuation(), parity: parity() });
+    b.portfolios.push({ id: "p2", summary: valuation(), parity: parity(), history: null });
     b.portfolios[1]!.parity.anomalies.anomalies.push({ code: "oversell", transactionId: "t2" });
     b.networthParity.anomalies.anomalies = [
       { code: "oversell", transactionId: "t2" },
@@ -235,5 +251,71 @@ describe("integrity rules", () => {
       { code: "negative_cash", meta: { currency: "EUR" } },
     ];
     expect(rules(b)).not.toContain("ANOMALY_UNION");
+  });
+
+  it("HISTORY_ORDERED: a duplicate or out-of-order date, in the aggregate or one portfolio", () => {
+    const dup = bodies();
+    dup.networthHistory.push({ date: "2026-06-30", netWorth: "1", marketValue: "1" });
+    const f = checkIntegrity(dup).find((x) => x.rule === "HISTORY_ORDERED");
+    expect(f).toMatchObject({ scope: "networth", actual: "2026-06-30" });
+
+    const back = bodies();
+    back.portfolios[0]!.history![0] = { date: "2026-07-01", netWorth: "1", marketValue: "1" };
+    expect(checkIntegrity(back).find((x) => x.rule === "HISTORY_ORDERED")).toMatchObject({
+      scope: "portfolio:p1",
+    });
+  });
+
+  it("HISTORY_SUMS_PORTFOLIOS: the aggregate differs from the sum of the portfolio series", () => {
+    const b = bodies();
+    b.networthHistory[1]!.netWorth = "1261";
+    const f = checkIntegrity(b).find((x) => x.rule === "HISTORY_SUMS_PORTFOLIOS");
+    expect(f).toMatchObject({ expected: "1260", actual: "1261", diff: "1" });
+    expect(f!.message).toContain("2026-06-30");
+  });
+
+  it("HISTORY_SUMS_PORTFOLIOS: a portfolio counts only on the dates it has a snapshot", () => {
+    const b = bodies();
+    b.portfolios.push({
+      id: "p2",
+      summary: valuation(),
+      parity: parity(),
+      history: [{ date: "2026-06-30", netWorth: "500", marketValue: "500" }],
+    });
+    b.networthHistory[1]!.netWorth = "1760"; // 1260 + 500 on the 30th only
+    b.networthHistory[1]!.marketValue = "1760";
+    expect(rules(b)).not.toContain("HISTORY_SUMS_PORTFOLIOS");
+    b.networthHistory[0]!.netWorth = "1700"; // as if p2 also counted on the 29th
+    expect(rules(b)).toContain("HISTORY_SUMS_PORTFOLIOS");
+  });
+
+  it("HISTORY_SUMS_PORTFOLIOS: a date only one side has is a finding", () => {
+    const b = bodies();
+    b.networthHistory.pop();
+    const f = checkIntegrity(b).find((x) => x.rule === "HISTORY_SUMS_PORTFOLIOS");
+    expect(f).toMatchObject({ expected: "a point", actual: "no point" });
+  });
+
+  it("HISTORY_SUMS_PORTFOLIOS: abstains with a foreign-currency portfolio or an uncollected series", () => {
+    const foreign = bodies();
+    foreign.portfolios[0]!.summary.displayCurrency = "USD";
+    foreign.networthHistory[1]!.netWorth = "1";
+    expect(rules(foreign)).not.toContain("HISTORY_SUMS_PORTFOLIOS");
+
+    const missing = bodies();
+    missing.portfolios[0]!.history = null;
+    missing.networthHistory[1]!.netWorth = "1";
+    expect(rules(missing)).not.toContain("HISTORY_SUMS_PORTFOLIOS");
+  });
+
+  it("HISTORY_SUMS_PORTFOLIOS: lists the first five differing dates in full, then a count of the rest", () => {
+    const b = bodies();
+    const dates = Array.from({ length: 9 }, (_, i) => `2026-05-${String(i + 10)}`);
+    b.networthHistory = dates.map((date) => ({ date, netWorth: "1", marketValue: "1" }));
+    b.portfolios[0]!.history = dates.map((date) => ({ date, netWorth: "2", marketValue: "2" }));
+    const hist = checkIntegrity(b).filter((x) => x.rule === "HISTORY_SUMS_PORTFOLIOS");
+    // 5 listed dates x (netWorth + marketValue), then the count of the other 4 dates.
+    expect(hist).toHaveLength(11);
+    expect(hist.at(-1)!.actual).toBe("4 more date(s) differ");
   });
 });

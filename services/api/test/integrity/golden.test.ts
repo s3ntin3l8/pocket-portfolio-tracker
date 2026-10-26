@@ -18,6 +18,7 @@ import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
 import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
 import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
+import { history, historyExpected } from "./ledgers/history.js";
 import { merger, mergerExpected } from "./ledgers/merger.js";
 import { mixedBoundary, mixedBoundaryExpected } from "./ledgers/mixed-boundary.js";
 import { deTaxSlice, deTaxSliceExpected } from "./ledgers/de-tax-slice.js";
@@ -409,6 +410,34 @@ describe("mixed-boundary", () => {
     expect(nw.gain.boundary).toBe(boundary);
     expectGain(nw.gain, figures, "gain[all]");
     expectDecimal(nw.netWorth, figures.value, "netWorth", ROUNDING);
+  });
+});
+
+describe("history", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(history.asOf) });
+    l = await loadLedger(app, sign, history);
+  }, 60_000);
+
+  const points = (body: { date: string; netWorth: string; marketValue: string }[]) =>
+    body.map((p) => ({ date: p.date, netWorth: p.netWorth, marketValue: p.marketValue }));
+
+  it("the aggregate sums each date's snapshots; a portfolio counts only where it has one", async () => {
+    const agg = points(await get(l, "/networth/history?range=all"));
+    expect(agg.map((p) => p.date)).toEqual(historyExpected.aggregate.map((p) => p.date));
+    for (const [i, e] of historyExpected.aggregate.entries()) {
+      expectDecimal(agg[i]!.netWorth, e.netWorth, `${e.date} netWorth`);
+      expectDecimal(agg[i]!.marketValue, e.marketValue, `${e.date} marketValue`);
+    }
+  });
+
+  it("a portfolio's own series is exactly its stored snapshots", async () => {
+    const b = points(await get(l, `/portfolios/${l.portfolioIds.b}/history?range=all`));
+    expect(b.map((p) => p.date)).toEqual(historyExpected.b.map((p) => p.date));
+    for (const [i, e] of historyExpected.b.entries()) {
+      expectDecimal(b[i]!.netWorth, e.netWorth, `${e.date} netWorth`);
+    }
   });
 });
 

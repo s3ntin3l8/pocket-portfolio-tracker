@@ -18,6 +18,8 @@ export const RULE_IDS = [
   "CONTRIB_PARITY",
   "REALIZED_PARITY",
   "ANOMALY_UNION",
+  "HISTORY_ORDERED",
+  "HISTORY_SUMS_PORTFOLIOS",
 ] as const;
 
 export type RuleId = (typeof RULE_IDS)[number];
@@ -91,10 +93,29 @@ export interface ParityBodies {
   anomalies: { anomalies: AnomalyBody[] };
 }
 
+/** One point of a stored daily-snapshot series (`/networth/history`, `/portfolios/:id/history`). */
+export interface HistoryPoint {
+  date: string;
+  netWorth: string;
+  marketValue: string;
+}
+
 export interface IntegrityBodies {
   networth: NetWorthBody;
   networthParity: ParityBodies;
-  portfolios: { id: string; summary: ValuationBody; parity: ParityBodies }[];
+  /** `/networth/history?range=all`: the aggregate of the stored daily snapshots. */
+  networthHistory: HistoryPoint[];
+  portfolios: {
+    id: string;
+    summary: ValuationBody;
+    parity: ParityBodies;
+    /**
+     * `/portfolios/:id/history?range=all`, in the portfolio's base currency. Only collected when
+     * every portfolio is already in the display currency (otherwise summing needs a per-date FX
+     * lookup per currency, which the report does not do); `null` when not collected.
+     */
+    history: HistoryPoint[] | null;
+  }[];
   /**
    * Today's rate from each portfolio currency into `networth.displayCurrency` (`/fx-rate`);
    * `null` when the app has none. The same currency maps to "1".
@@ -381,6 +402,120 @@ export function checkAnomalyUnion(b: IntegrityBodies): Finding[] {
   ];
 }
 
+const MAX_HISTORY_FINDINGS = 5;
+
+/** Stored snapshots are one row per portfolio and day: a series must be strictly ascending. */
+export function checkHistoryOrdered(b: IntegrityBodies): Finding[] {
+  const series: { scope: string; points: HistoryPoint[] }[] = [
+    { scope: "networth", points: b.networthHistory },
+    ...b.portfolios.flatMap((p) =>
+      p.history ? [{ scope: `portfolio:${p.id}`, points: p.history }] : [],
+    ),
+  ];
+  const out: Finding[] = [];
+  for (const { scope, points } of series) {
+    for (let i = 1; i < points.length; i++) {
+      if (points[i - 1]!.date < points[i]!.date) continue;
+      out.push({
+        rule: "HISTORY_ORDERED",
+        scope,
+        expected: `a date after ${points[i - 1]!.date}`,
+        actual: points[i]!.date,
+        diff: "n/a",
+        tolerance: "n/a",
+        message: "history dates are not strictly ascending (a duplicate or out-of-order point)",
+      });
+      break; // one finding per series: the rest follows from the same defect
+    }
+  }
+  return out;
+}
+
+/**
+ * The aggregate history at a date is the sum of that date's portfolio snapshots, each converted
+ * at that date's rate. When every portfolio is already in the display currency no conversion
+ * is involved, so the aggregate must equal the plain sum of the per-portfolio series (a
+ * portfolio contributes only on the dates it has a snapshot). Abstains when any portfolio is in
+ * another currency or its history was not collected.
+ */
+export function checkHistorySumsPortfolios(b: IntegrityBodies): Finding[] {
+  if (b.portfolios.length === 0 || b.portfolios.some((p) => p.history === null)) return [];
+  if (b.portfolios.some((p) => p.summary.displayCurrency !== b.networth.displayCurrency)) return [];
+
+  const expected = new Map<string, { netWorth: Decimal; marketValue: Decimal }>();
+  for (const p of b.portfolios) {
+    for (const pt of p.history!) {
+      const e = expected.get(pt.date) ?? { netWorth: new Decimal(0), marketValue: new Decimal(0) };
+      e.netWorth = e.netWorth.add(pt.netWorth);
+      e.marketValue = e.marketValue.add(pt.marketValue);
+      expected.set(pt.date, e);
+    }
+  }
+  const actual = new Map(b.networthHistory.map((pt) => [pt.date, pt]));
+  const dates = [...new Set([...expected.keys(), ...actual.keys()])].sort();
+
+  const out: Finding[] = [];
+  // Capped by differing DATES (a date can carry a netWorth and a marketValue finding), so a
+  // systematic defect does not bury the report in hundreds of rows.
+  let datesListed = 0;
+  let skipped = 0;
+  const push = (f: Finding[]) => {
+    if (f.length === 0) return;
+    if (datesListed < MAX_HISTORY_FINDINGS) {
+      out.push(...f);
+      datesListed++;
+    } else {
+      skipped++;
+    }
+  };
+  for (const date of dates) {
+    const e = expected.get(date);
+    const a = actual.get(date);
+    if (!e || !a) {
+      push([
+        {
+          rule: "HISTORY_SUMS_PORTFOLIOS",
+          scope: "networth",
+          expected: e ? "a point" : "no point",
+          actual: a ? "a point" : "no point",
+          diff: "n/a",
+          tolerance: "n/a",
+          message: `${date}: the aggregate and the per-portfolio histories disagree on whether this date exists`,
+        },
+      ]);
+      continue;
+    }
+    push([
+      ...compare(
+        "HISTORY_SUMS_PORTFOLIOS",
+        "networth",
+        `${date}: aggregate netWorth differs from the sum of the portfolio histories`,
+        e.netWorth,
+        new Decimal(a.netWorth),
+      ),
+      ...compare(
+        "HISTORY_SUMS_PORTFOLIOS",
+        "networth",
+        `${date}: aggregate marketValue differs from the sum of the portfolio histories`,
+        e.marketValue,
+        new Decimal(a.marketValue),
+      ),
+    ]);
+  }
+  if (skipped > 0) {
+    out.push({
+      rule: "HISTORY_SUMS_PORTFOLIOS",
+      scope: "networth",
+      expected: "no further differences",
+      actual: `${skipped} more date(s) differ`,
+      diff: String(skipped),
+      tolerance: "n/a",
+      message: `only the first ${MAX_HISTORY_FINDINGS} differing dates are listed`,
+    });
+  }
+  return out;
+}
+
 /**
  * Keyed by `RuleId` so the compiler enforces that the ids in `RULE_IDS` and the rules that
  * actually run are the same set: a rule added here without an id (or the reverse) is a type
@@ -396,6 +531,8 @@ export const RULES: Record<RuleId, (b: IntegrityBodies) => Finding[]> = {
   CONTRIB_PARITY: checkContributionParity,
   REALIZED_PARITY: checkRealizedParity,
   ANOMALY_UNION: checkAnomalyUnion,
+  HISTORY_ORDERED: checkHistoryOrdered,
+  HISTORY_SUMS_PORTFOLIOS: checkHistorySumsPortfolios,
 };
 
 export function checkIntegrity(b: IntegrityBodies): Finding[] {
