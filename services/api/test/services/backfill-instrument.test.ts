@@ -338,6 +338,61 @@ describe("fetchInstrumentPrices (#761, #773)", () => {
     expect(rows).toHaveLength(3);
   });
 
+  it("stores candles in the provider's currency, not the instrument's declared one", async () => {
+    const db = await ensureDb();
+    const [u] = await db
+      .insert(users)
+      .values({ authSub: "instr-ccy-user", email: "instr-ccy@example.com" })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: u.id, name: "Instr Ccy", baseCurrency: "EUR", cashCounted: false })
+      .returning();
+    // A USD-priced UCITS line on Xetra: declared EUR, quoted USD.
+    const [instr] = await db
+      .insert(instruments)
+      .values({
+        symbol: "INSTRCCY",
+        market: "XETRA",
+        assetClass: "etf",
+        currency: "EUR",
+        name: "Instr Ccy ETF",
+      })
+      .returning();
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      type: "buy",
+      quantity: "1",
+      price: "15",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2026-03-01T10:00:00.000Z"),
+    });
+
+    const svc = new MarketDataService([
+      new FixedCandleProvider(
+        "INSTRCCY",
+        [
+          { date: "2026-03-01", close: "18.5" },
+          { date: "2026-03-02", close: "18.6" },
+        ],
+        "USD",
+      ),
+    ]);
+
+    await fetchInstrumentPrices(db, svc, {
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      chunkStart: "2026-03-01",
+      chunkEnd: "2026-03-02",
+    });
+
+    const rows = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.currency === "USD")).toBe(true);
+  });
+
   it("proxies a UBS gold instrument's history from XAU spot scaled by today's UBS buyback", async () => {
     const db = await ensureDb();
     const [u] = await db

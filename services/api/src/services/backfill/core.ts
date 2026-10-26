@@ -217,7 +217,9 @@ export async function backfillPortfolioHistory(
       }
       for (const c of candles) {
         if (c.date >= fetchFrom) {
-          instrPrices.set(c.date, { close: c.close, currency: instr.currency });
+          // The provider's own currency wins: a USD-priced UCITS line on Xetra is declared
+          // EUR on the instrument, and stamping its candles EUR mislabels every row ~17%.
+          instrPrices.set(c.date, { close: c.close, currency: c.currency ?? instr.currency });
         }
       }
     }
