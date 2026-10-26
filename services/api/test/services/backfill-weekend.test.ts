@@ -281,13 +281,24 @@ describe("backfillStalePortfolios — force option", () => {
     // FORCE_CANDLES only covers early Feb 2026 — WeekdayCandleProvider doesn't extend
     // an equity's price series to "today" the way the flat bond/mutual_fund paths do.
     // This test is isolating the from-inception skip check, not trailing staleness, so
-    // seed one fresh price directly to keep the portfolio non-trailing-stale too.
-    await db.insert(prices).values({
-      instrumentId: forceInstrId,
-      date: toDateKey(new Date()),
-      close: "5400",
-      currency: "EUR",
-    });
+    // seed prices directly, every 5 days up to today, so the portfolio is neither
+    // trailing-stale nor has a hole in the middle of its price history.
+    const filler: (typeof prices.$inferInsert)[] = [];
+    const todayKey = toDateKey(new Date());
+    for (
+      let d = new Date(`${FORCE_INCEPTION}T00:00:00.000Z`);
+      toDateKey(d) < todayKey;
+      d = new Date(d.getTime() + 5 * 86_400_000)
+    ) {
+      filler.push({
+        instrumentId: forceInstrId,
+        date: toDateKey(d),
+        close: "5400",
+        currency: "EUR",
+      });
+    }
+    filler.push({ instrumentId: forceInstrId, date: todayKey, close: "5400", currency: "EUR" });
+    await db.insert(prices).values(filler).onConflictDoNothing();
 
     // Corrupt the Saturday snapshot to simulate a pre-fix zero row.
     await db

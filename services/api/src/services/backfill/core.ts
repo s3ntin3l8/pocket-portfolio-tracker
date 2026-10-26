@@ -11,6 +11,7 @@ import {
   firstHeldDateFrom,
   isManualPriceBond,
   laterDateKey,
+  priceGapRemains,
 } from "./shared.js";
 import { buildFlowDateFn, writeSnapshotSeries, type RawPriceMap } from "./snapshots.js";
 
@@ -259,10 +260,22 @@ export async function backfillPortfolioHistory(
     // priceFeedErrorCount tracks only the throw path for operational visibility —
     // it's not used by the cooldown decision, but it tells an operator at a glance
     // whether the failures are network/HTTP errors vs. legitimately empty feeds.
+    // A feed that returns candles but leaves a hole longer than the carry-forward window
+    // is still a miss: the holding goes unpriced for the hole, and counting it lets the
+    // dead-feed cooldown stop the sweep re-fetching an unfillable gap every night.
+    const gapRemains =
+      candles.length > 0 &&
+      (await priceGapRemains(
+        db,
+        instr.id,
+        fetchFrom,
+        candles.map((c) => c.date).filter((d) => d >= fetchFrom),
+        today,
+      ));
     await db
       .update(instruments)
       .set(
-        candles.length > 0
+        candles.length > 0 && !gapRemains
           ? {
               priceFeedMissCount: 0,
               priceFeedLastMissAt: null,
@@ -277,7 +290,9 @@ export async function backfillPortfolioHistory(
                     priceFeedErrorCount: sql`${instruments.priceFeedErrorCount} + 1`,
                     priceFeedLastErrorAt: new Date(),
                   }
-                : {}),
+                : // Nothing threw (candles with a hole left, or an empty result): a stale error
+                  // streak is not current — only the miss counter is gap/empty-driven.
+                  { priceFeedErrorCount: 0, priceFeedLastErrorAt: null }),
             },
       )
       .where(eq(instruments.id, instr.id));

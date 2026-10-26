@@ -1,6 +1,7 @@
-import { eq, and, inArray, isNull, or } from "drizzle-orm";
-import { corporateActions, instruments, portfolios, transactions } from "@portfolio/db";
-import { toDateKey } from "@portfolio/core";
+import { eq, and, gte, inArray, isNull, lt, max, or } from "drizzle-orm";
+import { corporateActions, instruments, portfolios, prices, transactions } from "@portfolio/db";
+import { MAX_PRICE_CARRY_FORWARD_DAYS, toDateKey } from "@portfolio/core";
+import { findGaps } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 
 /**
@@ -146,4 +147,40 @@ export function isManualPriceBond(instr: {
  *  both are always zero-padded ISO dates. */
 export function laterDateKey(a: string, b: string): string {
   return a > b ? a : b;
+}
+
+/**
+ * After a fetch of `fetchedDates` (all >= `fetchFrom`), does the instrument's price
+ * history still have a hole longer than the carry-forward window — between prices, or
+ * from the last price to `today`? The series graded is what the backfill will actually
+ * value from: the rows already stored from `fetchFrom` on, unioned with this run's
+ * candles, anchored on the newest stored price before `fetchFrom` (so a heal that only
+ * returns the far side of a hole is not mistaken for a contiguous series, and a
+ * transiently short fetch on an already-contiguous series is not a miss). A feed that
+ * keeps leaving such a hole is a miss for the dead-feed cooldown, even though it
+ * returned candles.
+ */
+export async function priceGapRemains(
+  db: DB,
+  instrumentId: string,
+  fetchFrom: string,
+  fetchedDates: string[],
+  today: string,
+): Promise<boolean> {
+  const [anchor] = await db
+    .select({ date: max(prices.date) })
+    .from(prices)
+    .where(and(eq(prices.instrumentId, instrumentId), lt(prices.date, fetchFrom)));
+  const stored = await db
+    .select({ date: prices.date })
+    .from(prices)
+    .where(and(eq(prices.instrumentId, instrumentId), gte(prices.date, fetchFrom)));
+  const dates = [
+    ...new Set([
+      ...(anchor?.date ? [anchor.date] : []),
+      ...stored.map((r) => r.date),
+      ...fetchedDates,
+    ]),
+  ].sort();
+  return findGaps(dates, today, MAX_PRICE_CARRY_FORWARD_DAYS).length > 0;
 }
