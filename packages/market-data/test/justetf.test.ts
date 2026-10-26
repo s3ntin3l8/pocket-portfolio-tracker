@@ -336,9 +336,11 @@ describe("JustEtfProvider", () => {
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it("returns [] on an HTTP error", async () => {
-      fetchSpy.mockResolvedValueOnce({ ok: false, status: 500 });
+    it("returns [] on a 404 but throws on any other HTTP failure so onProviderError fires", async () => {
+      fetchSpy.mockResolvedValueOnce({ ok: false, status: 404 });
       expect(await provider.getHistoryFrom(ref, "2026-08-21")).toEqual([]);
+      fetchSpy.mockResolvedValueOnce({ ok: false, status: 429 });
+      await expect(provider.getHistoryFrom(ref, "2026-08-21")).rejects.toThrow(/JustETF 429/);
     });
   });
 });

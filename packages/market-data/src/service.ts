@@ -13,6 +13,9 @@ import { assetClassFromType, mapExchange } from "./instrument-mapping.js";
 import { isIsin, isWkn } from "./types.js";
 
 const MAX_SEARCH_RESULTS = 10;
+/** How long a gap-fill that produced nothing is not retried for the same instrument. */
+const FILL_RETRY_MS = 6 * 60 * 60 * 1000;
+const MAX_EMPTY_FILL_MEMO = 1000;
 /** Max in-flight quote lookups during `getQuotes`. */
 const QUOTE_CONCURRENCY = 4;
 /** Provider failures tolerated per `getQuotes` run before it is skipped for the rest. */
@@ -39,6 +42,9 @@ export interface MarketDataServiceOptions {
  * resilient: if the primary is rate-limited or 404s, the next supporter is tried.
  */
 export class MarketDataService {
+  /** Gap-fill attempts that added nothing → when they may be retried (see `fillGaps`). */
+  private readonly emptyFills = new Map<string, number>();
+
   constructor(
     private readonly providers: MarketDataProvider[],
     private readonly opts: MarketDataServiceOptions = {},
@@ -148,8 +154,12 @@ export class MarketDataService {
    * The first provider with candles wins `getHistoryFrom`, so a hole in its series (a
    * feed that silently skipped weeks) is never patched by the providers behind it. Ask the
    * remaining providers for the holes longer than `minGapDays` and merge by date: the
-   * primary's candles always win on overlap, and each candle keeps its own currency. A
-   * failing fallback is skipped — the primary's series is returned as-is.
+   * primary's candles always win on overlap. The fallback is asked in the primary's own
+   * quote currency (a USD-priced line declared EUR stays USD) and a candle in any other
+   * currency is dropped, so the merged series is single-currency — consumers that read
+   * `close` alone (sparklines) never see an FX-sized seam. A failing fallback is skipped and
+   * reported through `onProviderError`; a fill that produced nothing is remembered for
+   * `FILL_RETRY_MS` so a stale-but-alive feed isn't re-scraped on every call.
    */
   private async fillGaps(
     ref: InstrumentRef,
@@ -159,19 +169,32 @@ export class MarketDataService {
   ): Promise<Candle[]> {
     const merged = new Map(primary.map((c) => [c.date, c]));
     const today = new Date().toISOString().slice(0, 10);
+    const currency = primary.find((c) => c.currency)?.currency ?? ref.currency;
+    const fillRef = { ...ref, currency };
     for (const provider of fallbacks) {
       if (!provider.getHistoryFrom) continue;
       const gaps = findGaps([...merged.keys()].sort(), today, minGapDays);
       if (gaps.length === 0) break;
+      const memoKey = `${provider.name}|${ref.market}|${ref.symbol}|${gaps[0]!.from}|${currency}`;
+      if ((this.emptyFills.get(memoKey) ?? 0) > Date.now()) continue;
+      let added = 0;
       try {
         this.opts.onCall?.(provider.name);
-        const extra = (await provider.getHistoryFrom(ref, gaps[0]!.from)) ?? [];
+        const extra = (await provider.getHistoryFrom(fillRef, gaps[0]!.from)) ?? [];
         for (const c of extra) {
-          if (merged.has(c.date)) continue;
-          if (gaps.some((g) => c.date >= g.from && c.date <= g.to)) merged.set(c.date, c);
+          if (merged.has(c.date) || (c.currency ?? currency) !== currency) continue;
+          if (gaps.some((g) => c.date >= g.from && c.date <= g.to)) {
+            merged.set(c.date, { ...c, currency });
+            added++;
+          }
         }
       } catch (err) {
         this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
+        continue;
+      }
+      if (added === 0) {
+        if (this.emptyFills.size >= MAX_EMPTY_FILL_MEMO) this.emptyFills.clear();
+        this.emptyFills.set(memoKey, Date.now() + FILL_RETRY_MS);
       }
     }
     return [...merged.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
@@ -396,10 +419,11 @@ function addDays(date: string, days: number): string {
  * the first candle is not a gap — that is the instrument not existing yet.
  */
 export function findGaps(
-  sortedDates: string[],
+  dates: string[],
   today: string,
   minGapDays: number,
 ): { from: string; to: string }[] {
+  const sortedDates = [...new Set(dates)].sort();
   const gaps: { from: string; to: string }[] = [];
   for (let i = 1; i <= sortedDates.length; i++) {
     const prev = sortedDates[i - 1]!;

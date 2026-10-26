@@ -228,7 +228,11 @@ the quote priority chain above.
 caller passes `gapFillDays` (the backfill passes `MAX_PRICE_CARRY_FORWARD_DAYS`), holes in
 that series longer than the threshold — and a stale tail up to today — are patched from the
 providers behind it (for an ETF with an ISIN, ultimately JustETF). The primary wins on
-overlap, each candle keeps its own `currency`, and a failing fallback is skipped. Without
+overlap and the fallback is asked in the primary's own quote currency; a fallback candle in any
+other currency is dropped, so the merged series stays single-currency. A failing fallback is
+skipped (reported through `onProviderError`), and a fill that added nothing isn't retried for
+the same hole for six hours. JustETF only fills ETFs with an ISIN declared or quoted in EUR,
+USD, GBP or CHF; any other currency is never filled. Without
 this, a primary feed that silently skips weeks leaves the holding unpriced for the gap and the
 backfill valuing it at 0/cost there.
 

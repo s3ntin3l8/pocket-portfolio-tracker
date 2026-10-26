@@ -1,4 +1,5 @@
 import { PROVIDER_FETCH_TIMEOUT_MS } from "./http.js";
+import { MarketDataError } from "./types.js";
 import type {
   AssetClass,
   Candle,
@@ -68,7 +69,8 @@ export class JustEtfProvider implements MarketDataProvider {
    * The chart is requested in the instrument's declared currency (JustETF converts) and
    * the candles are stamped with it. JustETF repeats Friday's value on Sat/Sun; those
    * rows aren't trading days and no other provider emits them, so they are dropped.
-   * Returns [] for a non-ETF, a bad ISIN, an unsupported currency or any HTTP/parse miss.
+   * Returns [] for a non-ETF, a bad ISIN, an unsupported currency or a 404; any other HTTP
+   * failure throws.
    */
   async getHistoryFrom(ref: InstrumentRef, fromDate: string): Promise<Candle[]> {
     if (ref.assetClass !== "etf" || !ref.isin || !this.isValidIsin(ref.isin)) return [];
@@ -84,7 +86,11 @@ export class JustEtfProvider implements MarketDataProvider {
       signal: AbortSignal.timeout(PROVIDER_FETCH_TIMEOUT_MS),
       headers: { "User-Agent": JUSTETF_USER_AGENT, Accept: "application/json" },
     });
-    if (!res.ok) return [];
+    if (res.status === 404) return [];
+    // Anything else (UA block, 429, a rejected currency → 500) is a failure, not "no
+    // candles": throw so the service's onProviderError hook fires like every other provider.
+    if (!res.ok)
+      throw new MarketDataError(`JustETF ${res.status} for ${ref.isin}`, this.name, res.status);
 
     const body = (await res.json()) as {
       series?: { date?: string; value?: { raw?: number } }[];
