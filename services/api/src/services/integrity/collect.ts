@@ -57,14 +57,24 @@ function asValuation(body: unknown, what: string): ValuationBody {
   };
 }
 
-function needStrings(body: unknown, keys: string[], what: string): Record<string, unknown> {
+/**
+ * Check that `body` carries a string for every key and return it typed by exactly those keys.
+ * Building each parity object from this (instead of re-typing with a cast) ties the guard to
+ * the interface: a field added to `ParityBodies` without a guard is a type error, not an
+ * anonymous DecimalError at the first `new Decimal(...)`.
+ */
+function needStrings<K extends string>(
+  body: unknown,
+  keys: readonly K[],
+  what: string,
+): Record<K, string> {
   const b = body as Record<string, unknown> | null;
   for (const key of keys) {
     if (typeof b?.[key] !== "string") {
       throw new Error(`${what}: expected a string "${key}", got ${JSON.stringify(b?.[key])}`);
     }
   }
-  return b!;
+  return b as Record<K, string>;
 }
 
 /** The parity endpoints for one scope: `base` is `/networth` or `/portfolios/:id`. */
@@ -72,23 +82,21 @@ async function collectParity(
   get: (url: string) => Promise<unknown>,
   base: string,
 ): Promise<ParityBodies> {
+  const contributionsBody = await get(`${base}/contributions`);
+  const tradesBody = await get(`${base}/trades`);
+  const anomaliesBody = (await get(`${base}/anomalies`)) as { anomalies?: unknown };
+  if (!Array.isArray(anomaliesBody?.anomalies)) {
+    throw new Error(
+      `${base}/anomalies: expected an "anomalies" array, got ${JSON.stringify(anomaliesBody)}`,
+    );
+  }
   const contributions = needStrings(
-    await get(`${base}/contributions`),
+    contributionsBody,
     ["displayCurrency", "netContributed"],
     `${base}/contributions`,
   );
-  const trades = needStrings(
-    await get(`${base}/trades`),
-    ["displayCurrency", "totalRealized"],
-    `${base}/trades`,
-  );
-  const anomalies = (await get(`${base}/anomalies`)) as { anomalies?: unknown };
-  if (!Array.isArray(anomalies?.anomalies)) {
-    throw new Error(
-      `${base}/anomalies: expected an "anomalies" array, got ${JSON.stringify(anomalies)}`,
-    );
-  }
-  return { contributions, trades, anomalies } as unknown as ParityBodies;
+  const trades = needStrings(tradesBody, ["displayCurrency", "totalRealized"], `${base}/trades`);
+  return { contributions, trades, anomalies: anomaliesBody as ParityBodies["anomalies"] };
 }
 
 /**
@@ -96,6 +104,11 @@ async function collectParity(
  * on a non-200, so a failing endpoint is a loud failure, not an empty (vacuously passing) rule.
  * Tests pass an `app.inject` wrapper; the real-data report passes an in-process inject with the
  * caller's own auth — the same rule code runs against the same serialized responses.
+ *
+ * Cost: per portfolio this is the summary plus the contributions, trades and anomalies
+ * endpoints, and the aggregate adds the same three, all drawn from the caller's own rate-limit
+ * bucket and valuation work (`/portfolios/:id/contributions` has no derivation cache). On a big
+ * account a 429/502 from here is this fan-out, not a data problem.
  */
 export async function collectBodies(
   get: (url: string) => Promise<unknown>,

@@ -213,4 +213,27 @@ describe("integrity rules", () => {
     ];
     expect(rules(b)).not.toContain("ANOMALY_UNION");
   });
+
+  it("ANOMALY_UNION: same-code anomalies that differ only in meta are kept apart", () => {
+    // e.g. negative_cash per currency: dropping one of the two in the aggregate must be seen.
+    const two = [
+      { code: "negative_cash", meta: { currency: "EUR" } },
+      { code: "negative_cash", meta: { currency: "USD" } },
+    ];
+    const b = bodies();
+    b.portfolios[0]!.parity.anomalies.anomalies = two;
+    b.networthParity.anomalies.anomalies = [two[0]!];
+    const f = checkIntegrity(b).find((x) => x.rule === "ANOMALY_UNION");
+    expect(f).toMatchObject({ diff: "1 missing, 0 extra" });
+    // ... and meta key order is not part of the identity.
+    b.networthParity.anomalies.anomalies = [
+      { code: "negative_cash", meta: { currency: "EUR" } },
+      { code: "negative_cash", meta: { currency: "USD" } },
+    ];
+    b.portfolios[0]!.parity.anomalies.anomalies = [
+      { code: "negative_cash", meta: { currency: "USD" } },
+      { code: "negative_cash", meta: { currency: "EUR" } },
+    ];
+    expect(rules(b)).not.toContain("ANOMALY_UNION");
+  });
 });

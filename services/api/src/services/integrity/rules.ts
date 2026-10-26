@@ -74,6 +74,13 @@ export interface ValuationBody {
 /** `/networth` also says which instant it was computed for. */
 export type NetWorthBody = ValuationBody & { asOf: string };
 
+export interface AnomalyBody {
+  code?: string;
+  transactionId?: string | null;
+  instrumentId?: string | null;
+  meta?: Record<string, unknown>;
+}
+
 /** The other endpoints that restate a figure the valuation also carries. */
 export interface ParityBodies {
   /** `/…/contributions`: `netContributed` is `gain.netContributed`. */
@@ -81,9 +88,7 @@ export interface ParityBodies {
   /** `/…/trades`: `totalRealized` is the valuation's `totalRealizedPnL`. */
   trades: { displayCurrency: string; totalRealized: string };
   /** `/…/anomalies`. */
-  anomalies: {
-    anomalies: { code?: string; transactionId?: string | null; instrumentId?: string | null }[];
-  };
+  anomalies: { anomalies: AnomalyBody[] };
 }
 
 export interface IntegrityBodies {
@@ -323,7 +328,11 @@ export function checkContributionParity(b: IntegrityBodies): Finding[] {
   );
 }
 
-/** The trade log's realized total is the valuation's (both default to average cost). */
+/**
+ * The trade log's realized total is the valuation's. The collector asks for the trade log's
+ * default method (average cost), which is what the valuation's realized comes from; a `?method=`
+ * (fifo/lifo) would make this comparison meaningless.
+ */
 export function checkRealizedParity(b: IntegrityBodies): Finding[] {
   return scopes(b).flatMap(({ scope, v, parity }) =>
     !sameCurrency(parity.trades.displayCurrency, v.displayCurrency)
@@ -338,11 +347,17 @@ export function checkRealizedParity(b: IntegrityBodies): Finding[] {
   );
 }
 
-const anomalyKey = (a: {
-  code?: string;
-  transactionId?: string | null;
-  instrumentId?: string | null;
-}) => `${a.code ?? ""}|${a.transactionId ?? ""}|${a.instrumentId ?? ""}`;
+/**
+ * What makes two anomalies the same one. `meta` is where same-code anomalies differ
+ * (`negative_cash` per currency, `reconciliation_gap` per broker), so it is part of the key;
+ * its keys are sorted so serialisation order cannot matter.
+ */
+const anomalyKey = (a: AnomalyBody): string => {
+  const meta = Object.fromEntries(
+    Object.entries(a.meta ?? {}).sort(([x], [y]) => (x < y ? -1 : 1)),
+  );
+  return `${a.code ?? ""}|${a.transactionId ?? ""}|${a.instrumentId ?? ""}|${JSON.stringify(meta)}`;
+};
 
 /** /networth/anomalies is the union of every portfolio's own anomalies. */
 export function checkAnomalyUnion(b: IntegrityBodies): Finding[] {

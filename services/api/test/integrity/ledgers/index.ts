@@ -8,6 +8,7 @@ import { degraded } from "./degraded.js";
 import { fxCarry, fxStale } from "./fx-carry.js";
 import { multiBase } from "./multi-base.js";
 import { metaBase } from "./meta-base.js";
+import { anomalies } from "./anomalies.js";
 
 /** Every golden ledger; the invariant suite must hold on all of them. */
 export const allLedgers: Ledger[] = [
@@ -21,4 +22,5 @@ export const allLedgers: Ledger[] = [
   fxStale,
   multiBase,
   metaBase,
+  anomalies,
 ];

@@ -13,6 +13,7 @@ import { transfers, transfersExpected } from "./ledgers/transfers.js";
 import { split, splitExpected } from "./ledgers/split.js";
 import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
 import { degraded, degradedExpected } from "./ledgers/degraded.js";
+import { anomalies, anomaliesExpected } from "./ledgers/anomalies.js";
 import { metaBase, metaBaseExpected } from "./ledgers/meta-base.js";
 import { multiBase, multiBaseExpected } from "./ledgers/multi-base.js";
 import { fxCarry, fxCarryExpected, fxStale, fxStaleExpected } from "./ledgers/fx-carry.js";
@@ -233,5 +234,23 @@ describe("meta-base", () => {
     const s = await get(l, `/portfolios/${l.portfolioIds.a}/summary`);
     expect(s.gain.boundary).toBe("outside");
     expectGain(s.gain, metaBaseExpected, "gain");
+  });
+});
+
+describe("anomalies", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(anomalies.asOf) });
+    l = await loadLedger(app, sign, anomalies);
+  }, 60_000);
+
+  it("flags the oversell and the zero-price trade, per depot and in the aggregate", async () => {
+    const codes = async (url: string) =>
+      ((await get(l, url)).anomalies as { code: string }[]).map((a) => a.code).sort();
+    expect(await codes(`/portfolios/${l.portfolioIds.a}/anomalies`)).toEqual(anomaliesExpected.a);
+    expect(await codes(`/portfolios/${l.portfolioIds.b}/anomalies`)).toEqual(anomaliesExpected.b);
+    expect(await codes("/networth/anomalies")).toEqual(
+      [...anomaliesExpected.a, ...anomaliesExpected.b].sort(),
+    );
   });
 });
