@@ -29,7 +29,13 @@ Pitfalls the loader already handles, and one it can't:
   quotes at the ledger's `asOf`. Otherwise the holding silently falls back to cost.
 - Instrument symbols are namespaced per ledger. `fx_rates` rows are **global**: a ledger that
   needs an absent or stale pair must use a currency no other ledger quotes.
-- A figure derived from an average-cost pool is exact only to ~1e-15 (`1e-12` tolerance).
+- A figure derived from an average-cost pool is exact only to ~1e-15 (`1e-12` tolerance). The
+  raw API string for 9 shares at an average cost of 1600/15 is `959.99999999999999998`, not `960`:
+  the engine divides at 20 significant digits and the display layers round. This is a deliberate
+  decision (#1159), not an open bug: rounding the pool at a fixed scale would touch every cost
+  basis in the app for no gain, so golden ledgers compare pool-derived figures with the `1e-12`
+  tolerance (exact for everything else) and the invariant rules use a relative `1e-9`. Never
+  compare two such strings for equality in application code; compare as decimals with a tolerance.
 
 Adding a ledger: create `ledgers/<name>.ts` exporting the `Ledger` and its expected figures,
 assert them in `golden.test.ts`, and add it to `ledgers/index.ts` so the invariant suite and
