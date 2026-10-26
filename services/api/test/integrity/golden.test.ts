@@ -10,6 +10,10 @@ import {
 import { eurBasic, eurBasicExpected } from "./ledgers/eur-basic.js";
 import { cashInside, cashInsideExpected } from "./ledgers/cash-inside.js";
 import { transfers, transfersExpected } from "./ledgers/transfers.js";
+import { split, splitExpected } from "./ledgers/split.js";
+import { usdFx, usdFxExpected } from "./ledgers/usd-fx.js";
+import { degraded, degradedExpected } from "./ledgers/degraded.js";
+import { fxCarry, fxCarryExpected, fxStale, fxStaleExpected } from "./ledgers/fx-carry.js";
 
 // Golden ledgers: fixed-date scenarios, hand-derived expectations (see ledger.ts). The clock is
 // frozen at each ledger's `asOf` (Date only, so PGlite/Fastify timers keep running) because route
@@ -108,5 +112,87 @@ describe("transfers", () => {
     const nw = await get(l, "/networth");
     expectDecimal(nw.netWorth, transfersExpected.all.value, "netWorth", ROUNDING);
     expectGain(nw.gain, transfersExpected.all, "gain[all]");
+  });
+});
+
+describe("split", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(split.asOf) });
+    l = await loadLedger(app, sign, split);
+  }, 60_000);
+
+  it("holds split-adjusted shares", async () => {
+    const h = await get(l, `/portfolios/${l.portfolioIds.depot}/holdings`);
+    expect(h.holdings).toHaveLength(1);
+    expectDecimal(h.holdings[0].quantity, splitExpected.openShares, "openShares");
+  });
+
+  it("cost of sold shares, realized and contribution use the split-adjusted pool (#823)", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expectGain(s.gain, splitExpected.gain, "gain");
+  });
+});
+
+describe("usd-fx", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(usdFx.asOf) });
+    l = await loadLedger(app, sign, usdFx);
+  }, 60_000);
+
+  it("values and costs the holding at today's rate, so a flat price shows no gain", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expect(s.fxMissingCurrencies).toEqual([]);
+    expectDecimal(s.netWorth, usdFxExpected.value, "netWorth", ROUNDING);
+    expect(s.gain.boundary).toBe("outside");
+    expectGain(s.gain, usdFxExpected, "gain");
+  });
+});
+
+describe("degraded", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(degraded.asOf) });
+    l = await loadLedger(app, sign, degraded);
+  }, 60_000);
+
+  it("values an unpriced holding at cost and excludes a holding with no FX rate", async () => {
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${l.portfolioIds.depot}/summary`,
+      headers: l.headers,
+    });
+    expect(res.statusCode).toBe(200);
+    const s = res.json();
+    expect(s.fxMissingCurrencies).toEqual(degradedExpected.fxMissingCurrencies);
+    expect(res.headers["x-fx-missing-currencies"]).toContain("CAD");
+    expectDecimal(s.netWorth, degradedExpected.netWorth, "netWorth", ROUNDING);
+    for (const [k, v] of Object.entries(degradedExpected.totals)) {
+      expectDecimal(s[k], v, k, ROUNDING);
+    }
+
+    const byId = new Map<string, Record<string, unknown>>(
+      s.holdings.map((h: { instrumentId: string }) => [h.instrumentId, h]),
+    );
+    expect(byId.get(l.instrumentIds.noq)?.valuedAtCost).toBe(true);
+    expect(byId.get(l.instrumentIds.cad)?.fxMissing).toBe(true);
+  });
+});
+
+describe.each([
+  ["fx-carry (rate 5 days old: carried forward)", fxCarry, fxCarryExpected],
+  ["fx-stale (rate 15 days old: missing, never today's)", fxStale, fxStaleExpected],
+])("%s", (_name, ledger, expected) => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(ledger.asOf) });
+    l = await loadLedger(app, sign, ledger);
+  }, 60_000);
+
+  it("converts only with a rate inside the carry-forward window", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expect(s.fxMissingCurrencies).toEqual(expected.fxMissingCurrencies);
+    expectDecimal(s.netWorth, expected.netWorth, "netWorth", ROUNDING);
   });
 });
