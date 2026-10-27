@@ -28,6 +28,19 @@ export default async function TaxReportsPage({ params }: { params: Promise<{ loc
     selection.status === "ok" && selection.portfolios.length > 0
       ? (selection.selectedId ?? selection.portfolios[0].id)
       : "";
+  // Same scope the loader applied: one portfolio, one holder's portfolios, or every
+  // portfolio. The client's post-upload refresh has to keep it, or it replaces the
+  // scoped list with the whole inbox (#1155).
+  const scopedPortfolioIds =
+    selection.status !== "ok"
+      ? null
+      : selection.selectedId
+        ? [selection.selectedId]
+        : selection.selectedHolderId
+          ? selection.portfolios
+              .filter((p) => p.accountHolderId === selection.selectedHolderId)
+              .map((p) => p.id)
+          : null;
 
   return (
     <div className="space-y-6">
@@ -36,6 +49,7 @@ export default async function TaxReportsPage({ params }: { params: Promise<{ loc
         initialDocuments={documents}
         portfolios={portfolios}
         initialPortfolioId={initialPortfolioId}
+        scopedPortfolioIds={scopedPortfolioIds}
       />
     </div>
   );
