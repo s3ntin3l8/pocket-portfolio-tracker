@@ -67,11 +67,16 @@ export async function resolveDraftInstruments(
   const resolved: ResolvedDraft[] = [];
   for (const d of drafts) {
     const isEu = opts.isEu || (euWhenIsin && Boolean(d.isin));
+    // A standalone `tax` row (TR CSV Vorabpauschale: "no instrument leg", only a label in
+    // `name`) is a cash debit, not a position — creating an instrument from its name would add
+    // a junk symbol that every price job then tries to fetch. A tax draft that carries an
+    // ISIN/ticker is tied to that instrument and keeps resolving one.
     const isCash =
       d.action === "deposit" ||
       d.action === "withdrawal" ||
       d.action === "interest" ||
-      d.action === "bonus_cash";
+      d.action === "bonus_cash" ||
+      (d.action === "tax" && !d.isin && !d.ticker);
     let instrumentId: string | null = null;
 
     if (!isCash) {
