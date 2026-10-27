@@ -96,6 +96,9 @@ function asHistory(body: unknown, what: string): HistoryPoint[] {
   }
   return body.map((pt, i) => {
     const v = needStrings(pt, ["date", "netWorth", "marketValue"], `${what}[${i}]`);
+    // Optional and strictly boolean: the route only ever emits `true` or omits it, so anything
+    // else is off-contract rather than malformed and is read as "not carried" (the other fields
+    // are required and named by `needStrings`).
     const carried = (pt as { netWorthCarried?: unknown }).netWorthCarried === true;
     return {
       date: v.date,
