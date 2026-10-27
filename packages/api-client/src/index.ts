@@ -1178,6 +1178,11 @@ export interface HoldingValuation extends Holding {
    */
   valuedAtCost?: boolean;
   /**
+   * Merged all-portfolios row only: some, but not all, contributing depots hold it at cost, so
+   * the P&L is real but partly measured (#1193). `valuedAtCost` is then unset.
+   */
+  valuedAtCostPartial?: boolean;
+  /**
    * True when this holding's currency has no known FX rate into the display currency
    * (audit B2). For a wholly unconvertible holding the display-currency fields are null and it
    * is excluded from totals rather than converted 1:1. Undefined when FX resolved normally.
@@ -1185,9 +1190,7 @@ export interface HoldingValuation extends Holding {
    * On a row merged across depots (all-portfolios view) the flag is OR-merged while the display
    * figures are the sums of the depots that could convert: a flagged row that still has a
    * `marketValueDisplay` is PARTIAL (its figures are real and counted, at least one depot's
-   * share is left out); only one without it is wholly excluded (#1181). The same OR-merge applies
-   * to `valuedAtCost` (a merged row can mix an at-cost depot with a priced one and still shows
-   * "—" for P&L; tracked in #1193).
+   * share is left out); only one without it is wholly excluded (#1181).
    */
   fxMissing?: boolean;
   previousClose: string | null;

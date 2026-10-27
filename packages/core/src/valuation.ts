@@ -45,6 +45,14 @@ export interface HoldingValuation extends Holding {
    */
   valuedAtCost?: boolean;
   /**
+   * On a row merged across depots (`aggregatePortfolios`) only: some, but not all, of the depots
+   * that contributed a value hold it at cost. The merged figures are then a sum of measured and
+   * at-cost parts, so the row has a real (partly measured) P&L; `valuedAtCost` is NOT set on it.
+   * `valuedAtCost` on a merged row means every valued depot is at cost (#1193). Undefined
+   * otherwise.
+   */
+  valuedAtCostPartial?: boolean;
+  /**
    * True when this holding's quote or cost currency has no known FX rate into the
    * display currency (audit B2). The display-currency fields (`marketValueDisplay`,
    * `costBasisDisplay`, `unrealizedPnLDisplay`) are then all null (the native `costBasis` and
@@ -55,8 +63,8 @@ export interface HoldingValuation extends Holding {
    * On a row merged across depots (`aggregatePortfolios`) the flag is OR-merged while the display
    * figures are the sums of the depots that could convert: a flagged row that still has a
    * `marketValueDisplay` is PARTIAL (its figures are real and counted, one depot's share is
-   * left out), only one without it is wholly excluded (#1181). `valuedAtCost` is OR-merged the
-   * same way and its merged row still renders "—" for P&L (tracked in #1193).
+   * left out), only one without it is wholly excluded (#1181). `valuedAtCost` is not OR-merged:
+   * see `valuedAtCostPartial` (#1193).
    */
   fxMissing?: boolean;
   /** Prior session's close (instrument currency), when known. */
@@ -490,6 +498,18 @@ export function aggregatePortfolios(
     return new Decimal(a).add(b).toString();
   };
 
+  // Per merged instrument: how many contributing depots carry a display value, and how many of
+  // those hold it at cost. Decides `valuedAtCost` (all) vs `valuedAtCostPartial` (some).
+  const atCostTally = new Map<string, { valued: number; atCost: number }>();
+  const tally = (h: HoldingValuation) => {
+    const t = atCostTally.get(h.instrumentId) ?? { valued: 0, atCost: 0 };
+    if (h.marketValueDisplay !== null) {
+      t.valued++;
+      if (h.valuedAtCost) t.atCost++;
+    }
+    atCostTally.set(h.instrumentId, t);
+  };
+
   for (const s of summaries) {
     netWorth = netWorth.add(s.netWorth);
     for (const c of s.fxMissingCurrencies ?? []) fxMissingCurrencies.add(c);
@@ -514,6 +534,7 @@ export function aggregatePortfolios(
 
     for (const h of s.holdings) {
       const ex = holdings.get(h.instrumentId);
+      tally(h);
       if (!ex) {
         holdings.set(h.instrumentId, { ...h });
         continue;
@@ -541,10 +562,8 @@ export function aggregatePortfolios(
         previousClose: h.previousClose ?? ex.previousClose,
         dayChange: addNullable(ex.dayChange, h.dayChange),
         dayChangePct: h.dayChangePct ?? ex.dayChangePct,
-        // Two portfolios holding the same instrument could disagree (one still has a
-        // usable price, the other doesn't) — true if EITHER contributed an at-cost
-        // valuation, so the merged total is flagged whenever any part of it is.
-        valuedAtCost: ex.valuedAtCost || h.valuedAtCost || undefined,
+        // Settled after the loop from the tally: wholly at cost vs partly (#1193).
+        valuedAtCost: undefined,
         // Same OR-merge as valuedAtCost: the merged display figures omit any part whose
         // FX rate was missing, so flag the merged holding if either side was.
         fxMissing: ex.fxMissing || h.fxMissing || undefined,
@@ -557,6 +576,23 @@ export function aggregatePortfolios(
               )
             : undefined,
       });
+    }
+  }
+
+  // Two depots holding the same instrument can disagree (one has a usable price, the other
+  // doesn't). The merged row is "at cost" only when every valued depot is; a mix has a real,
+  // partly measured P&L and is flagged `valuedAtCostPartial` instead (#1193).
+  for (const [id, h] of holdings) {
+    const t = atCostTally.get(id);
+    if (!t || t.atCost === 0) {
+      h.valuedAtCost = undefined;
+      h.valuedAtCostPartial = undefined;
+    } else if (t.atCost === t.valued) {
+      h.valuedAtCost = true;
+      h.valuedAtCostPartial = undefined;
+    } else {
+      h.valuedAtCost = undefined;
+      h.valuedAtCostPartial = true;
     }
   }
 

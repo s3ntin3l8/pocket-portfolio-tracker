@@ -920,7 +920,7 @@ describe("aggregatePortfolios", () => {
     expect(out.holdings).toEqual([]);
   });
 
-  it("flags the merged holding valuedAtCost when EITHER portfolio's leg was (issue #744)", () => {
+  it("flags a merged holding valuedAtCost only when EVERY valued leg is, else partial (#744, #1193)", () => {
     const baseHolding = {
       instrumentId: "i1",
       quantity: "10",
@@ -965,19 +965,50 @@ describe("aggregatePortfolios", () => {
     const merged = aggregatePortfolios([a, b], "IDR").holdings.find(
       (h) => h.instrumentId === "i1",
     )!;
-    expect(merged.valuedAtCost).toBe(true);
+    // One priced + one at-cost depot: a real, partly measured P&L (500 + 0), not "at cost".
+    expect(merged.valuedAtCost).toBeUndefined();
+    expect(merged.valuedAtCostPartial).toBe(true);
+    expect(merged.unrealizedPnLDisplay).toBe("500");
 
     // Symmetric: order shouldn't matter.
     const mergedReversed = aggregatePortfolios([b, a], "IDR").holdings.find(
       (h) => h.instrumentId === "i1",
     )!;
-    expect(mergedReversed.valuedAtCost).toBe(true);
+    expect(mergedReversed.valuedAtCost).toBeUndefined();
+    expect(mergedReversed.valuedAtCostPartial).toBe(true);
+
+    // Every leg at cost: the merged row is at cost, and not partial.
+    const bothAtCost = aggregatePortfolios([b, b], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(bothAtCost.valuedAtCost).toBe(true);
+    expect(bothAtCost.valuedAtCostPartial).toBeUndefined();
+
+    // A depot with no display value (no FX rate) does not count as a priced leg: an at-cost
+    // depot beside it is still wholly at cost.
+    const noFx = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          marketValueDisplay: null,
+          costBasisDisplay: null,
+          unrealizedPnLDisplay: null,
+          fxMissing: true,
+        },
+      ],
+    });
+    const atCostPlusNoFx = aggregatePortfolios([b, noFx], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(atCostPlusNoFx.valuedAtCost).toBe(true);
+    expect(atCostPlusNoFx.valuedAtCostPartial).toBeUndefined();
 
     // Two normally-priced legs merge to no flag at all (not `false`).
     const bothPriced = aggregatePortfolios([a, a], "IDR").holdings.find(
       (h) => h.instrumentId === "i1",
     )!;
     expect(bothPriced.valuedAtCost).toBeUndefined();
+    expect(bothPriced.valuedAtCostPartial).toBeUndefined();
   });
 });
 

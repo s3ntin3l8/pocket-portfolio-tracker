@@ -376,6 +376,30 @@ describe("HoldingsTable", () => {
       expect(screen.getAllByText(/11\.11%/).length).toBeGreaterThan(0);
     });
 
+    it("a partly-at-cost merged row shows its measured P&L with a partial disclosure (#1193)", () => {
+      // One priced + one at-cost depot: the sum has a real P&L (the priced depot's), so the row
+      // keeps it, with a "Partly at cost" badge and footnote instead of the whole-row at-cost "—".
+      const partial: HoldingValuation = {
+        ...makeHolding("MIXED", "10", "90"),
+        marketValueDisplay: "1000",
+        costBasisDisplay: "900",
+        unrealizedPnLDisplay: "100",
+        valuedAtCostPartial: true,
+      };
+      // Distinct return on the second row keeps the footer's percentage apart from the row's.
+      const other: HoldingValuation = {
+        ...makeHolding("OTHER", "10", "100"),
+        marketValueDisplay: "1500",
+        costBasisDisplay: "1000",
+        unrealizedPnLDisplay: "500",
+      };
+      renderTable({ rows: [partial, other] });
+      expect(screen.getAllByText("Partly at cost").length).toBeGreaterThan(0);
+      expect(screen.queryByText(/valued at cost$/i)).not.toBeInTheDocument();
+      expect(screen.getAllByText(/1 holding is partly valued at cost/).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/11\.11%/).length).toBeGreaterThan(0);
+    });
+
     it("does not badge a holding whose FX resolved", () => {
       renderTable();
       expect(screen.queryByText("No FX rate")).not.toBeInTheDocument();

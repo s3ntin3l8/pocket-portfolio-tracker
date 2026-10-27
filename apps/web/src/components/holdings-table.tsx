@@ -110,6 +110,9 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
   // into the totals below like any priced holding. Surfaced via a footer note + a
   // per-row badge so the total doesn't silently read as a real market value.
   const valuedAtCostCount = rows.filter((h) => h.valuedAtCost).length;
+  // A merged row that mixes an at-cost depot with a priced one: its P&L is real but partly
+  // measured, so it is disclosed, not blanked (#1193).
+  const valuedAtCostPartialCount = rows.filter((h) => h.valuedAtCostPartial).length;
   // Holdings whose currency has no FX rate into the display currency (audit B2) and that have no
   // display value at all: they're left out of the totals rather than converted 1:1. A partial row
   // (merged across depots, still valued) is counted separately below and is NOT excluded.
@@ -259,6 +262,13 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
                         </span>
                       </InfoTip>
                     )}
+                    {h.valuedAtCostPartial && (
+                      <InfoTip label={t("valuedAtCostPartialTooltip")} focusable>
+                        <span className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                          {t("valuedAtCostPartialBadge")}
+                        </span>
+                      </InfoTip>
+                    )}
                     {h.fxMissing && (
                       <InfoTip
                         label={fxPartial(h) ? t("fxPartialTooltip") : t("fxMissingTooltip")}
@@ -345,6 +355,11 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
             {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
           </p>
         )}
+        {valuedAtCostPartialCount > 0 && (
+          <p className="mt-2 text-micro font-medium text-text-mute">
+            {t("valuedAtCostPartialFooterNote", { count: valuedAtCostPartialCount })}
+          </p>
+        )}
         {fxMissingCount > 0 && (
           <p className="mt-2 text-micro font-medium text-text-mute">
             {t("fxMissingFooterNote", { count: fxMissingCount })}
@@ -407,6 +422,13 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
                     <InfoTip label={t("valuedAtCostTooltip")} focusable>
                       <span className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
                         {t("valuedAtCostBadge")}
+                      </span>
+                    </InfoTip>
+                  )}
+                  {h.valuedAtCostPartial && (
+                    <InfoTip label={t("valuedAtCostPartialTooltip")} focusable>
+                      <span className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
+                        {t("valuedAtCostPartialBadge")}
                       </span>
                     </InfoTip>
                   )}
@@ -475,6 +497,11 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
         {valuedAtCostCount > 0 && (
           <p className="px-4 py-2 text-micro font-medium text-text-mute">
             {t("valuedAtCostFooterNote", { count: valuedAtCostCount })}
+          </p>
+        )}
+        {valuedAtCostPartialCount > 0 && (
+          <p className="px-4 py-2 text-micro font-medium text-text-mute">
+            {t("valuedAtCostPartialFooterNote", { count: valuedAtCostPartialCount })}
           </p>
         )}
         {fxMissingCount > 0 && (
