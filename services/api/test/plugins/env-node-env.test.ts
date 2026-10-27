@@ -3,9 +3,20 @@ import { users, apiTokens } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import { hashToken, PAT_PREFIX } from "../../src/plugins/auth.js";
+import { shouldLoadDotenv } from "../../src/plugins/env.js";
 
 describe("NODE_ENV default is fail-closed", () => {
   const saved = process.env.NODE_ENV;
+
+  it("does not load a developer .env when NODE_ENV is unset under Vitest", () => {
+    // The README setup (`cp .env.example .env`) puts NODE_ENV=development in that
+    // file. Unset NODE_ENV must stay unset — not be filled back in from .env —
+    // or the fail-closed default below is a lie on every developer machine.
+    expect(shouldLoadDotenv({ ...process.env, NODE_ENV: undefined, VITEST: "true" })).toBe(false);
+    expect(shouldLoadDotenv({ NODE_ENV: "test" })).toBe(false);
+    expect(shouldLoadDotenv({})).toBe(true);
+    expect(shouldLoadDotenv({ NODE_ENV: "development" })).toBe(true);
+  });
   afterEach(() => {
     if (saved === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = saved;

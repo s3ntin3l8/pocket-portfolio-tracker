@@ -266,6 +266,19 @@ export function resolveFileSecrets(
   }
 }
 
+/** Whether @fastify/env should read a developer's `.env`.
+ *
+ * Tests stay hermetic. Vitest sets `VITEST` for the whole run, including the case
+ * that deletes `NODE_ENV` to prove the fail-closed default (#1154). Checking only
+ * `NODE_ENV !== "test"` is wrong for that case: `undefined !== "test"`, so the
+ * plugin loaded `.env`, and `.env.example` ships `NODE_ENV=development` — which
+ * makes a personal access token an admin. `NODE_ENV=test` still skips dotenv
+ * outside Vitest (one-off runners that aren't Vitest).
+ */
+export function shouldLoadDotenv(env: NodeJS.ProcessEnv = process.env): boolean {
+  return !env.VITEST && env.NODE_ENV !== "test";
+}
+
 /** Minimum length of AUTH_LOCAL_SECRET (the HS256 signing key for local-login JWTs). */
 export const MIN_AUTH_LOCAL_SECRET_LENGTH = 32;
 
@@ -273,8 +286,8 @@ export const envPlugin = fp(async (app) => {
   resolveFileSecrets();
   await app.register(env, {
     schema: schema,
-    // Don't read the developer's .env during tests — keep them hermetic.
-    dotenv: process.env.NODE_ENV !== "test",
+    // Don't read the developer's .env during tests — keep them hermetic (#1154).
+    dotenv: shouldLoadDotenv(),
   });
   const localSecret = app.config.AUTH_LOCAL_SECRET;
   if (localSecret && localSecret.length < MIN_AUTH_LOCAL_SECRET_LENGTH) {
