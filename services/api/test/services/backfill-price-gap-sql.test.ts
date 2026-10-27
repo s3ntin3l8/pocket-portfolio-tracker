@@ -90,9 +90,9 @@ describe("priceGapRemains (SQL)", () => {
     };
     const outcomes = new Set<boolean>();
     for (let k = 0; k < 40; k++) {
-      // Alternate dense (1-8 day steps, never a hole) and sparse (1-15 day steps, holes > 10
+      // Alternate dense (1-4 day steps, so even every other price is < 10 days apart) and sparse (1-15 day steps, holes > 10
       // days occur) series, so both answers come up.
-      const maxStep = k % 2 === 0 ? 8 : 15;
+      const maxStep = k % 2 === 0 ? 4 : 15;
       const all: string[] = [];
       for (let offset = rand(10); offset < 150; offset += 1 + rand(maxStep)) {
         all.push(day("2026-01-01", offset));
