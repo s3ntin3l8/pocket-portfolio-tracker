@@ -8,13 +8,12 @@ import type { Ledger } from "../ledger.js";
 //   A: 2026-06-26 1,000   (2026-06-27 missing)   2026-06-28 1,020
 //   B:                    2026-06-27   500        2026-06-28   505
 //
-// The aggregate netWorth at a date is the plain sum of that date's snapshots, a portfolio
-// counting only on the dates it has one (no FX is involved: everything is in the display currency):
-//   2026-06-26: 1,000                  (only A has a row)
-//   2026-06-27:   500                  (only B has a row; A's hole is NOT filled in netWorth)
+// The aggregate netWorth at a date sums each portfolio's snapshot; a portfolio with none that day
+// keeps its last known value (like marketValue), so a skipped portfolio is not a phantom dip
+// (no FX is involved: everything is in the display currency):
+//   2026-06-26: 1,000                  (only A has a row; B has not started)
+//   2026-06-27: 1,000 + 500 = 1,500    (A's hole is filled with its 06-26 value; flagged carried)
 //   2026-06-28: 1,020 + 505 = 1,525
-// The aggregate marketValue deliberately carries A's last value forward over the hole (by
-// design, pinned by packages/core's twr tests), so it is not asserted here.
 export const history: Ledger = {
   name: "history",
   asOf: "2026-06-30T12:00:00.000Z",
@@ -36,7 +35,7 @@ export const history: Ledger = {
 export const historyExpected = {
   aggregateNetWorth: [
     { date: "2026-06-26", netWorth: "1000" },
-    { date: "2026-06-27", netWorth: "500" },
+    { date: "2026-06-27", netWorth: "1500" },
     { date: "2026-06-28", netWorth: "1525" },
   ],
   b: [

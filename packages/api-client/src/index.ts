@@ -1372,6 +1372,11 @@ export interface PerformancePoint {
   date: string; // YYYY-MM-DD
   /** Net worth in display currency (incl. cash + liabilities). */
   netWorth: string;
+  /**
+   * True on an aggregate point where at least one portfolio had no snapshot that day (the daily
+   * job skipped it, e.g. for a missing FX rate) and its last known net worth was carried forward.
+   */
+  netWorthCarried?: boolean;
   /** Holdings market value only (excl. cash), in display/base currency. Optional for back-compat. */
   marketValue?: string;
   /** TWR index level (base 100). Optional for back-compat. */

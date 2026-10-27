@@ -130,6 +130,8 @@ export interface HistoryPoint {
   date: string;
   netWorth: string;
   marketValue: string;
+  /** Aggregate series only: a portfolio had no snapshot that day and its last value was carried. */
+  netWorthCarried?: boolean;
 }
 
 export interface IntegrityBodies {
@@ -524,15 +526,14 @@ export function checkHistoryOrdered(b: IntegrityBodies, skip?: Skip): Finding[] 
 }
 
 /**
- * The aggregate history's `netWorth` at a date is the plain sum of that date's portfolio
- * snapshots (a portfolio contributes only on the dates it has one), each converted at that
- * date's rate; with every portfolio already in the display currency no conversion is involved.
+ * The aggregate history's `netWorth` at a date is the sum of that date's portfolio snapshots;
+ * a portfolio with none that day keeps its last known value (from the day it first has one),
+ * like `marketValue` does, so a skipped portfolio is not a phantom dip (#1172). With every
+ * portfolio already in the display currency no conversion is involved.
  * Abstains when any portfolio is in another currency or its history was not collected.
  *
  * Only `netWorth` is compared. The aggregate's `marketValue` comes from `aggregateValueFlows`,
- * which by design carries a leg's last known value forward on a date it has no row for (and
- * substitutes one it judges implausible), so it is NOT a plain per-date sum: on an ordinary
- * account with a mid-series gap (e.g. a portfolio skipped for a missing FX rate) the two differ.
+ * which also substitutes a value it judges implausible, so it is not a plain carried sum.
  */
 export function checkHistorySumsPortfolios(b: IntegrityBodies, skip?: Skip): Finding[] {
   if (b.portfolios.length === 0) return []; // nothing to sum: vacuous, not an abstention
@@ -548,9 +549,15 @@ export function checkHistorySumsPortfolios(b: IntegrityBodies, skip?: Skip): Fin
   }
 
   const expected = new Map<string, Decimal>();
+  const expectedCarried = new Set<string>();
+  const grid = [...new Set(b.portfolios.flatMap((p) => p.history!.map((pt) => pt.date)))].sort();
   for (const p of b.portfolios) {
-    for (const pt of p.history!) {
-      expected.set(pt.date, (expected.get(pt.date) ?? new Decimal(0)).add(pt.netWorth));
+    const own = new Map(p.history!.map((pt) => [pt.date, new Decimal(pt.netWorth)]));
+    let last: Decimal | null = null;
+    for (const date of grid) {
+      if (!own.has(date) && last !== null) expectedCarried.add(date);
+      last = own.get(date) ?? last;
+      if (last !== null) expected.set(date, (expected.get(date) ?? new Decimal(0)).add(last));
     }
   }
   const actual = new Map(b.networthHistory.map((pt) => [pt.date, pt]));
@@ -586,15 +593,32 @@ export function checkHistorySumsPortfolios(b: IntegrityBodies, skip?: Skip): Fin
       ]);
       continue;
     }
-    push(
-      compare(
+    // The flag must mark exactly the dates a leg was carried: independent of the sum above, so
+    // a wrong carry shape (a leg carried backwards, twice) shows up even if the sums agree.
+    const flagged = a.netWorthCarried === true;
+    const carried = expectedCarried.has(date);
+    push([
+      ...compare(
         "HISTORY_SUMS_PORTFOLIOS",
         "networth",
         `${date}: aggregate netWorth differs from the sum of the portfolio histories`,
         e,
         new Decimal(a.netWorth),
       ),
-    );
+      ...(flagged === carried
+        ? []
+        : [
+            {
+              rule: "HISTORY_SUMS_PORTFOLIOS" as const,
+              scope: "networth",
+              expected: carried ? "netWorthCarried" : "no netWorthCarried",
+              actual: flagged ? "netWorthCarried" : "no netWorthCarried",
+              diff: "n/a",
+              tolerance: "n/a",
+              message: `${date}: the carried-forward flag does not match the portfolios that have no snapshot that day`,
+            },
+          ]),
+    ]);
   }
   if (skipped > 0) {
     out.push({
