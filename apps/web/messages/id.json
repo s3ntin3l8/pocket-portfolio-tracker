@@ -522,7 +522,7 @@
     "heatmapCellSubtitle": "{month} · {amount}",
     "heatmapCellAmount": "Jumlah",
     "paymentsTimelineTitle": "Linimasa pembayaran",
-    "paymentsTimelineSubtitle": "Distribusi diterima & perkiraan",
+    "paymentsTimelineSubtitle": "Dividen & kupon, diterima & perkiraan",
     "legendReceived": "Diterima",
     "legendForecast": "Perkiraan",
     "est": "perk.",

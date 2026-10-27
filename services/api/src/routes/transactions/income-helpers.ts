@@ -80,7 +80,8 @@ export async function buildIncomeStats(
   const sumInterest = (rows: typeof interestTxns) =>
     rows
       .reduce(
-        (sum, t) => sum.plus(new Decimal(convert(t.price, t.currency, display, fx))),
+        (sum, t) =>
+          sum.plus(new Decimal(convert(incomeFlow(t).toString(), t.currency, display, fx))),
         new Decimal(0),
       )
       .toString();

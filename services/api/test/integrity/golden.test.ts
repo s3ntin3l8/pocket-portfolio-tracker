@@ -472,6 +472,20 @@ describe("income", () => {
     expectDecimal(i.ttm, incomeExpected.total, "ttm");
   });
 
+  it("averages the payments only: (28 + 12 + 5) / 3, the tax debit is not a payment", async () => {
+    const i = await get(l, `/portfolios/${l.portfolioIds.depot}/income`);
+    expectDecimal(i.averagePerPayment, "15", "averagePerPayment");
+  });
+
+  it("shows the same net amount for a payment in the recent window and the lazy year", async () => {
+    const recent = await get(l, "/networth/income");
+    const lazy = await get(l, "/networth/income?eventsYear=2026");
+    const net = (rows: { type: string; amount?: string; price?: string }[]) =>
+      rows.filter((r) => r.type === "dividend").map((r) => Number(r.amount ?? r.price));
+    expect(net(recent.events)).toEqual([28]); // 30 − 2 fee
+    expect(net(lazy.events)).toEqual([28]);
+  });
+
   it("splits the total into the dividend (equity) and cash income, which add up to it", async () => {
     const i = await get(l, `/portfolios/${l.portfolioIds.depot}/income`);
     const byClass = Object.fromEntries(

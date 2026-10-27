@@ -837,7 +837,9 @@ describe("aggregateIncome — non-instrument income (#1167)", () => {
 
   it("does not count a tax debit as a payment", () => {
     expect(stats.paymentCount).toBe(3); // dividend, interest, bonus
-    expect(stats.averagePerPayment).toBe("56710"); // 170130 / 3
+    // The average is of the three payments (100 + 50 + 170000) / 3, not of the total net of the
+    // tax debit: the debit is neither a payment nor part of the mean (170150 / 3 at 20 digits).
+    expect(stats.averagePerPayment).toBe("56716.666666666666667");
   });
 
   it("keeps the per-instrument bars about securities: shares of what they paid, summing to 100%", () => {
@@ -874,6 +876,6 @@ describe("aggregateIncome — non-instrument income (#1167)", () => {
     expect(negative.lifetimeTotal).toBe("-5");
     expect(negative.byAssetClass).toEqual([{ assetClass: "cash", total: "-5", pct: 0 }]);
     expect(negative.paymentCount).toBe(0);
-    expect(negative.averagePerPayment).toBe("0".replace("0", negative.averagePerPayment));
+    expect(negative.averagePerPayment).toBe("0");
   });
 });

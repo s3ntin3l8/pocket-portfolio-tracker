@@ -208,13 +208,19 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
   // to 100%, whatever interest and bonuses sit beside them).
   const securitiesLifetime = lifetime;
   let otherCount = 0;
+  // What the payments alone add up to: the tax debit reduces the totals but is not a payment,
+  // so it is out of the average's numerator as it is out of its denominator.
+  let paymentsTotal = lifetime;
   for (const e of input.otherEvents ?? []) {
     const amount = new Decimal(convert(e.amount, e.currency, displayCurrency, fx));
     const year = String(e.executedAt.getUTCFullYear());
     lifetime = lifetime.add(amount);
     // A tax debit reduces the totals but is not a payment: it is not counted as one.
     const counts = e.type !== "tax";
-    if (counts) otherCount++;
+    if (counts) {
+      otherCount++;
+      paymentsTotal = paymentsTotal.add(amount);
+    }
     const y = byYear.get(year) ?? { total: ZERO(), count: 0 };
     byYear.set(year, { total: y.total.add(amount), count: y.count + (counts ? 1 : 0) });
     const month = toMonthKey(e.executedAt);
@@ -303,6 +309,6 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
       }))
       .sort((a, b) => Number(b.totalNormalized) - Number(a.totalNormalized)),
     paymentCount: count,
-    averagePerPayment: count > 0 ? lifetime.div(count).toString() : "0",
+    averagePerPayment: count > 0 ? paymentsTotal.div(count).toString() : "0",
   };
 }

@@ -522,7 +522,7 @@
     "heatmapCellSubtitle": "{month} · {amount}",
     "heatmapCellAmount": "Amount",
     "paymentsTimelineTitle": "Payments timeline",
-    "paymentsTimelineSubtitle": "Received & forecast distributions",
+    "paymentsTimelineSubtitle": "Dividends & coupons, received and forecast",
     "legendReceived": "Received",
     "legendForecast": "Forecast",
     "est": "est.",
