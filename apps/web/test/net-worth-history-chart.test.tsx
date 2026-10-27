@@ -67,69 +67,6 @@ describe("NetWorthHistoryChart", () => {
     expect(getNetWorthHistory).not.toHaveBeenCalled();
   });
 
-  it("discloses carried-forward days on the value line, and not when none carry (#1189)", async () => {
-    const carried: PerformancePoint[] = [
-      { date: "2026-01-01", netWorth: "100" },
-      { date: "2026-01-02", netWorth: "150", netWorthCarried: true },
-      { date: "2026-01-03", netWorth: "160", netWorthCarried: true },
-    ];
-    const { unmount } = render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <NetWorthHistoryChart initial={carried} currency="IDR" />
-      </NextIntlClientProvider>,
-    );
-    // The default mode is Performance (TWR, unaffected): no note there.
-    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: "Value" }));
-    expect(await screen.findByText(/2 days include a carried-forward value/)).toBeInTheDocument();
-    unmount();
-
-    renderChart();
-    fireEvent.click(screen.getByRole("radio", { name: "Value" }));
-    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
-  });
-
-  it("uses the singular for one carried day, and shows no note on an intraday range (#1189)", async () => {
-    const one: PerformancePoint[] = [
-      { date: "2026-01-01", netWorth: "100" },
-      { date: "2026-01-02", netWorth: "150", netWorthCarried: true },
-    ];
-    const { unmount } = render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <NetWorthHistoryChart initial={one} currency="IDR" />
-      </NextIntlClientProvider>,
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "Value" }));
-    expect(await screen.findByText(/1 day includes a carried-forward value/)).toBeInTheDocument();
-    unmount();
-
-    // Intraday points are a different shape and are never carried; even a stray flag on the
-    // daily-shaped data must not print a note there.
-    render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <NetWorthHistoryChart initial={one} currency="IDR" initialRange="1d" />
-      </NextIntlClientProvider>,
-    );
-    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
-  });
-
-  it("does not print the old series' count while a range change is in flight (#1189)", async () => {
-    const carried: PerformancePoint[] = [
-      { date: "2026-01-01", netWorth: "100" },
-      { date: "2026-01-02", netWorth: "150", netWorthCarried: true },
-    ];
-    getNetWorthHistory.mockImplementationOnce(() => new Promise<HistoryPoint[]>(() => {}));
-    render(
-      <NextIntlClientProvider locale="en" messages={messages}>
-        <NetWorthHistoryChart initial={carried} currency="IDR" />
-      </NextIntlClientProvider>,
-    );
-    fireEvent.click(screen.getByRole("radio", { name: "Value" }));
-    expect(await screen.findByText(/1 day includes a carried-forward value/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: "3M" })); // never resolves
-    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
-  });
-
   it("refetches the series when the range changes", async () => {
     renderChart();
     fireEvent.click(screen.getByRole("radio", { name: "3M" }));

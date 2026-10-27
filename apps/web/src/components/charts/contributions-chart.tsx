@@ -87,6 +87,10 @@ export function ContributionsChart({
 
   const isOverlay = overlayData.length >= 2;
 
+  // Days where a portfolio had no snapshot and its last net worth was carried forward in the
+  // aggregate series (#1172); the value line plots net worth, so say so.
+  const carriedDays = valueHistory.filter((p) => p.netWorthCarried === true).length;
+
   const money = (v: number) => formatMoney(v, currency, locale);
 
   // ── OVERLAY PATH ─────────────────────────────────────────────────────────
@@ -210,6 +214,12 @@ export function ContributionsChart({
             </ComposedChart>
           </ResponsiveContainer>
         </div>
+
+        {carriedDays > 0 && (
+          <p className="text-micro font-medium text-text-mute">
+            {t("carriedNote", { count: carriedDays })}
+          </p>
+        )}
 
         {/* Invested / Gain / Now worth footer — reference shows this row under the chart.
             Even 3-col spread on mobile (a fixed gap-6 flex row left-clusters into ~80% of

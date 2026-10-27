@@ -570,6 +570,7 @@
     "chartContributions": "Contributed",
     "chartValue": "Value",
     "chartValueUnavailable": "Value history not yet available — run a backfill from Admin → Jobs.",
+    "carriedNote": "{count, plural, one {1 day of the value line includes} other {# days of the value line include}} a carried-forward value for a portfolio with no snapshot that day.",
     "footerInvested": "Invested",
     "footerGain": "Gain",
     "footerNowWorth": "Now worth",
@@ -1505,7 +1506,6 @@
     "modeLabel": "Chart mode",
     "modePerformance": "Performance",
     "modeValue": "Value",
-    "carriedNote": "{count, plural, one {1 day includes} other {# days include}} a carried-forward value for a portfolio with no snapshot that day.",
     "range": {
       "label": "Time range",
       "1d": "1D",
