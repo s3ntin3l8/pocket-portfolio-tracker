@@ -42,7 +42,17 @@ const HOLDINGS_COLS: ColDef<HoldingValuation>[] = [
  * "+0.00 / 0.00%" is an artefact of valuing it at cost (or excluding it), not a measured
  * result, so the P&L cells render a neutral "—" instead of a green zero (audit G3).
  */
-const pnlUnavailable = (h: HoldingValuation) => Boolean(h.valuedAtCost || h.fxMissing);
+const pnlUnavailable = (h: HoldingValuation) => Boolean(h.valuedAtCost || noDisplayFigures(h));
+
+/**
+ * `fxMissing` is OR-merged across depots on the all-portfolios view, while the display figures
+ * are the sums of the depots that could convert. A flagged row with NO display value is wholly
+ * excluded ("No FX rate", "—"); a flagged row that still has one is PARTIAL: its figures are
+ * real and in the totals, but one depot's share is left out (#1181).
+ */
+const noDisplayFigures = (h: HoldingValuation) =>
+  Boolean(h.fxMissing && h.marketValueDisplay === null);
+const fxPartial = (h: HoldingValuation) => Boolean(h.fxMissing && h.marketValueDisplay !== null);
 
 function computeRowValues(h: HoldingValuation, currency: string, locale: string) {
   const unavailable = pnlUnavailable(h);
@@ -111,7 +121,8 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
   const valuedAtCostCount = rows.filter((h) => h.valuedAtCost).length;
   // Holdings whose currency has no FX rate into the display currency (audit B2): their
   // display value is null and they're left out of the totals rather than converted 1:1.
-  const fxMissingCount = rows.filter((h) => h.fxMissing).length;
+  const fxMissingCount = rows.filter(noDisplayFigures).length;
+  const fxPartialCount = rows.filter(fxPartial).length;
 
   // Column totals across the (already class-filtered) visible rows. Market value and
   // P&L sum every holding that has a value at all — priced or valued at cost; a holding
@@ -130,8 +141,8 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
       // all-portfolios view is also flagged `fxMissing` (the flag is OR-merged) but its display
       // value, cost and P&L are the sums of the depots that could convert, so it keeps its cost
       // in step with the value and P&L already counted above.
-      const noDisplayFigures = h.fxMissing && h.marketValueDisplay === null;
-      if (h.costBasisDisplay !== null && !noDisplayFigures) acc.cost += Number(h.costBasisDisplay);
+      if (h.costBasisDisplay !== null && !noDisplayFigures(h))
+        acc.cost += Number(h.costBasisDisplay);
       return acc;
     },
     {
@@ -257,9 +268,12 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
                       </InfoTip>
                     )}
                     {h.fxMissing && (
-                      <InfoTip label={t("fxMissingTooltip")} focusable>
+                      <InfoTip
+                        label={fxPartial(h) ? t("fxPartialTooltip") : t("fxMissingTooltip")}
+                        focusable
+                      >
                         <span className="ml-1.5 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
-                          {t("fxMissingBadge")}
+                          {fxPartial(h) ? t("fxPartialBadge") : t("fxMissingBadge")}
                         </span>
                       </InfoTip>
                     )}
@@ -270,7 +284,7 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
                         <span aria-hidden>—</span>
                         {pnlUnavailable(h) && (
                           <span className="sr-only">
-                            {h.fxMissing ? t("fxMissingTooltip") : t("valuedAtCostTooltip")}
+                            {noDisplayFigures(h) ? t("fxMissingTooltip") : t("valuedAtCostTooltip")}
                           </span>
                         )}
                       </>
@@ -344,6 +358,11 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
             {t("fxMissingFooterNote", { count: fxMissingCount })}
           </p>
         )}
+        {fxPartialCount > 0 && (
+          <p className="mt-2 text-micro font-medium text-text-mute">
+            {t("fxPartialFooterNote", { count: fxPartialCount })}
+          </p>
+        )}
         {fxMissingCash.length > 0 && (
           <p className="mt-2 text-micro font-medium text-text-mute">
             {t("fxMissingCashFooterNote", { currencies: fxMissingCash.join(", ") })}
@@ -400,9 +419,12 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
                     </InfoTip>
                   )}
                   {h.fxMissing && (
-                    <InfoTip label={t("fxMissingTooltip")} focusable>
+                    <InfoTip
+                      label={fxPartial(h) ? t("fxPartialTooltip") : t("fxMissingTooltip")}
+                      focusable
+                    >
                       <span className="ml-1 inline-block rounded-full bg-border px-1.5 py-0.5 align-middle text-micro font-bold uppercase text-text-mute">
-                        {t("fxMissingBadge")}
+                        {fxPartial(h) ? t("fxPartialBadge") : t("fxMissingBadge")}
                       </span>
                     </InfoTip>
                   )}
@@ -466,6 +488,11 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
         {fxMissingCount > 0 && (
           <p className="px-4 py-2 text-micro font-medium text-text-mute">
             {t("fxMissingFooterNote", { count: fxMissingCount })}
+          </p>
+        )}
+        {fxPartialCount > 0 && (
+          <p className="px-4 py-2 text-micro font-medium text-text-mute">
+            {t("fxPartialFooterNote", { count: fxPartialCount })}
           </p>
         )}
         {fxMissingCash.length > 0 && (

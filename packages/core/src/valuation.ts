@@ -51,6 +51,11 @@ export interface HoldingValuation extends Holding {
    * `costCurrency` still carry the amount), and the holding is excluded from every
    * display-currency total — a missing rate is never treated as 1:1. Undefined when FX
    * resolved normally.
+   *
+   * On a row merged across depots (`aggregatePortfolios`) the flag is OR-merged while the display
+   * figures are the sums of the depots that could convert: a flagged row that still has a
+   * `marketValueDisplay` is PARTIAL (its figures are real and counted, one depot's share is
+   * left out), only one without it is wholly excluded (#1181).
    */
   fxMissing?: boolean;
   /** Prior session's close (instrument currency), when known. */

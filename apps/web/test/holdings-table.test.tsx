@@ -348,6 +348,34 @@ describe("HoldingsTable", () => {
       });
     });
 
+    it("shows a merged, partly convertible row's measured P&L, with a partial disclosure (#1181)", () => {
+      // The all-portfolios view OR-merges fxMissing but sums the depots that could convert: the
+      // row has a value, cost and P&L that are in the footer, so its own cells must show them
+      // too, and the badge and footnote must say "partial", not "no exchange rate / excluded".
+      const merged: HoldingValuation = {
+        ...makeHolding("MERGED", "10", "90"),
+        marketValueDisplay: "1000",
+        costBasisDisplay: "900",
+        unrealizedPnLDisplay: "100",
+        fxMissing: true,
+      };
+      // A second row with a different return keeps the footer's percentage (600 / 1900 = 31.58%)
+      // apart from the merged row's own (100 / 900 = 11.11%), which only its cell can show.
+      const other: HoldingValuation = {
+        ...makeHolding("OTHER", "10", "100"),
+        marketValueDisplay: "1500",
+        costBasisDisplay: "1000",
+        unrealizedPnLDisplay: "500",
+      };
+      renderTable({ rows: [merged, other] });
+      expect(screen.getAllByText("Partial").length).toBeGreaterThan(0);
+      expect(screen.queryByText("No FX rate")).not.toBeInTheDocument();
+      expect(screen.getAllByText(/1 holding is partial/).length).toBeGreaterThan(0);
+      expect(screen.queryByText(/with no exchange rate available/)).not.toBeInTheDocument();
+      // The row's own P&L cell shows its percentage instead of a dash.
+      expect(screen.getAllByText(/11\.11%/).length).toBeGreaterThan(0);
+    });
+
     it("does not badge a holding whose FX resolved", () => {
       renderTable();
       expect(screen.queryByText("No FX rate")).not.toBeInTheDocument();
