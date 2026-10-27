@@ -11,14 +11,13 @@ import {
   computeHoldings,
   toDateKey,
   MAX_PRICE_CARRY_FORWARD_DAYS,
-  DEAD_FEED_MISS_THRESHOLD,
   type CorporateAction,
 } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { toCoreTxns } from "../tx-core.js";
 import { backfillPortfolioHistory, type BackfillResult } from "./core.js";
-import { firstHeldDateFrom, isManualPriceBond } from "./shared.js";
+import { firstHeldDateFrom, isDeadFeedCoolingDown, isManualPriceBond } from "./shared.js";
 
 export interface SweepResult {
   scanned: number;
@@ -218,9 +217,7 @@ export async function backfillStalePortfolios(
   }
   function isCoolingDownDeadFeed(instrumentId: string): boolean {
     const health = feedHealthByInstr.get(instrumentId);
-    if (!health || health.priceFeedMissCount < DEAD_FEED_MISS_THRESHOLD) return false;
-    if (!health.priceFeedLastMissAt) return false;
-    return daysBetween(toDateKey(health.priceFeedLastMissAt), today) < DEAD_FEED_MISS_THRESHOLD;
+    return !!health && isDeadFeedCoolingDown(health, today);
   }
 
   // Per portfolio, the OLDEST latest-price-date across its CURRENTLY HELD instruments —

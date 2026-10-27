@@ -154,12 +154,13 @@ export async function enqueueBackfillPortfolio(
   portfolioId: string,
   fromDate?: string,
   tailOnly?: boolean,
+  retryDeadFeeds?: boolean,
 ): Promise<boolean> {
   if (!activeBoss) return false;
   try {
     await activeBoss.send(
       BACKFILL_PORTFOLIO_QUEUE,
-      { portfolioId, fromDate, tailOnly },
+      { portfolioId, fromDate, tailOnly, ...(retryDeadFeeds ? { retryDeadFeeds } : {}) },
       {
         singletonKey: portfolioSingletonKey(portfolioId),
         singletonSeconds: BACKFILL_PORTFOLIO_SINGLETON_SECONDS,

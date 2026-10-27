@@ -11,6 +11,7 @@ import {
   firstHeldDateFrom,
   isManualPriceBond,
   laterDateKey,
+  isDeadFeedCoolingDown,
   priceGapRemains,
 } from "./shared.js";
 import { buildFlowDateFn, writeSnapshotSeries, type RawPriceMap } from "./snapshots.js";
@@ -26,6 +27,14 @@ export interface BackfillOptions {
    * re-fetch on every sweep run. See issue #737.
    */
   tailOnly?: boolean;
+  /**
+   * Ask the providers even for an instrument whose feed is cooling down as dead
+   * (`isDeadFeedCoolingDown`). Off by default: a dead feed (delisted, bankrupt, a bogus
+   * symbol) is skipped under every trigger, `force` included, because the fetch can't
+   * change a number — valuation reads the stored prices, and a holding with none is valued
+   * at cost. A caller that knows the feed is back (a manual re-check) sets this.
+   */
+  retryDeadFeeds?: boolean;
 }
 
 export interface BackfillResult {
@@ -175,6 +184,12 @@ export async function backfillPortfolioHistory(
         const proxyClose = k.mul(new Decimal(spot)).toString();
         instrPrices.set(date, { close: proxyClose, currency: instr.currency });
       }
+      continue;
+    }
+
+    // A dead feed is not asked again until its cooldown lapses (any trigger, force included):
+    // the stored prices are merged below, so skipping changes no valuation.
+    if (!opts.retryDeadFeeds && isDeadFeedCoolingDown(instr, today)) {
       continue;
     }
 

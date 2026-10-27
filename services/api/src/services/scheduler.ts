@@ -458,10 +458,11 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   // re-fail its unrelated batch-mates on every retry.
   await boss.work(BACKFILL_PORTFOLIO_QUEUE, { batchSize: 1 }, async (jobs) => {
     for (const job of jobs) {
-      const { portfolioId, fromDate, tailOnly } = job.data as {
+      const { portfolioId, fromDate, tailOnly, retryDeadFeeds } = job.data as {
         portfolioId: string;
         fromDate?: string;
         tailOnly?: boolean;
+        retryDeadFeeds?: boolean;
       };
       // Heartbeat supervision is pg-boss's own (#763): BACKFILL_PORTFOLIO_QUEUE_OPTIONS
       // sets heartbeatSeconds, so `#processJobs` auto-touches this job every
@@ -474,7 +475,11 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
           // backfill_jobs coordination rows. planFanOut/runFanOut own the fan-out/poll/
           // cleanup lifecycle end to end — see backfill/fan-out.ts for the testable core
           // this used to be inlined here.
-          const plan = await planFanOut(getDb(), portfolioId, { fromDate, tailOnly });
+          const plan = await planFanOut(getDb(), portfolioId, {
+            fromDate,
+            tailOnly,
+            retryDeadFeeds,
+          });
 
           if (plan.pending > 0) {
             app.log.info(
@@ -581,15 +586,23 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     { batchSize: 1, includeMetadata: true },
     async (jobs) => {
       for (const job of jobs) {
-        const { backfillJobId, portfolioId, instrumentId, chunkStart, chunkEnd, tailOnly } =
-          job.data as {
-            backfillJobId: string;
-            portfolioId: string;
-            instrumentId: string;
-            chunkStart: string;
-            chunkEnd: string;
-            tailOnly?: boolean;
-          };
+        const {
+          backfillJobId,
+          portfolioId,
+          instrumentId,
+          chunkStart,
+          chunkEnd,
+          tailOnly,
+          retryDeadFeeds,
+        } = job.data as {
+          backfillJobId: string;
+          portfolioId: string;
+          instrumentId: string;
+          chunkStart: string;
+          chunkEnd: string;
+          tailOnly?: boolean;
+          retryDeadFeeds?: boolean;
+        };
         try {
           const result = await fetchInstrumentPrices(getDb(), await getMarketData(), {
             portfolioId,
@@ -597,6 +610,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
             chunkStart,
             chunkEnd,
             tailOnly,
+            retryDeadFeeds,
           });
           await flushUsage();
 

@@ -29,6 +29,8 @@ export interface FanOutSubJob {
    *  (instrument.ts) — always set here, never left `undefined`, so a forgetful caller
    *  can't accidentally drop it the way the pre-#773 planner did. */
   tailOnly: boolean;
+  /** See BackfillOptions.retryDeadFeeds (core.ts). Omitted when off. */
+  retryDeadFeeds?: boolean;
 }
 
 export interface FanOutPlan {
@@ -95,7 +97,7 @@ export class FanOutOwnershipLostError extends Error {
 export async function planFanOut(
   db: DB,
   portfolioId: string,
-  opts: { fromDate?: string; tailOnly?: boolean } = {},
+  opts: { fromDate?: string; tailOnly?: boolean; retryDeadFeeds?: boolean } = {},
 ): Promise<FanOutPlan> {
   const claimedAt = new Date();
   const ctx = await loadBackfillContext(db, portfolioId, opts);
@@ -144,6 +146,7 @@ export async function planFanOut(
         chunkStart,
         chunkEnd: today,
         tailOnly: opts.tailOnly ?? false,
+        ...(opts.retryDeadFeeds ? { retryDeadFeeds: true } : {}),
       });
     }
   }

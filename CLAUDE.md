@@ -223,6 +223,9 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   portfolio first held it) with a bounded `fromDate`/`tailOnly` re-fetch, and a fetch that
   returns candles but leaves such a hole open counts as a dead-feed miss (`priceGapRemains`),
   so the cooldown stops re-fetching an unfillable gap every night.
+  A feed in that cooldown (`isDeadFeedCoolingDown`, `DEAD_FEED_MISS_THRESHOLD` misses, last one within as many
+  days) is skipped by every backfill fetch, `force` included, unless `retryDeadFeeds` is set — valuation reads the
+  stored prices, so skipping changes no number.
 - **Every gain figure names its basis.** `GainSummary` (`packages/core/src/gain-summary.ts`,
   on `/networth` and `/portfolios/:id/summary` as `gain`) is the one derivation of
   `{ value, costOfOpen, netContributed, unrealized, realized, income }` — built from

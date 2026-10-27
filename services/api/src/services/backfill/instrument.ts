@@ -6,7 +6,12 @@ import { instruments, scrapedQuotes } from "@portfolio/db";
 import type { Candle, InstrumentRef, MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { buybackKeyFor, isBuybackGoldMarket } from "../scrapers/store.js";
-import { firstHeldDateFor, isManualPriceBond, priceGapRemains } from "./shared.js";
+import {
+  firstHeldDateFor,
+  isDeadFeedCoolingDown,
+  isManualPriceBond,
+  priceGapRemains,
+} from "./shared.js";
 
 export interface InstrumentChunkData {
   portfolioId: string;
@@ -22,6 +27,8 @@ export interface InstrumentChunkData {
    * every sweep run.
    */
   tailOnly?: boolean;
+  /** See BackfillOptions.retryDeadFeeds (core.ts). */
+  retryDeadFeeds?: boolean;
 }
 
 export interface InstrumentChunkResult {
@@ -49,7 +56,7 @@ export async function fetchInstrumentPrices(
   marketData: MarketDataService,
   data: InstrumentChunkData,
 ): Promise<InstrumentChunkResult> {
-  const { portfolioId, instrumentId, chunkStart, chunkEnd, tailOnly } = data;
+  const { portfolioId, instrumentId, chunkStart, chunkEnd, tailOnly, retryDeadFeeds } = data;
 
   const [instr] = await db
     .select()
@@ -177,6 +184,12 @@ export async function fetchInstrumentPrices(
       })),
     );
     return { instrumentId, days, truncated: false, unpriced: days === 0 };
+  }
+
+  // Regular instrument — a dead feed is skipped under any trigger (see core.ts); the stored
+  // prices are read back by computeBackfillSnapshots, so nothing about valuation changes.
+  if (!retryDeadFeeds && isDeadFeedCoolingDown(instr, new Date().toISOString().slice(0, 10))) {
+    return { instrumentId, days: 0, truncated: false, unpriced: true };
   }
 
   // Regular instrument — fetch from market data provider
