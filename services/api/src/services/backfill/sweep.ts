@@ -226,7 +226,7 @@ export async function backfillStalePortfolios(
     const h = feedHealthByInstr.get(instrumentId);
     return !!h && h.assetClass === "bond" && (isManualPriceBond(h) || !h.faceValue);
   }
-  function isCoolingDownDeadFeed(instrumentId: string): boolean {
+  function skipsDeadFeed(instrumentId: string): boolean {
     // `retryDeadFeeds` (an operator who knows the feed is back) must reach the selection
     // too, or a portfolio stale only because of its dead feed is never enqueued at all.
     if (opts.retryDeadFeeds) return false;
@@ -242,7 +242,7 @@ export async function backfillStalePortfolios(
   const worstLatestPriceByPortfolio = new Map<string, string | null>();
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
-      if (isCoolingDownDeadFeed(instrumentId) || isUnhealableBond(instrumentId)) continue;
+      if (skipsDeadFeed(instrumentId) || isUnhealableBond(instrumentId)) continue;
       const latest = latestPriceByInstr.get(instrumentId) ?? null;
       const cur = worstLatestPriceByPortfolio.get(portfolioId);
       if (cur === undefined) {
@@ -314,7 +314,7 @@ export async function backfillStalePortfolios(
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
       const gaps = midGapsByInstr.get(instrumentId);
-      if (!gaps || isUnhealableBond(instrumentId) || isCoolingDownDeadFeed(instrumentId)) continue;
+      if (!gaps || isUnhealableBond(instrumentId) || skipsDeadFeed(instrumentId)) continue;
       const firstHeld = firstHeldDateFrom(txByPortfolio.get(portfolioId) ?? [], instrumentId);
       if (!firstHeld) continue;
       for (const g of gaps) {
