@@ -25,6 +25,7 @@ import { HoldingSparkline } from "@/components/holding-sparkline";
 import { ScopeLink } from "@/components/scope-link";
 import { formatMoney, formatPercent, formatSignedMoney, formatQuantity, cn } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
+import { fxPartial, noDisplayFigures } from "@/lib/fx-missing";
 import type { ColDef } from "@/lib/table-sort";
 import { InfoTip } from "@/components/ui/tooltip";
 
@@ -43,16 +44,6 @@ const HOLDINGS_COLS: ColDef<HoldingValuation>[] = [
  * result, so the P&L cells render a neutral "—" instead of a green zero (audit G3).
  */
 const pnlUnavailable = (h: HoldingValuation) => Boolean(h.valuedAtCost || noDisplayFigures(h));
-
-/**
- * `fxMissing` is OR-merged across depots on the all-portfolios view, while the display figures
- * are the sums of the depots that could convert. A flagged row with NO display value is wholly
- * excluded ("No FX rate", "—"); a flagged row that still has one is PARTIAL: its figures are
- * real and in the totals, but one depot's share is left out (#1181).
- */
-const noDisplayFigures = (h: HoldingValuation) =>
-  Boolean(h.fxMissing && h.marketValueDisplay === null);
-const fxPartial = (h: HoldingValuation) => Boolean(h.fxMissing && h.marketValueDisplay !== null);
 
 function computeRowValues(h: HoldingValuation, currency: string, locale: string) {
   const unavailable = pnlUnavailable(h);
@@ -119,8 +110,9 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
   // into the totals below like any priced holding. Surfaced via a footer note + a
   // per-row badge so the total doesn't silently read as a real market value.
   const valuedAtCostCount = rows.filter((h) => h.valuedAtCost).length;
-  // Holdings whose currency has no FX rate into the display currency (audit B2): their
-  // display value is null and they're left out of the totals rather than converted 1:1.
+  // Holdings whose currency has no FX rate into the display currency (audit B2) and that have no
+  // display value at all: they're left out of the totals rather than converted 1:1. A partial row
+  // (merged across depots, still valued) is counted separately below and is NOT excluded.
   const fxMissingCount = rows.filter(noDisplayFigures).length;
   const fxPartialCount = rows.filter(fxPartial).length;
 

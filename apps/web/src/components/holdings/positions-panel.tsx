@@ -11,6 +11,7 @@ import { HoldingsTable } from "@/components/holdings-table";
 import { TableToolbar, TOOLBAR_FILTERS, ToolbarSearch } from "@/components/table-toolbar";
 import { CHIP_BASE, CHIP_INACTIVE } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { noDisplayFigures } from "@/lib/fx-missing";
 
 /**
  * The "Positions" section on Holdings — the asset-class tabs + table, plus (unlike the
@@ -61,8 +62,11 @@ export function PositionsPanel({
 
   const q = query.trim().toLowerCase();
 
-  // Rows with no real P&L: valued at cost (no market price) or without an FX rate.
-  const atCostRows = useMemo(() => rows.filter((h) => h.valuedAtCost || h.fxMissing), [rows]);
+  // Rows with no real P&L: valued at cost (no market price) or without any FX-converted figures.
+  const atCostRows = useMemo(
+    () => rows.filter((h) => h.valuedAtCost || noDisplayFigures(h)),
+    [rows],
+  );
   const base = atCostOnly ? atCostRows : rows;
 
   // Matches what the table actually renders (holdings-table.tsx): symbol and

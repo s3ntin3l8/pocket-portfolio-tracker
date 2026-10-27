@@ -55,7 +55,8 @@ export interface HoldingValuation extends Holding {
    * On a row merged across depots (`aggregatePortfolios`) the flag is OR-merged while the display
    * figures are the sums of the depots that could convert: a flagged row that still has a
    * `marketValueDisplay` is PARTIAL (its figures are real and counted, one depot's share is
-   * left out), only one without it is wholly excluded (#1181).
+   * left out), only one without it is wholly excluded (#1181). `valuedAtCost` is OR-merged the
+   * same way and its merged row still renders "—" for P&L (tracked separately).
    */
   fxMissing?: boolean;
   /** Prior session's close (instrument currency), when known. */

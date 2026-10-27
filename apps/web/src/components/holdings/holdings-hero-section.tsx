@@ -1,6 +1,7 @@
 import type { HistoryPoint, NetWorth } from "@portfolio/api-client";
 import { HeroGlanceCard } from "@/components/holdings/hero-glance-card";
 import { isIntradayHeroRange, resolveHeroRange, type HeroRange } from "@/lib/chart-range";
+import { noDisplayFigures } from "@/lib/fx-missing";
 import {
   loadHasIntraday,
   loadNetWorthHistory,
@@ -81,7 +82,7 @@ export async function HoldingsHeroSection({
       holderId={holderId}
       benchmarkSymbol={benchmarkSymbol}
       atCostCount={summary.holdings.filter((h) => h.valuedAtCost).length}
-      fxMissingCount={summary.holdings.filter((h) => h.fxMissing).length}
+      fxMissingCount={summary.holdings.filter(noDisplayFigures).length}
       atCostHref={
         portfolioParam
           ? `/holdings?portfolio=${portfolioParam}&filter=at-cost`
