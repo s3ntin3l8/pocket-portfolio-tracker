@@ -66,7 +66,8 @@ function groupAbstentions(items: { rule: string; scope: string; reason: string }
 
 const BASIS_NOTE =
   "Name the basis of any gain you quote (vs cost of holdings / vs net contributed) and disclose " +
-  "valuedAtCost holdings and fxMissingCurrencies exclusions.";
+  "valuedAtCost holdings, partly at-cost rows (valuedAtCostPartial) and fxMissingCurrencies " +
+  "exclusions.";
 
 /** Run `fn` over `items` with at most `limit` in flight; results keep input order. */
 async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
@@ -102,6 +103,7 @@ function compactHolding(h: HoldingValuation) {
     unrealizedPnLDisplay: h.unrealizedPnLDisplay,
     dayChangePct: h.dayChangePct,
     valuedAtCost: h.valuedAtCost ?? false,
+    valuedAtCostPartial: h.valuedAtCostPartial ?? false,
     fxMissing: h.fxMissing ?? false,
   };
 }
@@ -130,6 +132,7 @@ function compactHeadline(s: PortfolioSummary | NetWorth) {
     fxMissingCurrencies: s.fxMissingCurrencies ?? [],
     holdingCount: s.holdings.length,
     valuedAtCostCount: s.holdings.filter((h) => h.valuedAtCost).length,
+    valuedAtCostPartialCount: s.holdings.filter((h) => h.valuedAtCostPartial).length,
     gain: s.gain ?? null,
     allocation: s.allocation ?? null,
     drift: s.drift ?? null,
@@ -261,7 +264,9 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     description:
       "Current holdings with quantity, average cost, cost basis, price, market value and unrealized " +
       "P&L in the display currency. valuedAtCost=true means no usable price: valued at cost, no " +
-      "measured gain. fxMissing=true means excluded from totals (no FX rate).",
+      "measured gain. valuedAtCostPartial=true (all-portfolios rows) means only some depots are valued " +
+      "at cost: the P&L is real but partly measured. fxMissing=true means excluded from totals " +
+      "(no FX rate).",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       holderId,

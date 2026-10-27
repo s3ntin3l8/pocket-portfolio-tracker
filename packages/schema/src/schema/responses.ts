@@ -101,6 +101,7 @@ export const holdingValuationResponseSchema = z.looseObject({
   costBasisDisplay: decimalOutNullable,
   unrealizedPnLDisplay: decimalOutNullable,
   valuedAtCost: z.boolean().optional(),
+  valuedAtCostPartial: z.boolean().optional(),
   fxMissing: z.boolean().optional(),
   previousClose: decimalOutNullable,
   dayChange: decimalOutNullable,

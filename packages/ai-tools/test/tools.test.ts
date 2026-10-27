@@ -633,6 +633,38 @@ describe("ai-tools", () => {
     expect(out.netWorth).toBe("1750"); // money stays a string
   });
 
+  it("projects valuedAtCostPartial per holding, counts it in the headline, and documents it (#1193)", async () => {
+    // A merged, partly-at-cost row (priced + at-cost depot) beside the two default rows; added
+    // for this test only so the other tests' counts and ordering are untouched.
+    const partial = holding({
+      instrumentId: "i3",
+      valuedAtCostPartial: true,
+      marketValueDisplay: "1",
+    });
+    summary.holdings.push(partial);
+    try {
+      const t = byName("get_holdings");
+      const out = (await t.handler(t.inputSchema.parse({}))) as {
+        holdings: Record<string, unknown>[];
+      };
+      const flags = Object.fromEntries(out.holdings.map((h) => [h.instrumentId, h]));
+      expect(flags.i3!.valuedAtCostPartial).toBe(true);
+      expect(flags.i3!.valuedAtCost).toBe(false);
+      expect(flags.i1!.valuedAtCostPartial).toBe(false);
+      expect(flags.i2!.valuedAtCostPartial).toBe(false);
+
+      const head = (await byName("get_net_worth").handler({})) as Record<string, unknown>;
+      expect(head.valuedAtCostPartialCount).toBe(1);
+      expect(head.valuedAtCostCount).toBe(1); // the partial row is not "at cost"
+    } finally {
+      summary.holdings.pop();
+    }
+    expect(byName("get_holdings").description).toMatch(/valuedAtCostPartial/);
+    // The basis note appended to the headline tools names the case too.
+    expect(byName("get_net_worth").description).toMatch(/valuedAtCostPartial/);
+    expect(byName("get_portfolio_summary").description).toMatch(/valuedAtCostPartial/);
+  });
+
   it("holdings are sorted by value, flag valuedAtCost, and drop lots/sparkline", async () => {
     const t = byName("get_holdings");
     const out = (await t.handler(t.inputSchema.parse({}))) as {
@@ -640,6 +672,7 @@ describe("ai-tools", () => {
     };
     expect(out.holdings.map((h) => h.instrumentId)).toEqual(["i1", "i2"]);
     expect(out.holdings[1]!.valuedAtCost).toBe(true);
+    expect(out.holdings[1]!.valuedAtCostPartial).toBe(false);
     expect(out.holdings[0]).not.toHaveProperty("lots");
     expect(out.holdings[0]).not.toHaveProperty("sparkline");
   });
