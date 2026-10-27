@@ -23,13 +23,42 @@ asserts the endpoint figures.
 ledger carries the arithmetic in a comment (`// 780 − 640 = 140 realized`). A value copied from
 the code under test turns the test into a snapshot that can only ever agree with the code.
 
-Pitfalls the loader already handles, and one it can't:
+Pitfalls the loader already handles, and one it can't (see the next subsection):
 
 - A `last_prices` row is only trusted while younger than the price-cache TTL; the loader stamps
   quotes at the ledger's `asOf`. Otherwise the holding silently falls back to cost.
 - Instrument symbols are namespaced per ledger. `fx_rates` rows are **global**: a ledger that
   needs an absent or stale pair must use a currency no other ledger quotes.
-- A figure derived from an average-cost pool is exact only to ~1e-15 (`1e-12` tolerance).
+- A figure derived from an average-cost pool is not always the exact decimal you would write by
+  hand (the example below is off by 2e-17); see "Average-cost precision" below.
+
+### Average-cost precision
+
+A cost basis that comes out of the average-cost pool is not always the exact decimal you would
+write by hand. Example (`eur-basic`): 15 shares cost 1,600, so the average cost is `1600/15`; the
+sale of 6 removes `6 × avg` and the remaining cost is `1600 − that`. With `decimal.js` at its 20
+significant digits:
+
+```
+1600 / 15            = 106.66666666666666667
+6 × 106.666…667      = 640.00000000000000002   (cost of the 6 sold)
+1600 − 640.0…0002    = 959.99999999999999998   (cost of the 9 left; 960 by hand)
+```
+
+The raw API string is therefore `959.99999999999999998`; the display layers round it to `960`.
+(Multiplying `1600/15` by 9 directly gives a different last digit; the string depends on the
+path the pool takes, which is the point.)
+
+This is a deliberate decision (#1159), not an open bug: rounding the pool at a fixed scale would
+touch every cost basis in the app, and every golden ledger, for no gain. Instead:
+
+- golden ledgers compare pool-derived figures with an absolute `1e-12` tolerance and everything
+  else exactly (`expectDecimal`); the example above diverges by about 2e-17, so `1e-12` and the
+  `1e-9` below are deliberately conservative headroom, not a measured bound;
+- the invariant rules compare with a **relative** `1e-9` tolerance and an absolute floor of
+  `1e-9` (so sub-unit figures stay comparable), i.e. `max(1e-9, 1e-9 × |expected|)`;
+- application code must never compare two such strings for equality: compare them as decimals
+  with a tolerance.
 
 Adding a ledger: create `ledgers/<name>.ts` exporting the `Ledger` and its expected figures,
 assert them in `golden.test.ts`, and add it to `ledgers/index.ts` so the invariant suite and
