@@ -4,13 +4,14 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   release-please:
     permissions:
       contents: write
       pull-requests: write
-    uses: s3ntin3l8/.github/.github/workflows/release-please.yml@e99be0ab019a9e7fb07cfdbee5f03c81a66542cc # main @ 2026-09-05
+    uses: s3ntin3l8/.github/.github/workflows/release-please.yml@main
 
   build-docker:
     needs: release-please
@@ -19,7 +20,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@ec085dff95c3482b513590b14b27c8b9713df428 # main @ 2026-09-11
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@main
     with:
       image-name: "s3ntin3l8/${{ github.event.repository.name }}"
       push-release: true
@@ -33,7 +34,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
-    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@ec085dff95c3482b513590b14b27c8b9713df428 # main @ 2026-09-11
+    uses: s3ntin3l8/.github/.github/workflows/docker-publish.yml@main
     with:
       image-name: "s3ntin3l8/${{ github.event.repository.name }}-web"
       push-release: true
