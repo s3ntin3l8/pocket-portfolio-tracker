@@ -393,7 +393,7 @@ Claude Code itself against `@claude`-mentioned issues/PR comments/reviews; **`he
 runs an on-demand PR review bot on `@s3ntin3l8-hermes` comment mentions (guarded against
 re-triggering itself via `github.actor`, since a submitted review's body also matches the
 mention substring — see the in-file comment on the Claude→Hermes cascade, `.github#527`).
-`claude-code.yml` is a thin caller of the reusable `s3ntin3l8/.github/.github/workflows/claude-code.yml`
+`claude-code.yml` is a thin caller of the reusable `claude-code.yml` in `s3ntin3l8/.github`
 (same `workflow_call` pattern as `hermes.yml`/`hermes-review.yml`) — the trusted-commenter
 gate, Node setup, and review-capable tool grants (including
 `mcp__github_inline_comment__create_inline_comment` for inline suggested edits, plus
