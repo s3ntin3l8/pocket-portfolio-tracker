@@ -43,8 +43,11 @@ export async function listProviders(app: FastifyInstance) {
     pausedUntil = new Map(
       (await getMarketData()).getBlockedProviders().map((b) => [b.provider, b.until.toISOString()]),
     );
-  } catch {
-    // no paused hints
+  } catch (err) {
+    // Still visible in the logs: a broken chain must not look like "nothing paused".
+    console.warn(
+      `[admin] could not read paused providers: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
 
   return resolveProviderConfig(rows, PROVIDER_REGISTRY, credentials).map((p) => {

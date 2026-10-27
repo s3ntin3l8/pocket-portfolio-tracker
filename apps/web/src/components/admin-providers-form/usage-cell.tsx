@@ -15,8 +15,14 @@ export function UsageCell({
   const paused = pausedUntil
     ? t("usagePausedUntil", {
         time: new Date(pausedUntil).toLocaleString(locale, {
-          dateStyle: "short",
-          timeStyle: "short",
+          // UTC on purpose: the quota window resets at UTC midnight, and a fixed zone keeps
+          // the server render and the browser's hydration identical.
+          timeZone: "UTC",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
         }),
       })
     : null;
