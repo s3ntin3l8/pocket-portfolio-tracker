@@ -14,9 +14,9 @@ export function UsageCell({
   const locale = useLocale();
   const paused = pausedUntil
     ? t("usagePausedUntil", {
-        time: new Date(pausedUntil).toLocaleTimeString(locale, {
-          hour: "2-digit",
-          minute: "2-digit",
+        time: new Date(pausedUntil).toLocaleString(locale, {
+          dateStyle: "short",
+          timeStyle: "short",
         }),
       })
     : null;

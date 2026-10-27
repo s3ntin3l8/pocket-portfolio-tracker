@@ -36,9 +36,16 @@ export async function listProviders(app: FastifyInstance) {
   const usage = await getProviderUsage();
   // Providers the circuit breaker is currently skipping (quota/rate limit), with when
   // they are retried — otherwise a tripped provider just looks idle.
-  const pausedUntil = new Map(
-    (await getMarketData()).getBlockedProviders().map((b) => [b.provider, b.until.toISOString()]),
-  );
+  // Informational only: if the provider chain can't be built, the page you use to fix the
+  // provider config must still load.
+  let pausedUntil = new Map<string, string>();
+  try {
+    pausedUntil = new Map(
+      (await getMarketData()).getBlockedProviders().map((b) => [b.provider, b.until.toISOString()]),
+    );
+  } catch {
+    // no paused hints
+  }
 
   return resolveProviderConfig(rows, PROVIDER_REGISTRY, credentials).map((p) => {
     const cred = credMap.get(p.id);
