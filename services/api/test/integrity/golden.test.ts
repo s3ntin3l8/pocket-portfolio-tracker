@@ -19,6 +19,7 @@ import { degraded, degradedExpected } from "./ledgers/degraded.js";
 import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
 import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
 import { history, historyExpected } from "./ledgers/history.js";
+import { income, incomeExpected } from "./ledgers/income.js";
 import { merger, mergerExpected } from "./ledgers/merger.js";
 import { mixedBoundary, mixedBoundaryExpected } from "./ledgers/mixed-boundary.js";
 import { deTaxSlice, deTaxSliceExpected } from "./ledgers/de-tax-slice.js";
@@ -443,6 +444,48 @@ describe("history", () => {
       expectDecimal(b[i]!.netWorth, e.netWorth, `${e.date} netWorth`);
       expectDecimal(b[i]!.marketValue, e.marketValue, `${e.date} marketValue`);
     }
+  });
+});
+
+describe("income", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(income.asOf) });
+    l = await loadLedger(app, sign, income);
+  }, 60_000);
+
+  it("the summary counts dividend (net of fee) + interest + bonus − the tax debit", async () => {
+    const s = await get(l, `/portfolios/${l.portfolioIds.depot}/summary`);
+    expectDecimal(s.totalIncome, incomeExpected.total, "totalIncome");
+    expectDecimal(s.gain.income, incomeExpected.total, "gain.income");
+  });
+
+  it("the Income page's totals are the same figure (#1167), per year and per month", async () => {
+    const i = await get(l, `/portfolios/${l.portfolioIds.depot}/income`);
+    expectDecimal(i.lifetimeTotal, incomeExpected.total, "lifetimeTotal");
+    expect(i.paymentCount).toBe(incomeExpected.paymentCount);
+    expect(i.byYear).toMatchObject(incomeExpected.byYear);
+    expect(
+      i.monthly.map((m: { month: string; total: string }) => [m.month, Number(m.total)]),
+    ).toEqual(incomeExpected.monthly.map((m) => [m.month, Number(m.total)]));
+    expectDecimal(i.thisYear, incomeExpected.total, "thisYear");
+    expectDecimal(i.ttm, incomeExpected.total, "ttm");
+  });
+
+  it("splits the total into the dividend (equity) and cash income, which add up to it", async () => {
+    const i = await get(l, `/portfolios/${l.portfolioIds.depot}/income`);
+    const byClass = Object.fromEntries(
+      i.byAssetClass.map((c: { assetClass: string; total: string }) => [c.assetClass, c.total]),
+    );
+    expectDecimal(byClass.equity, incomeExpected.byClass.equity, "equity");
+    expectDecimal(byClass.cash, incomeExpected.byClass.cash, "cash");
+  });
+
+  it("keeps the per-instrument bars about securities: the dividend is 100% of them", async () => {
+    const i = await get(l, `/portfolios/${l.portfolioIds.depot}/income`);
+    expect(i.byInstrument).toHaveLength(1);
+    expectDecimal(i.byInstrument[0].total, incomeExpected.byInstrumentTotals[0]!, "STOCK");
+    expect(i.byInstrument[0].pct).toBe(1);
   });
 });
 

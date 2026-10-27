@@ -2559,7 +2559,7 @@ describe("auth + portfolios + transactions", () => {
     });
   });
 
-  it("surfaces cash interest as a separate subtotal without polluting dividend totals", async () => {
+  it("counts cash interest in the income totals and still shows it as a subtotal", async () => {
     const { fxRates } = await import("@portfolio/db");
     const t = await token("income-interest-user");
     await app.inject({ method: "GET", url: "/me", headers: auth(t) }); // upsert
@@ -2656,16 +2656,23 @@ describe("auth + portfolios + transactions", () => {
         currency: "EUR",
       });
 
-      // The dividend headline is untouched by interest.
-      expect(body.thisYear).toBe("246.72");
-      expect(body.ttm).toBe("246.72");
-      expect(body.lifetimeTotal).toBe("246.72");
-      expect(body.byYear).toEqual([{ year: "2026", total: "246.72", paymentCount: 1 }]);
-      expect(body.byCurrency).toEqual([
-        { currency: "EUR", totalNative: "246.72", totalNormalized: "246.72" },
-      ]);
+      // The headline is the one income figure (#1167): dividend + all interest = 246.72 + 42.04.
+      expect(body.thisYear).toBe("288.76");
+      expect(body.ttm).toBe("288.76");
+      expect(body.lifetimeTotal).toBe("288.76");
+      expect(body.byYear).toEqual([{ year: "2026", total: "288.76", paymentCount: 4 }]);
+      // EUR: dividend 246.72 + interest 20 + 13.04; USD: the 10.00 interest, 9.00 in EUR.
+      expect(body.byCurrency).toEqual(
+        expect.arrayContaining([
+          { currency: "EUR", totalNative: "279.76", totalNormalized: "279.76" },
+          { currency: "USD", totalNative: "10", totalNormalized: "9" },
+        ]),
+      );
+      // The per-instrument bars stay about securities: the dividend alone is 100% of them.
+      expect(body.byInstrument).toHaveLength(1);
+      expect(body.byInstrument[0]).toMatchObject({ total: "246.72", pct: 1 });
 
-      // No interest row leaks into the dividend/coupon event log.
+      // No interest row leaks into the dividend/coupon payment log.
       expect(body.events).toHaveLength(1);
       expect(body.events.some((e: { type: string }) => e.type === "interest")).toBe(false);
     }

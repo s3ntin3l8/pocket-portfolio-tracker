@@ -1440,6 +1440,7 @@
     "integrityRule_VALUED_AT_COST_NO_GAIN": "Kepemilikan yang dinilai pada biaya seharusnya tidak menunjukkan keuntungan.",
     "integrityRule_CONTRIB_PARITY": "Halaman Tabungan seharusnya menampilkan setoran bersih yang sama dengan rincian keuntungan.",
     "integrityRule_REALIZED_PARITY": "Log transaksi seharusnya menampilkan keuntungan terealisasi yang sama dengan ringkasan.",
+    "integrityRule_INCOME_PARITY": "Halaman Pendapatan seharusnya menampilkan total pendapatan yang sama dengan ringkasan.",
     "integrityRule_ANOMALY_UNION": "Peringatan semua portofolio seharusnya gabungan peringatan tiap portofolio.",
     "integrityRule_HISTORY_ORDERED": "Grafik riwayat seharusnya memiliki satu titik per hari, berurutan.",
     "integrityRule_HISTORY_SUMS_PORTFOLIOS": "Kekayaan bersih pada grafik riwayat seharusnya sama dengan jumlah riwayat portofolio.",

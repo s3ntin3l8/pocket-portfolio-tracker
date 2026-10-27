@@ -119,7 +119,12 @@ async function collectParity(
     `${base}/contributions`,
   );
   const trades = needStrings(tradesBody, ["displayCurrency", "totalRealized"], `${base}/trades`);
-  return { contributions, trades, anomalies: anomaliesBody as ParityBodies["anomalies"] };
+  const income = needStrings(
+    await get(`${base}/income`),
+    ["displayCurrency", "lifetimeTotal"],
+    `${base}/income`,
+  );
+  return { contributions, trades, income, anomalies: anomaliesBody as ParityBodies["anomalies"] };
 }
 
 /**

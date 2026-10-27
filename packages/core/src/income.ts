@@ -92,8 +92,27 @@ export interface IncomeStats {
   averagePerPayment: string;
 }
 
+/**
+ * Income that is not a payment from an instrument: account interest, a broker bonus, and the
+ * standalone tax debit (the Vorabpauschale) that reduces income. `amount` is the signed net
+ * `incomeFlow` of the row in `currency`.
+ */
+export interface OtherIncomeEntry {
+  type: string;
+  amount: string;
+  currency: string;
+  executedAt: Date;
+}
+
 export interface AggregateIncomeInput {
   events: IncomeEntry[];
+  /**
+   * Non-instrument income, counted in every TOTAL (lifetime, per year/month, trailing year, this
+   * and last year, per currency, the "cash" class) so that the page agrees with the summary's
+   * income, but never in the per-instrument bars, the yields or the dividend forecasts, which are
+   * about securities.
+   */
+  otherEvents?: OtherIncomeEntry[];
   displayCurrency: string;
   fx: FxRateFn;
   now?: Date;
@@ -185,7 +204,35 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
     else if (e.executedAt.getUTCFullYear() === currentYear - 1) lastYear = lastYear.add(amount);
   }
 
-  const pct = (v: Decimal) => (lifetime.isZero() ? 0 : v.div(lifetime).toNumber());
+  // What the securities alone paid: the base the per-instrument bars are shares of (they must sum
+  // to 100%, whatever interest and bonuses sit beside them).
+  const securitiesLifetime = lifetime;
+  let otherCount = 0;
+  for (const e of input.otherEvents ?? []) {
+    const amount = new Decimal(convert(e.amount, e.currency, displayCurrency, fx));
+    const year = String(e.executedAt.getUTCFullYear());
+    lifetime = lifetime.add(amount);
+    // A tax debit reduces the totals but is not a payment: it is not counted as one.
+    const counts = e.type !== "tax";
+    if (counts) otherCount++;
+    const y = byYear.get(year) ?? { total: ZERO(), count: 0 };
+    byYear.set(year, { total: y.total.add(amount), count: y.count + (counts ? 1 : 0) });
+    const month = toMonthKey(e.executedAt);
+    byMonth.set(month, (byMonth.get(month) ?? ZERO()).add(amount));
+    byClass.set("cash", (byClass.get("cash") ?? ZERO()).add(amount));
+    const cur = byCurrency.get(e.currency) ?? { native: ZERO(), normalized: ZERO() };
+    byCurrency.set(e.currency, {
+      native: cur.native.add(e.amount),
+      normalized: cur.normalized.add(amount),
+    });
+    if (e.executedAt >= ttmStart) ttm = ttm.add(amount);
+    if (e.executedAt.getUTCFullYear() === currentYear) thisYear = thisYear.add(amount);
+    else if (e.executedAt.getUTCFullYear() === currentYear - 1) lastYear = lastYear.add(amount);
+  }
+
+  const pct = (v: Decimal) => (lifetime.lte(0) ? 0 : v.div(lifetime).toNumber());
+  const pctOfSecurities = (v: Decimal) =>
+    securitiesLifetime.lte(0) ? 0 : v.div(securitiesLifetime).toNumber();
   const deltaAbs = thisYear.sub(lastYear);
   const couponForecast = (input.forecastCoupons ?? []).reduce(
     (s, c) => s.add(convert(c.amount, c.currency, displayCurrency, fx)),
@@ -213,7 +260,7 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
   const forecastRestOfYear = restOfYearCouponSum.add(projectedDividendSum);
   const forecastFullYear = thisYear.add(forecastRestOfYear);
 
-  const count = events.length;
+  const count = events.length + otherCount;
 
   return {
     byYear: [...byYear.entries()]
@@ -238,7 +285,7 @@ export function aggregateIncome(input: AggregateIncomeInput): IncomeStats {
         name: v.name,
         displayName: v.displayName,
         total: v.total.toString(),
-        pct: pct(v.total),
+        pct: pctOfSecurities(v.total),
       }))
       .sort((a, b) => Number(b.total) - Number(a.total)),
     byAssetClass: [...byClass.entries()]

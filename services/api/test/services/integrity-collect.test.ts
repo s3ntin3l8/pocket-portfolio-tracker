@@ -26,6 +26,7 @@ function getter(
     networth?: Record<string, unknown>;
     portfolios?: unknown;
     trades?: unknown;
+    income?: unknown;
     history?: unknown;
   } = {},
 ) {
@@ -33,6 +34,9 @@ function getter(
     if (url.endsWith("/contributions")) return { displayCurrency: "EUR", netContributed: "100" };
     if (url.endsWith("/trades"))
       return over.trades ?? { displayCurrency: "EUR", totalRealized: "0" };
+    if (url.endsWith("/income")) {
+      return over.income ?? { displayCurrency: "EUR", lifetimeTotal: "0" };
+    }
     if (url.endsWith("/anomalies")) return { anomalies: [] };
     if (url.endsWith("/history?range=all")) {
       return over.history ?? [{ date: "2026-06-30", netWorth: "100", marketValue: "100" }];
@@ -86,12 +90,19 @@ describe("collectBodies", () => {
     const b = await collectBodies(getter());
     expect(b.networthParity.contributions.netContributed).toBe("100");
     expect(b.portfolios[0]!.parity.trades.totalRealized).toBe("0");
+    expect(b.portfolios[0]!.parity.income.lifetimeTotal).toBe("0");
     expect(b.portfolios[0]!.parity.anomalies.anomalies).toEqual([]);
   });
 
   it("names a missing field of a parity endpoint", async () => {
     await expect(collectBodies(getter({ trades: { displayCurrency: "EUR" } }))).rejects.toThrow(
       /\/trades: expected a string "totalRealized"/,
+    );
+  });
+
+  it("names a missing field of the income endpoint", async () => {
+    await expect(collectBodies(getter({ income: { displayCurrency: "EUR" } }))).rejects.toThrow(
+      /\/income: expected a string "lifetimeTotal"/,
     );
   });
 
