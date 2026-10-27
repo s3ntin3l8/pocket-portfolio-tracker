@@ -133,7 +133,7 @@ export class MarketDataService {
         if (candles.length > 0) {
           return opts.gapFillDays === undefined
             ? candles
-            : this.fillGaps(ref, candles, providers.slice(i + 1), opts.gapFillDays);
+            : this.fillGaps(ref, candles, providers.slice(i + 1), opts.gapFillDays, fromDate);
         }
       } catch (err) {
         lastError = err;
@@ -160,12 +160,20 @@ export class MarketDataService {
    * `close` alone (sparklines) never see an FX-sized seam. A failing fallback is skipped and
    * reported through `onProviderError`; a fill that produced nothing is remembered for
    * `FILL_RETRY_MS` so a stale-but-alive feed isn't re-scraped on every call.
+   *
+   * A series that starts more than `minGapDays` after the requested `fromDate` has a
+   * leading hole too — a feed that only keeps recent history (or lost the older part of a
+   * line) would otherwise leave everything before its first candle unpriced, and the
+   * stored rows there never refreshed. The fallback is asked for it like any interior hole;
+   * an instrument that genuinely listed later simply yields nothing (memoized as an empty
+   * fill).
    */
   private async fillGaps(
     ref: InstrumentRef,
     primary: Candle[],
     fallbacks: MarketDataProvider[],
     minGapDays: number,
+    fromDate: string,
   ): Promise<Candle[]> {
     const merged = new Map(primary.map((c) => [c.date, c]));
     const today = new Date().toISOString().slice(0, 10);
@@ -173,7 +181,11 @@ export class MarketDataService {
     const fillRef = { ...ref, currency };
     for (const provider of fallbacks) {
       if (!provider.getHistoryFrom) continue;
-      const gaps = findGaps([...merged.keys()].sort(), today, minGapDays);
+      const dates = [...merged.keys()].sort();
+      const gaps = findGaps(dates, today, minGapDays);
+      if (dayDiff(fromDate, dates[0]!) > minGapDays) {
+        gaps.unshift({ from: fromDate, to: addDays(dates[0]!, -1) });
+      }
       if (gaps.length === 0) break;
       const memoKey = `${provider.name}|${ref.market}|${ref.symbol}|${gaps[0]!.from}|${currency}`;
       if ((this.emptyFills.get(memoKey) ?? 0) > Date.now()) continue;

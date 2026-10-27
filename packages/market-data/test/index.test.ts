@@ -526,6 +526,40 @@ describe("MarketDataService", () => {
       expect(candles.map((c) => c.date)).toEqual([...candles.map((c) => c.date)].sort());
     });
 
+    it("fills the stretch before the primary's first candle back to fromDate", async () => {
+      const calls: string[] = [];
+      const from = "2026-07-01";
+      const early: MarketDataProvider = {
+        name: "early",
+        supports: () => true,
+        getHistoryFrom: async (r, f) => {
+          calls.push(`${f}|${r.currency}`);
+          return ["2026-07-01", "2026-07-15", day(3)].map((date) => ({
+            date,
+            close: "7",
+            currency: r.currency,
+          }));
+        },
+      };
+      const svc = new MarketDataService([primary, early]);
+      const candles = await svc.getHistoryFrom(etf, from, { gapFillDays: 10 });
+      const byDate = new Map(candles.map((c) => [c.date, c]));
+      expect(byDate.get("2026-07-15")).toMatchObject({ close: "7", currency: "USD" });
+      expect(byDate.get(day(3))).toMatchObject({ close: "100", currency: "USD" }); // primary wins
+      expect(calls[0]).toBe(`${from}|USD`);
+    });
+
+    it("does not treat a short lead-in before the first candle as a gap", async () => {
+      const calls: string[] = [];
+      const svc = new MarketDataService([primary, fallback(calls)]);
+      // fromDate 5 days before the primary's first candle: within the window, no fill.
+      const from = new Date(Date.parse(`${day(1)}T00:00:00Z`) - 5 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      await svc.getHistoryFrom(etf, from, { gapFillDays: 10 });
+      expect(calls[0]).toBe(`${day(6)}|USD`);
+    });
+
     it("does nothing without gapFillDays or when the primary has no long hole", async () => {
       const calls: string[] = [];
       const svc = new MarketDataService([primary, fallback(calls)]);
