@@ -38,7 +38,8 @@ export interface ReconciliationGap {
     derived: string;
     diff: string;
     /** Change in the FEED `diff` since the previous sync (this sync's diff − the last one's;
-     * stored manual corrections shift both equally and never move it). The incremental guard: a stable standing gap never alarms, only a fresh divergence does.
+     * stored manual corrections shift both equally and never move it).
+     * The incremental guard: a stable standing gap never alarms, only a fresh divergence does.
      * Absent on the first sync (no prior baseline) and on older stored reconciliations. */
     driftSincePrev?: string;
   }[];
