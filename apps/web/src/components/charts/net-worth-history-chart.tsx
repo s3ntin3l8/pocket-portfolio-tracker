@@ -245,8 +245,11 @@ export function NetWorthHistoryChart({
 
   // Days where a portfolio had no snapshot and its last net worth was carried forward (#1172).
   // Only the value line plots net worth; the TWR line is chained on market value and unaffected.
+  // Gated on `dataFor === range` like the hero emit: while a range change is in flight `range`
+  // has flipped but `data` is still the previous series, whose count must not sit next to the
+  // new chip.
   const carriedDays =
-    !intraday && effectiveMode === "value"
+    !intraday && effectiveMode === "value" && dataFor === range
       ? data.filter(isDailyPoint).filter((p) => p.netWorthCarried === true).length
       : 0;
 
