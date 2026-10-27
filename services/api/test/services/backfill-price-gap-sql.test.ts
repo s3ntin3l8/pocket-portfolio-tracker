@@ -84,14 +84,23 @@ describe("priceGapRemains (SQL)", () => {
   it("agrees with findGaps over randomized series", async () => {
     let state = 12345;
     const rand = (n: number) => {
-      state = (state * 1103515245 + 12345) % 2 ** 31;
-      return state % n;
+      // Math.imul keeps the LCG in 32-bit integers (a plain product loses low bits in float64).
+      state = (Math.imul(state, 1103515245) + 12345) >>> 0;
+      return (state >>> 8) % n;
     };
+    const outcomes = new Set<boolean>();
     for (let k = 0; k < 40; k++) {
+      // Alternate dense (1-8 day steps, never a hole) and sparse (1-15 day steps, holes > 10
+      // days occur) series, so both answers come up.
+      const maxStep = k % 2 === 0 ? 8 : 15;
       const all: string[] = [];
-      for (let d = 0; d < 120; d++) if (rand(100) < 25 + rand(60)) all.push(day("2026-01-01", d));
+      for (let offset = rand(10); offset < 150; offset += 1 + rand(maxStep)) {
+        all.push(day("2026-01-01", offset));
+      }
+      const newest = all[all.length - 1]!;
       const fetchFrom = day("2026-01-01", rand(100));
-      const today = day("2026-01-01", 20 + rand(120));
+      // Mostly at/after the newest price so the trailing rule fires; sometimes before it.
+      const today = rand(4) === 0 ? day("2026-01-01", 20 + rand(130)) : day(newest, rand(14));
       const stored = all.filter((_, i) => i % 2 === 0);
       const fetched = all.filter((d, i) => i % 2 === 1 && d >= fetchFrom);
       const { db, id } = await seed(stored);
@@ -108,7 +117,10 @@ describe("priceGapRemains (SQL)", () => {
       expect(await priceGapRemains(db, id, fetchFrom, fetched, today), `series ${k}`).toBe(
         expected,
       );
+      outcomes.add(expected);
     }
+    // The differential must exercise both answers, or it can decay to all-false unnoticed.
+    expect(outcomes).toEqual(new Set([true, false]));
   });
 
   it("is false with no rows and no fetched dates", async () => {
