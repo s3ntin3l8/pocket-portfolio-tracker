@@ -161,22 +161,12 @@ export function netManualAdjustments(
       const delta = byCurrency.get(c.currency);
       if (!delta || delta.isZero()) return c;
       const derived = new Decimal(c.derived).add(delta);
-      const previousDiff = new Decimal(c.diff);
       const diff = new Decimal(c.reported).sub(derived).toFixed(2);
-      // The drift is "this sync's diff − the previous sync's diff". Folding a manual
-      // adjustment moves *this* sync's diff, so the drift has to move with it — otherwise
-      // the `reconciliation_drift` anomaly fires with a number that no longer matches the
-      // `diff` printed next to it.
-      const drift =
-        c.driftSincePrev == null
-          ? undefined
-          : new Decimal(c.driftSincePrev).plus(new Decimal(diff).minus(previousDiff)).toFixed(2);
-      return {
-        ...c,
-        derived: derived.toString(),
-        diff,
-        ...(drift === undefined ? {} : { driftSincePrev: drift }),
-      };
+      // `driftSincePrev` is deliberately left as stored: it is the sync-to-sync change of the
+      // FEED diff. A stored correction shifts this sync's diff and the previous sync's diff by
+      // the same amount, so it cancels out of the drift. Shifting the drift with the diff made
+      // an old correction look like a new divergence (a phantom `reconciliation_drift`).
+      return { ...c, derived: derived.toString(), diff };
     }),
   };
 }
