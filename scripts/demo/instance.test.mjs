@@ -1,5 +1,16 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  fstatSync,
+  openSync,
+  closeSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -39,6 +50,7 @@ let healthTimeoutMs;
 let parsePsRows;
 let descendantGroups;
 let signalGroup;
+let HANDOFF_FILE;
 
 beforeAll(async () => {
   scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
@@ -58,6 +70,7 @@ beforeAll(async () => {
     parsePsRows,
     descendantGroups,
     signalGroup,
+    HANDOFF_FILE,
   } = await import("./instance.mjs"));
 });
 
@@ -584,5 +597,96 @@ describe("healthTimeoutMs", () => {
 
   it.each(["0", "-5", "1.5", "abc", "1e400", String(2 ** 31)])("rejects %s", (value) => {
     expect(() => healthTimeoutMs(value)).toThrow(/positive integer/);
+  });
+});
+
+describe("startDemo clock and session hand-off", () => {
+  afterEach(() => rmSync(HANDOFF_FILE, { force: true }));
+
+  // Reads rather than stats, so the later writes are not a check-then-use of the same path.
+  const handoffPresent = () => {
+    try {
+      readFileSync(HANDOFF_FILE);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it("refuses a bad DEMO_NOW before creating anything", async () => {
+    for (const demoNow of [
+      "yesterday",
+      "2026-10-15",
+      "2026-10-15T10:00:00",
+      "2026-02-30T00:00:00Z",
+    ]) {
+      await expect(startDemo({ quiet: true, demoNow, boot: async () => {} })).rejects.toThrow(
+        /DEMO_NOW must be an ISO instant/,
+      );
+    }
+    expect(readdirSync(scratchRoot)).toEqual([]);
+  });
+
+  it("hands DEMO_NOW and the freeze preload to the seed, API and web, and only then", async () => {
+    const seen = {};
+    const boot = async (ctx) => {
+      for (const key of ["seedEnv", "apiEnv", "webEnv"]) seen[key] = ctx[key];
+    };
+    const demo = await startDemo({ quiet: true, demoNow: "2026-10-15T10:00:00Z", boot });
+    await demo.stop();
+    for (const env of Object.values(seen)) {
+      expect(env.DEMO_NOW).toBe("2026-10-15T10:00:00Z");
+      expect(env.NODE_OPTIONS).toMatch(/^--import file:\/\/.*\/scripts\/demo\/freeze-time\.mjs$/);
+    }
+    await startDemo({ quiet: true, demoNow: undefined, boot }).then((d) => d.stop());
+    for (const env of Object.values(seen)) {
+      expect(env.DEMO_NOW).toBeUndefined();
+      expect(env.NODE_OPTIONS).toBeUndefined();
+    }
+  });
+
+  it.each([
+    [false, "demo|pocket"],
+    [true, "local|demo@pocket.invalid"],
+  ])(
+    "writes .demo/instance.json (0600) while it runs, removes it on stop (login: %s)",
+    async (login, sub) => {
+      const boot = async (ctx) => writeFileSync(ctx.patFile, "pt_test-secret\n");
+      const demo = await startDemo({ quiet: true, login, handoff: true, boot });
+      // One open file for the mode and the content: no stat-then-read of the path.
+      const fd = openSync(HANDOFF_FILE, "r");
+      const info = JSON.parse(readFileSync(fd, "utf8"));
+      expect(fstatSync(fd).mode & 0o777).toBe(0o600);
+      closeSync(fd);
+      expect(info.webUrl).toBe(demo.webUrl);
+      expect(info.cookie.name).toBe("authjs.session-token");
+      // The cookie is for the user the seed creates, and carries the demo's PAT.
+      const { decode } = await import("next-auth/jwt");
+      const token = await decode({
+        token: info.cookie.value,
+        secret: demo.authSecret,
+        salt: info.cookie.name,
+      });
+      expect(token).toMatchObject({ sub, accessToken: "pt_test-secret" });
+      await demo.stop();
+      expect(handoffPresent()).toBe(false);
+    },
+    20_000,
+  );
+
+  it("writes nothing without handoff, and nothing when startup fails", async () => {
+    const demo = await startDemo({ quiet: true, boot: async () => {} });
+    expect(handoffPresent()).toBe(false);
+    await demo.stop();
+    mkdirSync(path.dirname(HANDOFF_FILE), { recursive: true });
+    writeFileSync(HANDOFF_FILE, "stale");
+    await expect(
+      startDemo({
+        quiet: true,
+        handoff: true,
+        boot: async () => Promise.reject(new Error("boom")),
+      }),
+    ).rejects.toThrow("boom");
+    expect(handoffPresent()).toBe(false);
   });
 });

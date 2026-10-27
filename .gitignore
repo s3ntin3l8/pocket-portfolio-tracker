@@ -69,3 +69,6 @@ apps/web/.ds-sync-css/
 .design-sync/learnings/
 .design-sync/node_modules
 landing-shots/
+
+# Session hand-off of a running `make demo` (scripts/demo/instance.mjs); removed on stop
+.demo/
