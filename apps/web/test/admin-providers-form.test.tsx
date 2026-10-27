@@ -170,7 +170,10 @@ describe("AdminProvidersForm", () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByText("20 / 20 today")).toBeInTheDocument();
-    expect(screen.getByText(/paused until Oct 28, 12:00 AM UTC/)).toBeInTheDocument();
+    // Not the whole ICU-rendered string (CLDR patterns shift): the day and the explicit zone.
+    const hint = screen.getByText(/paused until/);
+    expect(hint).toHaveTextContent("Oct 28");
+    expect(hint).toHaveTextContent("UTC");
   });
 
   it("shows '—' usage cell when usage is null", () => {
