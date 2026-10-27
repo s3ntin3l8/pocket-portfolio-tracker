@@ -294,7 +294,7 @@ describe("integrity rules", () => {
     expect(f!.message).toContain("2026-06-30");
   });
 
-  it("HISTORY_SUMS_PORTFOLIOS: a portfolio counts only on the dates it has a snapshot", () => {
+  it("HISTORY_SUMS_PORTFOLIOS: a portfolio counts from the date it first has a snapshot", () => {
     const b = bodies();
     b.portfolios.push({
       id: "p2",
@@ -309,9 +309,9 @@ describe("integrity rules", () => {
     expect(rules(b)).toContain("HISTORY_SUMS_PORTFOLIOS");
   });
 
-  it("HISTORY_SUMS_PORTFOLIOS: marketValue is not compared (the aggregate carries a gap leg forward)", () => {
-    // p1 has no row on the 29th; the aggregate carries its last marketValue forward by design,
-    // so it differs from the plain per-date sum while netWorth still equals it.
+  it("HISTORY_SUMS_PORTFOLIOS: a gap carries the portfolio's last netWorth forward, not a dip (#1172)", () => {
+    // p2 has a row on the 29th only; on the 30th it has none, so its 500 is carried and the
+    // aggregate is 1260 + 500. p1 has not started on the 29th, so it is not part of that point.
     const b = bodies();
     b.portfolios.push({
       id: "p2",
@@ -321,10 +321,12 @@ describe("integrity rules", () => {
     });
     b.portfolios[0]!.history = [{ date: "2026-06-30", netWorth: "1260", marketValue: "1260" }];
     b.networthHistory = [
-      { date: "2026-06-29", netWorth: "500", marketValue: "1700" }, // 500 + p1's 1200 carried
-      { date: "2026-06-30", netWorth: "1260", marketValue: "1260" },
+      { date: "2026-06-29", netWorth: "500", marketValue: "500" },
+      { date: "2026-06-30", netWorth: "1760", marketValue: "1760" },
     ];
     expect(rules(b)).not.toContain("HISTORY_SUMS_PORTFOLIOS");
+    b.networthHistory[1]!.netWorth = "1260"; // the old behaviour: the skipped portfolio drops out
+    expect(rules(b)).toContain("HISTORY_SUMS_PORTFOLIOS");
   });
 
   it("HISTORY_SUMS_PORTFOLIOS: a date only one side has is a finding", () => {

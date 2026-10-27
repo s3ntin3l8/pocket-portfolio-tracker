@@ -429,7 +429,15 @@ describe("history", () => {
   const points = (body: { date: string; netWorth: string; marketValue: string }[]) =>
     body.map((p) => ({ date: p.date, netWorth: p.netWorth, marketValue: p.marketValue }));
 
-  it("the aggregate netWorth sums each date's snapshots; a portfolio counts only where it has one, and a hole is not filled", async () => {
+  it("the aggregate netWorth carries a portfolio's last value over a hole, and flags that point (#1172)", async () => {
+    const raw = (await get(l, "/networth/history?range=all")) as {
+      date: string;
+      netWorthCarried?: boolean;
+    }[];
+    expect(raw.filter((p) => p.netWorthCarried).map((p) => p.date)).toEqual(["2026-06-27"]);
+  });
+
+  it("the aggregate netWorth sums each date's snapshots, a hole keeping the portfolio's last value", async () => {
     const agg = points(await get(l, "/networth/history?range=all"));
     expect(agg.map((p) => p.date)).toEqual(historyExpected.aggregateNetWorth.map((p) => p.date));
     for (const [i, e] of historyExpected.aggregateNetWorth.entries()) {

@@ -466,16 +466,36 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       const indexed = chainIndex(aggregated);
       const indexById = new Map(indexed.map((p) => [p.date, p]));
 
+      // Net worth per date follows the same rule as `marketValue` above: a portfolio with no
+      // snapshot on a date (e.g. the daily job skipped it for a missing FX rate) keeps its last
+      // known value from the day it first has one, instead of dropping out and making the chart
+      // dip by the whole portfolio (#1172). A point that carries a leg is flagged so the UI can
+      // disclose it.
       const nwByDate = new Map<string, Decimal>();
-      for (const r of rows) {
-        const fx = makeFxRateFn(ratesByDate.get(r.date) ?? {}, display);
-        const nw = convert(r.netWorth, r.currency, display, fx);
-        nwByDate.set(r.date, (nwByDate.get(r.date) ?? new Decimal(0)).add(nw));
+      const carriedDates = new Set<string>();
+      for (const [, pfRows] of perPortfolio) {
+        const own = new Map<string, Decimal>();
+        for (const r of pfRows) {
+          const fx = makeFxRateFn(ratesByDate.get(r.date) ?? {}, display);
+          own.set(
+            r.date,
+            (own.get(r.date) ?? new Decimal(0)).add(convert(r.netWorth, r.currency, display, fx)),
+          );
+        }
+        let last: Decimal | null = null;
+        for (const p of aggregated) {
+          const nw = own.get(p.date);
+          if (nw !== undefined) last = nw;
+          else if (last !== null) carriedDates.add(p.date);
+          const v = nw ?? last;
+          if (v !== null) nwByDate.set(p.date, (nwByDate.get(p.date) ?? new Decimal(0)).add(v));
+        }
       }
 
       const result = aggregated.map((p) => ({
         date: p.date,
         netWorth: (nwByDate.get(p.date) ?? new Decimal(0)).toFixed(),
+        ...(carriedDates.has(p.date) ? { netWorthCarried: true } : {}),
         marketValue: p.marketValue,
         // No TWR point for the date → no index and no percentage (audit R4-E5). The
         // fields are left off rather than carrying a fabricated "100"/"0".
