@@ -139,6 +139,21 @@ describe("estimateVorabRows", () => {
     expect(rows).toHaveLength(0);
   });
 
+  it("a booked row without a base does not suppress the estimate", () => {
+    const rows = run([
+      tx({ quantity: "10", price: "90", executedAt: new Date("2024-06-03") }),
+      tx({ type: "tax", kind: "vorabpauschale", executedAt: new Date("2026-01-27") }),
+      tx({
+        type: "tax",
+        kind: "vorabpauschale",
+        vorabBase: "0",
+        executedAt: new Date("2026-01-28"),
+      }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.estimated).toBe(true);
+  });
+
   it("a broker row dated late in the next year (not just January) still suppresses the estimate", () => {
     const rows = run([
       tx({ quantity: "10", price: "90", executedAt: new Date("2024-06-03") }),

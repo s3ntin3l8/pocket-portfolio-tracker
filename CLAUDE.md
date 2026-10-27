@@ -257,7 +257,7 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   (`packages/core/src/tax/vorab-estimate.ts`, loaded by `services/vorab-estimate.ts`) adds
   `estimated: true` accrual rows to every DE-regime trade log (Tax, Trades, Sparplan; boundary
   prices batched once per request via `loadVorabPrices`); a broker row for the same
-  (instrument, year) always wins, and a missing price/Basiszins means no row (never 0). The
+  (instrument, year) that carries a `vorabBase` always wins (a base-less one, e.g. TR CSV, doesn't), and a missing price/Basiszins means no row (never 0). The
   §18 Abs. 2 monthly reduction applies to the Vorabpauschale itself, after cap and
   distributions. See `docs/tax.md`.
 - **Freistellungsauftrag (FSA) has two levels, don't conflate them.** The legal

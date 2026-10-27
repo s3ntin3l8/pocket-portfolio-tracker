@@ -183,7 +183,11 @@ export async function materializeDrafts(
 
   // Instrument resolution may hit the network — it stays OUTSIDE the transaction so a slow
   // provider lookup never holds the portfolio lock.
-  const resolved = await resolveDraftInstruments(ctx, drafts, { isEu, euWhenIsin });
+  const resolved = await resolveDraftInstruments(ctx, drafts, {
+    isEu,
+    euWhenIsin,
+    portfolioId: targetPortfolioId,
+  });
 
   return ctx.db.transaction(async (tx) => {
     // Row-level lock on the portfolio — the same lock the confirm path takes. It

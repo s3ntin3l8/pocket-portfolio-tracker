@@ -176,4 +176,98 @@ describe("Trade Republic CSV import path", () => {
       await db.select().from(instruments).where(like(instruments.symbol, "Vorabpauschale%")),
     ).toEqual([]);
   });
+
+  const vorabCsv = (isin: string, txId: string) =>
+    [
+      HEADER,
+      `"2026-01-28T07:42:17.274Z","2026-01-28","DEFAULT","CASH","EARNINGS","FUND","","","","","0.000000","","-1.37","EUR","","","","Vorabpauschale for ISIN ${isin}","${txId}","","","",""`,
+    ].join("\n");
+
+  async function importVorab(
+    sub: string,
+    isin: string,
+    seed?: (portfolioId: string) => Promise<void>,
+  ) {
+    const t = await token(sub);
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: `TR ${sub}`, baseCurrency: "EUR" },
+      })
+    ).json().id as string;
+    await seed?.(portfolioId);
+    const imp = await app.inject({
+      method: "POST",
+      url: "/imports/csv",
+      headers: auth(t),
+      payload: {
+        content: vorabCsv(isin, `00000000-0000-0000-0000-0000000000${sub.length}9`),
+        format: "auto",
+      },
+    });
+    const { importId, drafts } = imp.json();
+    expect(drafts[0]).toMatchObject({ action: "tax", isin, kind: "vorabpauschale" });
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { portfolioId, transactions: drafts },
+    });
+    expect(confirm.statusCode).toBe(201);
+    const db = await ensureDb();
+    const rows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.portfolioId, portfolioId));
+    return { db, portfolioId, rows };
+  }
+
+  async function seedFund(isin: string, symbol: string) {
+    const db = await ensureDb();
+    const [inst] = await db
+      .insert(instruments)
+      .values({ symbol, market: "XETRA", assetClass: "etf", currency: "EUR", name: symbol, isin })
+      .returning();
+    return inst!;
+  }
+
+  it("links a Vorabpauschale row to a fund the portfolio already trades, creating nothing", async () => {
+    const isin = "IE00B3RBWM25";
+    const inst = await seedFund(isin, "VORABHELD");
+    const { db, rows } = await importVorab("tr-csv-vorab-held", isin, async (portfolioId) => {
+      await db_insertBuy(portfolioId, inst.id);
+    });
+    expect(rows.filter((r) => r.type === "tax")).toHaveLength(1);
+    expect(rows.find((r) => r.type === "tax")).toMatchObject({
+      instrumentId: inst.id,
+      kind: "vorabpauschale",
+      price: "1.37",
+    });
+    expect(await db.select().from(instruments).where(eq(instruments.isin, isin))).toHaveLength(1);
+  });
+
+  it("does not link to a fund that only exists for another portfolio", async () => {
+    const isin = "IE00B4L5Y983";
+    await seedFund(isin, "VORABOTHER");
+    const { rows } = await importVorab("tr-csv-vorab-other", isin);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ type: "tax", instrumentId: null });
+  });
+
+  async function db_insertBuy(portfolioId: string, instrumentId: string) {
+    const db = await ensureDb();
+    await db.insert(transactions).values({
+      portfolioId,
+      instrumentId,
+      type: "buy",
+      quantity: "1",
+      price: "100",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date("2025-06-01T10:00:00.000Z"),
+    });
+  }
 });

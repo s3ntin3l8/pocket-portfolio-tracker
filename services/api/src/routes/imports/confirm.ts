@@ -189,6 +189,7 @@ export function registerConfirmImportRoute(app: FastifyInstance) {
       const resolved = await resolveDraftInstruments(app, drafts, {
         isEu,
         euWhenIsin: imp.parser === "ai",
+        portfolioId: targetPortfolioId,
       });
 
       // Cross-source duplicate check (#196, hardened to a real backstop in #217, enrichment

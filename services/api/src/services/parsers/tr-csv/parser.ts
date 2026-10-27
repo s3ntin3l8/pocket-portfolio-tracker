@@ -164,9 +164,15 @@ export function parseTrCsv(content: string): CsvParseResult {
         fail("EARNINGS row missing tax");
         continue;
       }
+      const description = decodeName(get(cols.description));
+      // The fund is named only inside the booking text ("Vorabpauschale for ISIN <ISIN>").
+      // Carry it so confirm can link the row to a fund the portfolio already trades; it never
+      // creates an instrument (materialize-drafts/instruments.ts).
+      const fundIsin = description.match(/\bISIN\s+([A-Z]{2}[A-Z0-9]{9}[0-9])\b/)?.[1];
       candidate = {
         ...base,
-        name: decodeName(get(cols.description)) || name || "Vorabpauschale",
+        name: description || name || "Vorabpauschale",
+        ...(fundIsin ? { isin: fundIsin, kind: "vorabpauschale" } : {}),
         action: "tax",
         quantity: "0",
         price: formatDecimal(Math.abs(tax)),
