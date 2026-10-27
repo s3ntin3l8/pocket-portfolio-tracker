@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { instruments, transactions } from "@portfolio/db";
 import type { ParsedTransaction, AssetClass } from "@portfolio/schema";
 import {
@@ -80,7 +80,8 @@ export async function resolveDraftInstruments(
     // A standalone `tax` row (TR CSV Vorabpauschale: "no instrument leg", only a label in
     // `name`) is a cash debit, not a position — creating an instrument from its name would add
     // a junk symbol that every price job then tries to fetch. A tax draft that carries an
-    // ISIN/ticker is tied to that instrument and keeps resolving one.
+    // ISIN is link-only (second pass below: an instrument the portfolio already trades, never a
+    // new one); one with a ticker resolves an instrument as before.
     const linkOnly = d.action === "tax" && Boolean(d.isin) && !d.ticker;
     const isCash =
       linkOnly ||
@@ -152,7 +153,8 @@ export async function resolveDraftInstruments(
       const [inst] = await ctx.db
         .select({ id: instruments.id })
         .from(instruments)
-        .where(eq(instruments.isin, isin))
+        // Stored verbatim by findOrCreateInstrument, so compare case-insensitively.
+        .where(sql`upper(${instruments.isin}) = ${isin}`)
         .limit(1);
       if (!inst) continue;
       let held = batchIds.has(inst.id);

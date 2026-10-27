@@ -249,6 +249,59 @@ describe("Trade Republic CSV import path", () => {
     expect(await db.select().from(instruments).where(eq(instruments.isin, isin))).toHaveLength(1);
   });
 
+  it("links a Vorabpauschale row to a fund bought in the same import", async () => {
+    const isin = "IE00B5BMR087";
+    const t = await token("tr-csv-vorab-batch");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR Vorab batch", baseCurrency: "EUR" },
+      })
+    ).json().id as string;
+    const csv = [
+      HEADER,
+      `"2025-06-02T09:00:00.000Z","2025-06-02","DEFAULT","TRADING","BUY","FUND","Core S&amp;P 500 USD (Acc)","${isin}","1.0000000000","500.000000","-500.00","","","EUR","","","","","00000000-0000-0000-0000-0000000000b1","","","",""`,
+      `"2026-01-28T07:42:17.274Z","2026-01-28","DEFAULT","CASH","EARNINGS","FUND","","","","","0.000000","","-1.37","EUR","","","","Vorabpauschale for ISIN ${isin}","00000000-0000-0000-0000-0000000000b2","","","",""`,
+    ].join("\n");
+    const imp = await app.inject({
+      method: "POST",
+      url: "/imports/csv",
+      headers: auth(t),
+      payload: { content: csv, format: "auto" },
+    });
+    const { importId, drafts } = imp.json();
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { portfolioId, transactions: drafts },
+    });
+    expect(confirm.statusCode).toBe(201);
+    const db = await ensureDb();
+    const rows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.portfolioId, portfolioId));
+    const buy = rows.find((r) => r.type === "buy")!;
+    expect(buy.instrumentId).not.toBeNull();
+    expect(rows.find((r) => r.type === "tax")).toMatchObject({
+      instrumentId: buy.instrumentId,
+      kind: "vorabpauschale",
+    });
+  });
+
+  it("matches the ISIN case-insensitively against a stored instrument", async () => {
+    const isin = "IE00BYX2JD69";
+    const inst = await seedFund(isin.toLowerCase(), "VORABLOWER");
+    const { rows } = await importVorab("tr-csv-vorab-lower", isin, async (portfolioId) => {
+      await db_insertBuy(portfolioId, inst.id);
+    });
+    expect(rows.find((r) => r.type === "tax")?.instrumentId).toBe(inst.id);
+  });
+
   it("does not link to a fund that only exists for another portfolio", async () => {
     const isin = "IE00B4L5Y983";
     await seedFund(isin, "VORABOTHER");

@@ -172,7 +172,10 @@ export function parseTrCsv(content: string): CsvParseResult {
       candidate = {
         ...base,
         name: description || name || "Vorabpauschale",
-        ...(fundIsin ? { isin: fundIsin, kind: "vorabpauschale" } : {}),
+        // The booking text stays visible on the row when no fund is linked.
+        description: description || undefined,
+        kind: "vorabpauschale",
+        ...(fundIsin ? { isin: fundIsin } : {}),
         action: "tax",
         quantity: "0",
         price: formatDecimal(Math.abs(tax)),
