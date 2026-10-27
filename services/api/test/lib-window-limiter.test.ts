@@ -15,6 +15,17 @@ describe("createWindowLimiter", () => {
     expect(l.hit("u")).toEqual({ ok: true }); // the first hit has aged out
   });
 
+  it("check() records nothing: only hit() uses up the allowance", () => {
+    let t = 0;
+    const l = createWindowLimiter({ max: 2, windowMs: 1000, now: () => t });
+    for (let i = 0; i < 3; i++) expect(l.check("u")).toEqual({ ok: true });
+    expect(l.hit("u")).toEqual({ ok: true });
+    expect(l.hit("u")).toEqual({ ok: true });
+    t = 200;
+    expect(l.check("u")).toEqual({ ok: false, retryAfterSec: 1 });
+    expect(l.hit("u").ok).toBe(false);
+  });
+
   it("a max of 0 refuses everything and waits the whole window", () => {
     const l = createWindowLimiter({ max: 0, windowMs: 5000, now: () => 0 });
     expect(l.hit("u")).toEqual({ ok: false, retryAfterSec: 5 });

@@ -2910,6 +2910,14 @@ export function createApiClient(config: ApiClientConfig) {
         opts?.force ? { force: true } : undefined,
       ),
 
+    // Re-run the price-history backfill for the caller's own portfolios (write-scoped).
+    triggerMyBackfill: (opts?: { retryDeadFeeds?: boolean }) =>
+      request<{ queued: boolean; retryDeadFeeds: boolean }>(
+        "POST",
+        "/me/jobs/backfill",
+        opts?.retryDeadFeeds ? { retryDeadFeeds: true } : undefined,
+      ),
+
     // Admin: user management (#486).
     getAdminUsers: () => request<AdminUser[]>("GET", "/admin/users"),
     adminRevokeUserTokens: (id: string) =>
