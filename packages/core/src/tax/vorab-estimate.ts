@@ -81,7 +81,9 @@ export function estimateVorabRows(input: VorabEstimateInput): CoreTransaction[] 
 
     const brokerYears = new Set<number>();
     for (const r of rows) {
-      if (r.type === "tax" && r.kind === "vorabpauschale") {
+      // Only a row with a base replaces the estimate: the trade log skips a base-less
+      // `vorabpauschale` row, so letting it win would leave the year with no accrual at all.
+      if (r.type === "tax" && r.kind === "vorabpauschale" && r.vorabBase && D(r.vorabBase).gt(0)) {
         brokerYears.add(brokerRowYear(r.executedAt));
       }
     }

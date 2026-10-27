@@ -615,7 +615,14 @@ describe("parseTrCsv", () => {
       name: "Vorabpauschale for ISIN IE00BK5BQT80",
     });
     expect(draft(23)?.tax).toBeUndefined();
-    expect(draft(23)?.isin).toBeUndefined();
+    // The fund is named only in the booking text: carried as the link, with the kind the
+    // tax readers key on. No `vorabBase` (the CSV has none), so it never replaces the estimate.
+    expect(draft(23)).toMatchObject({
+      isin: "IE00BK5BQT80",
+      kind: "vorabpauschale",
+      description: "Vorabpauschale for ISIN IE00BK5BQT80",
+    });
+    expect(draft(23)?.vorabBase).toBeUndefined();
   });
 
   it("auto-maps every leona.csv type — none fall through to a needs-review issue", () => {

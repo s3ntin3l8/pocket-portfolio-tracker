@@ -229,9 +229,12 @@ verified against the statute text):
 - **Deemed received** (Abs. 3) on the first working day of the next year
   (`vorabZuflussDate`: weekends skipped, e.g. 4 Jan 2027 for 2026), so the accrual lands in
   year Y+1's allowance figures — the same year a broker row would be dated.
-- **A broker row always wins:** if a `vorabpauschale` row is dated December Y or in January–November of Y+1
-  for the instrument, no estimate is made for Y. The next broker import therefore replaces the
-  estimate without any cleanup.
+- **A broker row with a base always wins:** if a `vorabpauschale` row that carries a `vorabBase` is dated
+  December Y or in January–November of Y+1 for the instrument, no estimate is made for Y. The next broker
+  import therefore replaces the estimate without any cleanup. A row without a base (the Trade Republic CSV
+  `EARNINGS` row has only the tax withheld) is a plain cash debit linked to the fund; it does not replace the
+  estimate, since the trade log would book no accrual for that year. The CSV row is linked by the ISIN in its
+  booking text, only to a fund the portfolio already trades; it never creates an instrument.
 - **No row rather than a wrong one:** a missing boundary price, a price quoted in another
   currency than the transactions, or a year without a Basiszins produces no estimate (and a
   logged warning) — never a zero or guessed base. Years before 2023 (no table) are not
