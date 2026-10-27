@@ -67,6 +67,28 @@ describe("NetWorthHistoryChart", () => {
     expect(getNetWorthHistory).not.toHaveBeenCalled();
   });
 
+  it("discloses carried-forward days on the value line, and not when none carry (#1189)", async () => {
+    const carried: PerformancePoint[] = [
+      { date: "2026-01-01", netWorth: "100" },
+      { date: "2026-01-02", netWorth: "150", netWorthCarried: true },
+      { date: "2026-01-03", netWorth: "160", netWorthCarried: true },
+    ];
+    const { unmount } = render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <NetWorthHistoryChart initial={carried} currency="IDR" />
+      </NextIntlClientProvider>,
+    );
+    // The default mode is Performance (TWR, unaffected): no note there.
+    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("radio", { name: "Value" }));
+    expect(await screen.findByText(/2 days include a carried-forward value/)).toBeInTheDocument();
+    unmount();
+
+    renderChart();
+    fireEvent.click(screen.getByRole("radio", { name: "Value" }));
+    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
+  });
+
   it("refetches the series when the range changes", async () => {
     renderChart();
     fireEvent.click(screen.getByRole("radio", { name: "3M" }));
