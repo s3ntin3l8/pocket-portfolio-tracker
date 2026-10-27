@@ -47,20 +47,41 @@ describe("NODE_ENV default is fail-closed", () => {
     // file, and @fastify/env reads cwd/.env. Plant one for this boot so the
     // assertion fails in CI if `dotenv:` goes back to `NODE_ENV !== "test"` —
     // that check is true the moment this test deletes NODE_ENV (#1154).
+    // One file descriptor for the read and the write: a separate existsSync
+    // check is a TOCTOU (CodeQL js/file-system-race).
     const envPath = path.resolve(".env");
-    const previous = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : null;
-    const planted =
-      previous == null
-        ? "NODE_ENV=development\n"
-        : /^\s*NODE_ENV\s*=/m.test(previous)
-          ? previous
-          : `${previous.replace(/\n?$/, "\n")}NODE_ENV=development\n`;
-    fs.writeFileSync(envPath, planted);
+    let created = false;
+    let fd: number;
     try {
-      expect(await patIsAdmin(undefined, "env-unset")).toBe(false);
+      fd = fs.openSync(
+        envPath,
+        fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_EXCL,
+        0o600,
+      );
+      created = true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+      fd = fs.openSync(envPath, fs.constants.O_RDWR);
+    }
+    try {
+      const previous = fs.readFileSync(fd, "utf8");
+      const planted =
+        previous.length === 0
+          ? "NODE_ENV=development\n"
+          : /^\s*NODE_ENV\s*=/m.test(previous)
+            ? previous
+            : `${previous.replace(/\n?$/, "\n")}NODE_ENV=development\n`;
+      fs.ftruncateSync(fd, 0);
+      fs.writeSync(fd, planted, 0, "utf8");
+      try {
+        expect(await patIsAdmin(undefined, "env-unset")).toBe(false);
+      } finally {
+        fs.ftruncateSync(fd, 0);
+        if (previous.length > 0) fs.writeSync(fd, previous, 0, "utf8");
+      }
     } finally {
-      if (previous == null) fs.rmSync(envPath, { force: true });
-      else fs.writeFileSync(envPath, previous);
+      fs.closeSync(fd);
+      if (created) fs.rmSync(envPath, { force: true });
     }
   });
 

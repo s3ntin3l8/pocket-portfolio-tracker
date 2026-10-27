@@ -6,7 +6,9 @@ import type { PickablePortfolio } from "../src/components/portfolio-picker";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
-const listDocuments = vi.fn(async () => [] as InboxDocument[]);
+const listDocuments = vi.fn(
+  async (_category?: string, _portfolioId?: string): Promise<InboxDocument[]> => [],
+);
 const uploadDocument = vi.fn(async () => ({ id: "doc1", duplicate: false }));
 const getDocumentUrl = vi.fn(async () => ({
   url: "https://x/doc.pdf",
@@ -194,7 +196,7 @@ describe("TaxReportsInbox", () => {
         storedAt: "2026-01-02T00:00:00.000Z",
       },
     ];
-    listDocuments.mockImplementation(async (_category: string, portfolioId?: string) =>
+    listDocuments.mockImplementation(async (_category?: string, portfolioId?: string) =>
       rows.filter((d) => d.portfolioId === portfolioId),
     );
     const { container } = renderInbox({
