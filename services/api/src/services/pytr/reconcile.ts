@@ -22,7 +22,8 @@ export interface CashReconciliation {
     reported: string;
     derived: string;
     diff: string;
-    /** Change in `diff` vs the previous sync's reconciliation (incremental drift guard).
+    /** Change in the FEED `diff` vs the previous sync's reconciliation (incremental drift
+     * guard). Never re-derived from stored corrections: they shift both syncs equally.
      * Absent on the first sync for a connection. */
     driftSincePrev?: string;
   }[];

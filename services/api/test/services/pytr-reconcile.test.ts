@@ -174,4 +174,24 @@ describe("netManualAdjustments", () => {
     );
     expect(codes).toEqual(["reconciliation_gap"]);
   });
+
+  it("still emits reconciliation_drift for a genuinely nonzero stored drift", () => {
+    const withDrift: ReconciliationGap = {
+      cash: [
+        {
+          currency: "EUR",
+          reported: "271.35",
+          derived: "304.31",
+          diff: "-32.96",
+          driftSincePrev: "-5.00",
+        },
+      ],
+    };
+    const result = netManualAdjustments(withDrift, [adjustmentTx({ price: "-26.70" })]);
+    expect(result.cash[0]).toMatchObject({ driftSincePrev: "-5.00" });
+    const codes = detectAnomalies([], [], { cashCounted: true, reconciliationGap: result }).map(
+      (a) => a.code,
+    );
+    expect(codes).toEqual(["reconciliation_gap", "reconciliation_drift"]);
+  });
 });
