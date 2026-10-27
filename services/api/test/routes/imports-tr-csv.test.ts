@@ -170,8 +170,8 @@ describe("Trade Republic CSV import path", () => {
       .from(transactions)
       .where(eq(transactions.portfolioId, portfolioId));
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ type: "tax", instrumentId: null });
-    // The label is the transaction's name, not a tradable instrument.
+    expect(rows[0]).toMatchObject({ type: "tax", instrumentId: null, price: "1.37" });
+    // No tradable instrument is created from the row's label.
     expect(
       await db.select().from(instruments).where(like(instruments.symbol, "Vorabpauschale%")),
     ).toEqual([]);
