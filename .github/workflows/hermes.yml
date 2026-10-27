@@ -82,7 +82,7 @@ jobs:
   on-demand-review:
     # Restrict to trusted commenters -- otherwise any user on a public repo could
     # post "@s3ntin3l8-hermes Review" and trigger a run that inherits HERMES_*
-    # secrets and executes on the self-hosted runner. Mirrors claude.yml's guard.
+    # secrets and executes on the self-hosted runner. Mirrors claude-code.yml's guard.
     if: >-
       github.event_name == 'issue_comment' &&
       github.actor != 's3ntin3l8-hermes[bot]' &&

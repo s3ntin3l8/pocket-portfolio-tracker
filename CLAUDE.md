@@ -366,8 +366,8 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
 **ci-node** at the root (so root scripts fan out via Turbo: lint, typecheck, build),
 plus two self-contained jobs — **test-python** (pytest over `services/api/python`, the
 vendored pytr extraction tests — not covered by ci-node) and **e2e** (the Playwright
-suite in `apps/web/e2e/`, which needs its own job because the shared reusable workflow is
-pinned by SHA in another repo and exposes no e2e input) — then two parallel
+suite in `apps/web/e2e/`, which needs its own job because the shared reusable workflow
+exposes no e2e input) — then two parallel
 **docker-publish** jobs (root `Dockerfile` → `@portfolio/api`, and `apps/web/Dockerfile`
 → `@portfolio/web`) once all three test jobs pass. `release-please.yml` mirrors the same
 two-image publish on releases. Tests run
@@ -381,19 +381,19 @@ Sharding + caching cut the job from ~5m30s to ~2m (live-validated via a smoke-te
 before adopting).
 Caller jobs invoking reusable workflows with write scopes **must declare a
 `permissions:` block** or the run fails at startup. `codeql`, `dependency-review`,
-`release-please`, `cleanup-ghcr` are also wired.
+`release-please`, `ghcr-cleanup` are also wired.
 
 `codeql` and `dependency-review` are gated on `github.event.repository.private == false`
 — they need GitHub Advanced Security, which is free on public repos but not private ones.
 The repo **is public** (confirmed 2026-07-16), so both are live on every PR, not
 conditionally skipped.
 
-Two more workflows are mention-triggered, not push/PR-triggered: **`claude.yml`** runs
+Two more workflows are mention-triggered, not push/PR-triggered: **`claude-code.yml`** runs
 Claude Code itself against `@claude`-mentioned issues/PR comments/reviews; **`hermes.yml`**
 runs an on-demand PR review bot on `@s3ntin3l8-hermes` comment mentions (guarded against
 re-triggering itself via `github.actor`, since a submitted review's body also matches the
 mention substring — see the in-file comment on the Claude→Hermes cascade, `.github#527`).
-`claude.yml` is a thin caller of the reusable `s3ntin3l8/.github/.github/workflows/claude-code.yml`
+`claude-code.yml` is a thin caller of the reusable `s3ntin3l8/.github/.github/workflows/claude-code.yml`
 (same `workflow_call` pattern as `hermes.yml`/`hermes-review.yml`) — the trusted-commenter
 gate, Node setup, and review-capable tool grants (including
 `mcp__github_inline_comment__create_inline_comment` for inline suggested edits, plus
