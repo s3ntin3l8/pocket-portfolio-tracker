@@ -10,7 +10,13 @@ import {
   transactions,
   users,
 } from "@portfolio/db";
+import {
+  MarketDataError,
+  MarketDataService,
+  type MarketDataProvider,
+} from "@portfolio/market-data";
 import { buildApp } from "../../src/app.js";
+import { invalidateMarketData, overrideMarketData } from "../../src/services/market-data.js";
 import { closeDb } from "../../src/db/client.js";
 import {
   getScrapedQuote,
@@ -126,6 +132,31 @@ describe("admin provider config", () => {
     expect(res.providers.find((p) => p.id === "yahoo")?.configured).toBe(true);
     // encryptionEnabled reflects whether DB_ENCRYPTION_KEY is set (not set in tests).
     expect(typeof res.encryptionEnabled).toBe("boolean");
+  });
+
+  it("GET /admin/providers reports a provider the circuit breaker is skipping as paused", async () => {
+    const quota: MarketDataProvider = {
+      name: "eodhd",
+      supports: () => true,
+      getQuote: async () => {
+        throw new MarketDataError("limit", "eodhd", 402);
+      },
+    };
+    const svc = new MarketDataService([quota]);
+    await svc.getQuote({ symbol: "VWCE", market: "XETRA", assetClass: "etf", currency: "EUR" });
+    overrideMarketData(svc);
+    try {
+      const t = await token("admin-paused", [ADMIN_GROUP]);
+      const res = await app.inject({ method: "GET", url: "/admin/providers", headers: auth(t) });
+      const providers = (res.json() as { providers: { id: string; pausedUntil: string | null }[] })
+        .providers;
+      const until = providers.find((p) => p.id === "eodhd")!.pausedUntil;
+      expect(until).not.toBeNull();
+      expect(new Date(until!).getTime()).toBeGreaterThan(Date.now());
+      expect(providers.find((p) => p.id === "yahoo")!.pausedUntil).toBeNull();
+    } finally {
+      invalidateMarketData();
+    }
   });
 
   it("rejects unauthenticated requests with 401", async () => {

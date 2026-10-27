@@ -80,6 +80,8 @@ export interface AdminProvider {
   priority: number;
   /** API usage/quota, when available for this provider. */
   usage?: AdminProviderUsage | null;
+  /** ISO time until which the circuit breaker skips this provider (quota/rate limit), or null. */
+  pausedUntil?: string | null;
   /** Whether an encrypted API key is stored in the DB (overrides the env key). */
   hasKey: boolean;
   /** Masked display of the DB key, e.g. "••••abc1", or null when no DB key is set. */

@@ -3,11 +3,35 @@
 import { useLocale, useTranslations } from "next-intl";
 import type { AdminProviderUsage } from "@portfolio/api-client";
 
-export function UsageCell({ usage }: { usage: AdminProviderUsage | null | undefined }) {
+export function UsageCell({
+  usage,
+  pausedUntil,
+}: {
+  usage: AdminProviderUsage | null | undefined;
+  pausedUntil?: string | null;
+}) {
   const t = useTranslations("Admin");
   const locale = useLocale();
+  const paused = pausedUntil
+    ? t("usagePausedUntil", {
+        time: new Date(pausedUntil).toLocaleString(locale, {
+          // UTC on purpose: the quota window resets at UTC midnight, and a fixed zone keeps
+          // the server render and the browser's hydration identical.
+          timeZone: "UTC",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZoneName: "short",
+        }),
+      })
+    : null;
   if (!usage || usage.used === null) {
-    return <span className="text-muted-foreground">—</span>;
+    return paused ? (
+      <span className="text-xs text-amber-600 dark:text-amber-400">{paused}</span>
+    ) : (
+      <span className="text-muted-foreground">—</span>
+    );
   }
   const window = {
     minute: t("usageMinute"),
@@ -23,6 +47,7 @@ export function UsageCell({ usage }: { usage: AdminProviderUsage | null | undefi
     <span className="text-xs tabular-nums text-muted-foreground">
       {text}
       {usage.source === "local" && ` (${t("usageLocalHint")})`}
+      {paused && <span className="text-amber-600 dark:text-amber-400"> · {paused}</span>}
     </span>
   );
 }

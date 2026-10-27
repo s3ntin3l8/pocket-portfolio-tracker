@@ -153,6 +153,30 @@ describe("AdminProvidersForm", () => {
     expect(screen.queryByRole("button", { name: messages.Admin.credentialSet })).toBeNull();
   });
 
+  it("shows a paused hint next to the usage while the circuit breaker is open", () => {
+    const paused: AdminProvider[] = [
+      provider({
+        id: "eodhd",
+        label: "EODHD",
+        priority: 1,
+        keySource: "env",
+        usage: { source: "provider", window: "day", used: 20, limit: 20 },
+        pausedUntil: "2026-10-28T00:00:00.000Z",
+      }),
+    ];
+    render(
+      <NextIntlClientProvider locale="en" messages={messages}>
+        <AdminProvidersForm client={STUB_CLIENT} initialProviders={paused} encryptionEnabled />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByText("20 / 20 today")).toBeInTheDocument();
+    // Not the whole ICU-rendered string (CLDR patterns shift): the day and the explicit zone.
+    const hint = screen.getByText(/paused until/);
+    expect(hint).toHaveTextContent("Oct 28");
+    expect(hint).toHaveTextContent("UTC");
+    expect(hint).toHaveTextContent(/\d{1,2}:\d{2}/); // an hour:minute, not just a date
+  });
+
   it("shows '—' usage cell when usage is null", () => {
     const providers: AdminProvider[] = [
       provider({ id: "yahoo", label: "Yahoo Finance", priority: 1, usage: null }),

@@ -10,7 +10,7 @@ import type {
   Quote,
 } from "./types.js";
 import { assetClassFromType, mapExchange } from "./instrument-mapping.js";
-import { isIsin, isWkn } from "./types.js";
+import { isIsin, isWkn, MarketDataError } from "./types.js";
 
 const MAX_SEARCH_RESULTS = 10;
 /** How long a gap-fill that produced nothing is not retried for the same instrument. */
@@ -20,6 +20,26 @@ const MAX_EMPTY_FILL_MEMO = 1000;
 const QUOTE_CONCURRENCY = 4;
 /** Provider failures tolerated per `getQuotes` run before it is skipped for the rest. */
 const PROVIDER_ERROR_BUDGET = 5;
+/** A 429 from a `quotaProbe` provider pauses it briefly; a 402 (daily quota) until the next UTC midnight. */
+const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
+/** Upper bound on how long a read path waits for a quota probe (the usage endpoint can be slow). */
+const QUOTA_PROBE_TIMEOUT_MS = 2000;
+/** How often a `quotaProbe` provider's usage endpoint is read. */
+const QUOTA_PROBE_INTERVAL_MS = 60 * 1000;
+
+/** Resolve to null instead of waiting out a slow usage endpoint. */
+function withProbeTimeout<T>(p: Promise<T>): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), QUOTA_PROBE_TIMEOUT_MS);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+
+function nextUtcMidnight(now: number): number {
+  const d = new Date(now);
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+}
 
 /** Optional instrumentation, e.g. to count API calls per provider for usage tracking. */
 export interface MarketDataServiceOptions {
@@ -44,6 +64,12 @@ export interface MarketDataServiceOptions {
 export class MarketDataService {
   /** Gap-fill attempts that added nothing → when they may be retried (see `fillGaps`). */
   private readonly emptyFills = new Map<string, number>();
+  /**
+   * Circuit breaker: provider name → epoch ms until which it is not called, and why. A
+   * usage probe may lift a quota block (headroom reappeared) but never a 429 cooldown.
+   */
+  private readonly blockedUntil = new Map<string, { until: number; reason: "quota" | "rate" }>();
+  private readonly lastProbeAt = new Map<string, number>();
 
   constructor(
     private readonly providers: MarketDataProvider[],
@@ -55,12 +81,95 @@ export class MarketDataService {
     return this.providers.find((p) => p.supports(assetClass, market)) ?? null;
   }
 
-  /** All providers supporting the asset class/market, in registration order. */
+  /** All providers supporting the asset class/market, in registration order (minus tripped ones). */
   private providersFor(assetClass: AssetClass, market: string): MarketDataProvider[] {
-    return this.providers.filter((p) => p.supports(assetClass, market));
+    return this.providers.filter((p) => p.supports(assetClass, market) && !this.isBlocked(p));
+  }
+
+  private isBlocked(provider: MarketDataProvider): boolean {
+    const block = this.blockedUntil.get(provider.name);
+    if (block === undefined) return false;
+    if (block.until > Date.now()) return true;
+    this.blockedUntil.delete(provider.name);
+    return false;
+  }
+
+  /** Providers currently skipped by the circuit breaker, with when they are retried. */
+  getBlockedProviders(): { provider: string; until: Date }[] {
+    return this.providers
+      .filter((p) => this.isBlocked(p))
+      .map((p) => ({ provider: p.name, until: new Date(this.blockedUntil.get(p.name)!.until) }));
+  }
+
+  /**
+   * Every provider failure goes through here: a quota signal trips the breaker so the
+   * provider isn't asked again — each wasted call burns the budget it just ran out of —
+   * then the usual `onProviderError` fires. HTTP 402 (daily limit) is unambiguous for any
+   * provider. A 429 is only a provider-wide pause for a `quotaProbe` provider (a hard
+   * plan cap); for the scraped/keyless endpoints it is the normal per-request throttle
+   * shape and must not remove the provider from every other instrument's lookup.
+   */
+  private providerFailed(provider: MarketDataProvider, method: string, err: unknown): void {
+    if (err instanceof MarketDataError && !this.isBlocked(provider)) {
+      const now = Date.now();
+      if (err.status === 402) {
+        this.blockedUntil.set(provider.name, { until: nextUtcMidnight(now), reason: "quota" });
+      } else if (err.status === 429 && provider.quotaProbe) {
+        this.blockedUntil.set(provider.name, {
+          until: now + RATE_LIMIT_COOLDOWN_MS,
+          reason: "rate",
+        });
+      }
+    }
+    this.opts.onProviderError?.(provider.name, method, err);
+  }
+
+  /**
+   * For providers whose usage endpoint is free and reports a hard daily cap (`quotaProbe`),
+   * stop calling them once `used >= limit` — before paying for the 402 — and resume as soon
+   * as the endpoint reports headroom again (e.g. purchased extra calls) — but never lifts a
+   * 429 cooldown early. Read at most once a minute per provider and bounded to
+   * `QUOTA_PROBE_TIMEOUT_MS` on the request path; a failed, slow or unparseable probe never
+   * blocks (fail open — the reactive 402 trigger in `providerFailed` is the backstop).
+   */
+  private async probeQuotas(): Promise<void> {
+    const now = Date.now();
+    await Promise.all(
+      this.providers.map(async (provider) => {
+        if (!provider.quotaProbe || !provider.getUsage) return;
+        if (now - (this.lastProbeAt.get(provider.name) ?? 0) < QUOTA_PROBE_INTERVAL_MS) return;
+        this.lastProbeAt.set(provider.name, now);
+        try {
+          const usage = await withProbeTimeout(provider.getUsage());
+          if (usage?.window !== "day" || usage.used == null || usage.limit == null) return;
+          if (usage.used >= usage.limit) {
+            if (!this.isBlocked(provider)) {
+              this.blockedUntil.set(provider.name, {
+                until: nextUtcMidnight(now),
+                reason: "quota",
+              });
+              this.opts.onProviderError?.(
+                provider.name,
+                "quota",
+                new MarketDataError(
+                  `daily quota exhausted (${usage.used}/${usage.limit})`,
+                  provider.name,
+                  402,
+                ),
+              );
+            }
+          } else if (this.blockedUntil.get(provider.name)?.reason === "quota") {
+            this.blockedUntil.delete(provider.name);
+          }
+        } catch {
+          // fail open
+        }
+      }),
+    );
   }
 
   async getQuote(ref: InstrumentRef): Promise<Quote | null> {
+    await this.probeQuotas();
     return this.getQuoteBudgeted(ref);
   }
 
@@ -82,7 +191,7 @@ export class MarketDataService {
       } catch (err) {
         budget?.set(provider.name, (budget.get(provider.name) ?? 0) + 1);
         // Surfaced even when a later provider succeeds (#749, audit D10).
-        this.opts.onProviderError?.(provider.name, "getQuote", err);
+        this.providerFailed(provider, "getQuote", err);
         // A failing/timing-out provider shouldn't block the fallback chain — try the next.
       }
     }
@@ -90,6 +199,7 @@ export class MarketDataService {
   }
 
   async getHistory(ref: InstrumentRef, range: string): Promise<Candle[]> {
+    await this.probeQuotas();
     let lastError: unknown;
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getHistory) continue;
@@ -102,7 +212,7 @@ export class MarketDataService {
         // The error is surfaced via onProviderError even when a later provider succeeds —
         // a primary Yahoo outage covered by a fallback is operationally important and
         // shouldn't be invisible (#749).
-        this.opts.onProviderError?.(provider.name, "getHistory", err);
+        this.providerFailed(provider, "getHistory", err);
         // A failing/timing-out provider shouldn't block the fallback chain — try the next.
       }
     }
@@ -123,6 +233,7 @@ export class MarketDataService {
     fromDate: string,
     opts: { allowMaxFallback?: boolean; gapFillDays?: number } = {},
   ): Promise<Candle[]> {
+    await this.probeQuotas();
     let lastError: unknown;
     const providers = this.providersFor(ref.assetClass, ref.market);
     for (const [i, provider] of providers.entries()) {
@@ -137,7 +248,7 @@ export class MarketDataService {
         }
       } catch (err) {
         lastError = err;
-        this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
+        this.providerFailed(provider, "getHistoryFrom", err);
         // A failing/timing-out provider shouldn't block the fallback chain — try the next.
       }
     }
@@ -197,7 +308,7 @@ export class MarketDataService {
           }
         }
       } catch (err) {
-        this.opts.onProviderError?.(provider.name, "getHistoryFrom", err);
+        this.providerFailed(provider, "getHistoryFrom", err);
         // A blocked/429 fallback is the normal failure shape of a scraped endpoint: back
         // off like an empty fill instead of re-asking on every call.
         added = 0;
@@ -211,6 +322,7 @@ export class MarketDataService {
   }
 
   async getDividends(ref: InstrumentRef, fromDate?: string): Promise<DividendEvent[]> {
+    await this.probeQuotas();
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getDividends) continue;
       try {
@@ -219,7 +331,7 @@ export class MarketDataService {
         if (events.length > 0) return events;
       } catch (err) {
         // One provider throwing must not abort the chain (audit D10).
-        this.opts.onProviderError?.(provider.name, "getDividends", err);
+        this.providerFailed(provider, "getDividends", err);
       }
     }
     return [];
@@ -232,6 +344,7 @@ export class MarketDataService {
    * countryWeights), so merging gives a complete picture.
    */
   async getProfile(ref: InstrumentRef): Promise<InstrumentProfile | null> {
+    await this.probeQuotas();
     const parts: InstrumentProfile[] = [];
     for (const provider of this.providersFor(ref.assetClass, ref.market)) {
       if (!provider.getProfile) continue;
@@ -239,8 +352,9 @@ export class MarketDataService {
         this.opts.onCall?.(provider.name);
         const profile = await provider.getProfile(ref);
         if (profile != null) parts.push(profile);
-      } catch {
-        // A failing provider shouldn't block the others.
+      } catch (err) {
+        // A failing provider shouldn't block the others (a quota error trips the breaker).
+        this.providerFailed(provider, "getProfile", err);
       }
     }
     if (parts.length === 0) return null;
@@ -276,6 +390,7 @@ export class MarketDataService {
    * keyless fallback's. A failing provider is skipped, never fatal.
    */
   async search(query: string): Promise<InstrumentSearchResult[]> {
+    await this.probeQuotas();
     const q = query.trim();
     if (!q) return [];
 
@@ -283,6 +398,7 @@ export class MarketDataService {
     // Track whether a WKN query resolved anything, so we can fall through to name search.
     let wknResolved = false;
     for (const provider of this.providers) {
+      if (this.isBlocked(provider)) continue;
       try {
         if (isIsin(q)) {
           if (!provider.resolveISIN) continue;
@@ -306,8 +422,9 @@ export class MarketDataService {
           const results = (await provider.search(q)) ?? [];
           collected.push(...results);
         }
-      } catch {
+      } catch (err) {
         // A provider that errors or times out shouldn't sink the whole lookup.
+        this.providerFailed(provider, "search", err);
       }
     }
 
@@ -375,10 +492,11 @@ export class MarketDataService {
    * cosmetic lookup — no market/currency gating.
    */
   async resolveName(query: string): Promise<string | null> {
+    await this.probeQuotas();
     const q = query.trim();
     if (!q) return null;
     for (const provider of this.providers) {
-      if (!provider.resolveName) continue;
+      if (!provider.resolveName || this.isBlocked(provider)) continue;
       try {
         this.opts.onCall?.(provider.name);
         const name = await provider.resolveName(q);
@@ -396,6 +514,7 @@ export class MarketDataService {
    * provider (audit D2).
    */
   async getQuotes(refs: Array<{ id: string; ref: InstrumentRef }>): Promise<Record<string, Quote>> {
+    await this.probeQuotas();
     const out: Record<string, Quote> = {};
     const budget = new Map<string, number>();
     let next = 0;

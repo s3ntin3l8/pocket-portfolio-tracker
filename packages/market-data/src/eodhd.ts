@@ -9,7 +9,7 @@ import type {
   ProviderUsage,
   Quote,
 } from "./types.js";
-import { isIsin } from "./types.js";
+import { isIsin, MarketDataError } from "./types.js";
 import {
   eodhdExchangeForMarket,
   mapExchange,
@@ -62,6 +62,20 @@ export class EodhdProvider implements MarketDataProvider {
     return eodhdExchangeForMarket(market) !== undefined;
   }
 
+  /** Daily-cap provider: `getUsage()` (the free `/user` call) is probed by the service. */
+  readonly quotaProbe = true;
+
+  /**
+   * 402 (daily limit exceeded) and 429 are quota signals, not "no data": throw so the
+   * service's circuit breaker stops asking, instead of every request paying a wasted call
+   * and the failure being swallowed as an empty result.
+   */
+  private assertNotQuota(res: Response, what: string): void {
+    if (res.status === 402 || res.status === 429) {
+      throw new MarketDataError(`EODHD ${what}: HTTP ${res.status}`, this.name, res.status);
+    }
+  }
+
   /** Build the `<code>.<exchange>` ticker, or null if the symbol can't be qualified. */
   private directTicker(ref: InstrumentRef): string | null {
     if (ref.symbol.includes(".")) return ref.symbol;
@@ -79,6 +93,7 @@ export class EodhdProvider implements MarketDataProvider {
     const res = await this.doFetch(
       `${this.baseUrl}/search/${encodeURIComponent(ref.isin)}?api_token=${this.apiKey}&fmt=json`,
     );
+    this.assertNotQuota(res, "search");
     let ticker: string | null = null;
     if (res.ok) {
       const hits = (await res.json()) as EodhdSearchHit[];
@@ -119,6 +134,7 @@ export class EodhdProvider implements MarketDataProvider {
       const res = await this.doFetch(
         `${this.baseUrl}/search/${encodeURIComponent(searchTerm)}?api_token=${this.apiKey}&fmt=json`,
       );
+      this.assertNotQuota(res, "search");
       if (res.ok) {
         const hits = (await res.json()) as EodhdSearchHit[];
         const match = (hits ?? []).find(
@@ -129,7 +145,8 @@ export class EodhdProvider implements MarketDataProvider {
           return match.Currency;
         }
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof MarketDataError) throw err; // quota: let the breaker see it
       // network error — fall through to ref.currency
     }
     // Cache the fallback so we don't keep retrying on every refresh tick.
@@ -166,6 +183,7 @@ export class EodhdProvider implements MarketDataProvider {
     const res = await this.doFetch(
       `${this.baseUrl}/div/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json&from=${from}`,
     );
+    this.assertNotQuota(res, "dividends");
     if (!res.ok) return [];
     const data = (await res.json()) as
       | {
@@ -202,6 +220,7 @@ export class EodhdProvider implements MarketDataProvider {
     const res = await this.doFetch(
       `${this.baseUrl}/real-time/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json`,
     );
+    this.assertNotQuota(res, "real-time");
     if (!res.ok) return null;
     const data = (await res.json()) as {
       close?: number | string;
@@ -261,6 +280,7 @@ export class EodhdProvider implements MarketDataProvider {
     const res = await this.doFetch(
       `${this.baseUrl}/fundamentals/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json&filter=General`,
     );
+    this.assertNotQuota(res, "fundamentals");
     if (!res.ok) return null;
     const data = (await res.json()) as {
       Sector?: string;
@@ -295,6 +315,7 @@ export class EodhdProvider implements MarketDataProvider {
     const res = await this.doFetch(
       `${this.baseUrl}/fundamentals/${encodeURIComponent(ticker)}?api_token=${this.apiKey}&fmt=json`,
     );
+    this.assertNotQuota(res, "fundamentals");
     if (!res.ok) return null;
     const data = (await res.json()) as {
       General?: { CountryName?: string };

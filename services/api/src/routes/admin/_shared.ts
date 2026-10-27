@@ -6,6 +6,7 @@ import {
   resolveCredentials,
   flushUsage,
   getProviderUsage,
+  getMarketData,
 } from "../../services/market-data.js";
 
 export async function listProviders(app: FastifyInstance) {
@@ -33,6 +34,21 @@ export async function listProviders(app: FastifyInstance) {
 
   await flushUsage();
   const usage = await getProviderUsage();
+  // Providers the circuit breaker is currently skipping (quota/rate limit), with when
+  // they are retried — otherwise a tripped provider just looks idle.
+  // Informational only: if the provider chain can't be built, the page you use to fix the
+  // provider config must still load.
+  let pausedUntil = new Map<string, string>();
+  try {
+    pausedUntil = new Map(
+      (await getMarketData()).getBlockedProviders().map((b) => [b.provider, b.until.toISOString()]),
+    );
+  } catch (err) {
+    // Still visible in the logs: a broken chain must not look like "nothing paused".
+    console.warn(
+      `[admin] could not read paused providers: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   return resolveProviderConfig(rows, PROVIDER_REGISTRY, credentials).map((p) => {
     const cred = credMap.get(p.id);
@@ -50,7 +66,15 @@ export async function listProviders(app: FastifyInstance) {
     const desc = PROVIDER_REGISTRY.find((d) => d.id === p.id);
     const keySource: "db" | "env" | null =
       hasKey || hasUrl ? "db" : desc?.keyEnvVar && process.env[desc.keyEnvVar] ? "env" : null;
-    return { ...p, hasKey, keyHint, hasUrl, keySource, usage: usage[p.id] ?? null };
+    return {
+      ...p,
+      hasKey,
+      keyHint,
+      hasUrl,
+      keySource,
+      usage: usage[p.id] ?? null,
+      pausedUntil: pausedUntil.get(p.id) ?? null,
+    };
   });
 }
 

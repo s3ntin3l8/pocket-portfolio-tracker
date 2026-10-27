@@ -209,6 +209,12 @@ export interface MarketDataProvider {
   /** Live API quota/usage from the provider, when it exposes a usage endpoint. */
   getUsage?(): Promise<ProviderUsage | null>;
   /**
+   * `true` when `getUsage()` is a free call that reports a hard daily cap (EODHD's `/user`):
+   * the service then probes it and stops calling the provider for the rest of the UTC day
+   * once the cap is reached, instead of paying a 402 round trip per request.
+   */
+  readonly quotaProbe?: boolean;
+  /**
    * Fetch historical + upcoming dividend events for an instrument.
    * `fromDate` (YYYY-MM-DD) limits the window; defaults to 2 years back.
    */

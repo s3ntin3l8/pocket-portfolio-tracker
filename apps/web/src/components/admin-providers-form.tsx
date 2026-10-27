@@ -200,7 +200,7 @@ export function AdminProvidersForm({
                             <ProviderKeySubline
                               provider={p}
                               encryptionEnabled={encryptionEnabled}
-                              usage={<UsageCell usage={p.usage} />}
+                              usage={<UsageCell usage={p.usage} pausedUntil={p.pausedUntil} />}
                               t={t}
                             />
                           </div>
