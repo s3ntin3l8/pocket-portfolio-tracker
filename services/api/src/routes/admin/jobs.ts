@@ -130,8 +130,14 @@ export function registerJobsRoutes(app: FastifyInstance) {
           : typeof body?.userId === "string"
             ? body.userId
             : undefined;
+      // Separate from `force` on purpose: a forced backfill does not re-ask a feed that is
+      // cooling down as dead (delisted/bankrupt symbols); this opts back in.
+      const retryDeadFeeds = Boolean(
+        query?.retryDeadFeeds === "1" || query?.retryDeadFeeds === "true" || body?.retryDeadFeeds,
+      );
       const payload: Record<string, unknown> = {
         ...(force ? { force: true } : {}),
+        ...(retryDeadFeeds ? { retryDeadFeeds: true } : {}),
         ...(userId ? { userId } : {}),
       };
 

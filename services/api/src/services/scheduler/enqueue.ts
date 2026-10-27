@@ -207,6 +207,7 @@ export async function enqueueBackfillInstrument(
         chunkStart: sub.chunkStart,
         chunkEnd: sub.chunkEnd,
         tailOnly: sub.tailOnly,
+        ...(sub.retryDeadFeeds ? { retryDeadFeeds: true } : {}),
       },
       { singletonKey: sub.backfillJobId },
     );

@@ -44,6 +44,9 @@ export interface BackfillResult {
   truncated: string[];
   /** Instruments for which no price candle could be found at all this run. */
   unpriced: string[];
+  /** Dead feeds not asked this run (cooling down, see `isDeadFeedCoolingDown`) — they stay
+   *  valued from their stored prices/cost, and this keeps "why is X unvalued" answerable. */
+  skippedDeadFeeds?: string[];
 }
 
 /**
@@ -75,6 +78,7 @@ export async function backfillPortfolioHistory(
 
   const truncated: string[] = [];
   const unpriced: string[] = [];
+  const skippedDeadFeeds: string[] = [];
   const rawPrices: RawPriceMap = new Map();
 
   const goldBuybackByMarket = new Map<string, string>();
@@ -190,6 +194,7 @@ export async function backfillPortfolioHistory(
     // A dead feed is not asked again until its cooldown lapses (any trigger, force included):
     // the stored prices are merged below, so skipping changes no valuation.
     if (!opts.retryDeadFeeds && isDeadFeedCoolingDown(instr, today)) {
+      skippedDeadFeeds.push(instr.id);
       continue;
     }
 
@@ -361,7 +366,7 @@ export async function backfillPortfolioHistory(
   const flowDateOf = await buildFlowDateFn(db, instrIds);
   const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf);
 
-  return { instruments: instrRows.length, days, truncated, unpriced };
+  return { instruments: instrRows.length, days, truncated, unpriced, skippedDeadFeeds };
 }
 
 /**

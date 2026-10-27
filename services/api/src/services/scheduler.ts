@@ -538,6 +538,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     const force = jobDatas.some((d) => Boolean(d?.force));
     const userId = jobDatas.find((d) => typeof d?.userId === "string")?.userId as
       string | undefined;
+    const retryDeadFeeds = jobDatas.some((d) => Boolean(d?.retryDeadFeeds));
     try {
       const result = await backfillStalePortfolios(
         getDb(),
@@ -546,8 +547,9 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         {
           force,
           userId,
-          enqueue: (portfolioId, fromDate, tailOnly) =>
-            enqueueBackfillPortfolio(portfolioId, fromDate, tailOnly),
+          retryDeadFeeds,
+          enqueue: (portfolioId, fromDate, tailOnly, retry) =>
+            enqueueBackfillPortfolio(portfolioId, fromDate, tailOnly, retry),
         },
       );
       if (result.enqueueFailed > 0) {

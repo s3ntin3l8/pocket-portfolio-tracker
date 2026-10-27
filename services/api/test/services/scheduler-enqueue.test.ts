@@ -110,6 +110,15 @@ describe("enqueueBackfillInstrument (#773)", () => {
     tailOnly: true,
   };
 
+  it("carries retryDeadFeeds into the job payload only when set", async () => {
+    const boss = new RecordingBoss();
+    setActiveBoss(boss as unknown as PgBoss);
+    await enqueueBackfillInstrument({ ...sub, retryDeadFeeds: true });
+    await enqueueBackfillInstrument({ ...sub, backfillJobId: "job-2" });
+    expect(boss.calls[0]!.data).toMatchObject({ retryDeadFeeds: true });
+    expect(boss.calls[1]!.data).not.toHaveProperty("retryDeadFeeds");
+  });
+
   it("returns false with no active boss", async () => {
     setActiveBoss(null);
     const result = await enqueueBackfillInstrument(sub);

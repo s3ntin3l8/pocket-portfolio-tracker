@@ -540,6 +540,37 @@ describe("admin provider config", () => {
     }
   });
 
+  it("POST /admin/jobs/backfill-stale-history/trigger forwards retryDeadFeeds separately from force", async () => {
+    const { setActiveBoss } = await import("../../src/services/scheduler/enqueue.js");
+    const sent: unknown[] = [];
+    setActiveBoss({
+      send: async (_name: string, data: unknown) => {
+        sent.push(data);
+        return "fake-job-id";
+      },
+    } as unknown as Parameters<typeof setActiveBoss>[0]);
+    try {
+      const t = await token("admin-jobs-retry-dead", [ADMIN_GROUP]);
+      const forced = await app.inject({
+        method: "POST",
+        url: "/admin/jobs/backfill-stale-history/trigger",
+        headers: auth(t),
+        payload: { force: true },
+      });
+      expect(forced.statusCode).toBe(200);
+      const retry = await app.inject({
+        method: "POST",
+        url: "/admin/jobs/backfill-stale-history/trigger",
+        headers: auth(t),
+        payload: { force: true, retryDeadFeeds: true },
+      });
+      expect(retry.statusCode).toBe(200);
+      expect(sent).toEqual([{ force: true }, { force: true, retryDeadFeeds: true }]);
+    } finally {
+      setActiveBoss(null);
+    }
+  });
+
   it("POST /admin/jobs/:name/trigger is forbidden for non-admins", async () => {
     const res = await app.inject({
       method: "POST",

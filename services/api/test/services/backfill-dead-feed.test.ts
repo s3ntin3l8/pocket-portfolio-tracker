@@ -121,6 +121,13 @@ describe("backfill — a dead feed is not asked again", () => {
       pf.id,
     );
     expect(calls).toEqual([]);
+    const result = await backfillPortfolioHistory(
+      db,
+      new MarketDataService([spyProvider(symbol, calls)]),
+      10_000,
+      pf.id,
+    );
+    expect(result.skippedDeadFeeds).toEqual([instr.id]);
     const snaps = await db
       .select()
       .from(portfolioSnapshots)

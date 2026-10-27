@@ -48,7 +48,18 @@ export interface SweepOptions {
    * the whole fan-out, so a swallowed send failure here must not be counted as `queued`).
    * Direct callers (tests, dev scripts) that omit this keep today's synchronous behavior.
    */
-  enqueue?: (portfolioId: string, fromDate?: string, tailOnly?: boolean) => Promise<boolean>;
+  enqueue?: (
+    portfolioId: string,
+    fromDate?: string,
+    tailOnly?: boolean,
+    retryDeadFeeds?: boolean,
+  ) => Promise<boolean>;
+  /**
+   * Ask the providers even for feeds cooling down as dead (see `isDeadFeedCoolingDown`).
+   * Deliberately separate from `force`: a forced re-backfill re-derives snapshots, it must
+   * not silently re-hit a delisted symbol. Set by an operator who knows the feed is back.
+   */
+  retryDeadFeeds?: boolean;
 }
 
 /** How far back the sweep looks for a hole in the MIDDLE of a held instrument's prices. */
@@ -347,19 +358,16 @@ export async function backfillStalePortfolios(
     const tailOnly = !needsFullHeal && Boolean(fromDate);
 
     if (opts.enqueue) {
-      const ok = await opts.enqueue(portfolioId, fromDate, tailOnly);
+      const ok = await opts.enqueue(portfolioId, fromDate, tailOnly, opts.retryDeadFeeds);
       if (ok) result.queued++;
       else result.enqueueFailed++;
       continue;
     }
 
-    const backfillResult = await backfillPortfolioHistory(
-      db,
-      marketData,
-      ttlMs,
-      portfolioId,
-      fromDate ? { fromDate, tailOnly } : {},
-    );
+    const backfillResult = await backfillPortfolioHistory(db, marketData, ttlMs, portfolioId, {
+      ...(fromDate ? { fromDate, tailOnly } : {}),
+      ...(opts.retryDeadFeeds ? { retryDeadFeeds: true } : {}),
+    });
     result.healed++;
     result.portfolios.push({ portfolioId, result: backfillResult });
   }
