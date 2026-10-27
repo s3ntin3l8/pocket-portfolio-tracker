@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { buildApp } from "../../src/app.js";
-import { closeDb } from "../../src/db/client.js";
+import { like, eq } from "drizzle-orm";
+import { instruments, transactions } from "@portfolio/db";
+import { closeDb, ensureDb } from "../../src/db/client.js";
 
 const ISSUER = "https://auth.test/o/p/";
 const AUDIENCE = "portfolio-tracker";
@@ -125,5 +127,53 @@ describe("Trade Republic CSV import path", () => {
       })
     ).json();
     expect(contrib.totalContributed).toBe("241.52");
+  });
+
+  it("books a Vorabpauschale (EARNINGS) row as a tax transaction with no instrument", async () => {
+    const t = await token("tr-csv-vorab-user");
+    await app.inject({ method: "GET", url: "/me", headers: auth(t) });
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "TR Vorab", baseCurrency: "EUR" },
+      })
+    ).json().id;
+    const csv = [
+      HEADER,
+      '"2026-01-28T07:42:17.274Z","2026-01-28","DEFAULT","CASH","EARNINGS","FUND","","","","","0.000000","","-1.37","EUR","","","","Vorabpauschale for ISIN IE00BK5BQT80","00000000-0000-0000-0000-000000000009","","","",""',
+    ].join("\n");
+
+    const imp = await app.inject({
+      method: "POST",
+      url: "/imports/csv",
+      headers: auth(t),
+      payload: { content: csv, format: "auto" },
+    });
+    expect(imp.statusCode).toBe(201);
+    const { importId, drafts } = imp.json();
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]).toMatchObject({ action: "tax" });
+
+    const confirm = await app.inject({
+      method: "POST",
+      url: `/imports/${importId}/confirm`,
+      headers: auth(t),
+      payload: { portfolioId, transactions: drafts },
+    });
+    expect(confirm.statusCode).toBe(201);
+
+    const db = await ensureDb();
+    const rows = await db
+      .select()
+      .from(transactions)
+      .where(eq(transactions.portfolioId, portfolioId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ type: "tax", instrumentId: null });
+    // The label is the transaction's name, not a tradable instrument.
+    expect(
+      await db.select().from(instruments).where(like(instruments.symbol, "Vorabpauschale%")),
+    ).toEqual([]);
   });
 });
