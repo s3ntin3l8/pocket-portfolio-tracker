@@ -17,6 +17,7 @@ export const RULE_IDS = [
   "VALUED_AT_COST_NO_GAIN",
   "CONTRIB_PARITY",
   "REALIZED_PARITY",
+  "INCOME_PARITY",
   "ANOMALY_UNION",
   "HISTORY_ORDERED",
   "HISTORY_SUMS_PORTFOLIOS",
@@ -118,6 +119,8 @@ export interface ParityBodies {
   contributions: { displayCurrency: string; netContributed: string };
   /** `/…/trades`: `totalRealized` is the valuation's `totalRealizedPnL`. */
   trades: { displayCurrency: string; totalRealized: string };
+  /** `/…/income`: `lifetimeTotal` is the valuation's `totalIncome` (one definition, #1167). */
+  income: { displayCurrency: string; lifetimeTotal: string };
   /** `/…/anomalies`. */
   anomalies: { anomalies: AnomalyBody[] };
 }
@@ -425,6 +428,28 @@ export function checkRealizedParity(b: IntegrityBodies, skip?: Skip): Finding[] 
 }
 
 /**
+ * The Income page's lifetime total is the valuation's `totalIncome`: both are `incomeFlow` summed
+ * over the same transactions (dividends, coupons, interest, bonus cash, net of fees and the
+ * standalone tax debit). Per-instrument views and yields are deliberately not compared: they are
+ * about securities only.
+ */
+export function checkIncomeParity(b: IntegrityBodies, skip?: Skip): Finding[] {
+  return scopes(b).flatMap(({ scope, v, parity }) => {
+    if (!sameCurrency(parity.income.displayCurrency, v.displayCurrency)) {
+      skip?.("INCOME_PARITY", scope, "currency_mismatch");
+      return [];
+    }
+    return compare(
+      "INCOME_PARITY",
+      scope,
+      "income lifetimeTotal differs from the valuation's totalIncome",
+      new Decimal(v.totalIncome),
+      new Decimal(parity.income.lifetimeTotal),
+    );
+  });
+}
+
+/**
  * What makes two anomalies the same one. `meta` is where same-code anomalies differ
  * (`negative_cash` per currency, `reconciliation_gap` per broker), so it is part of the key;
  * its keys are sorted so serialisation order cannot matter.
@@ -599,6 +624,7 @@ export const RULES: Record<RuleId, RuleFn> = {
   VALUED_AT_COST_NO_GAIN: checkValuedAtCostHasNoGain,
   CONTRIB_PARITY: checkContributionParity,
   REALIZED_PARITY: checkRealizedParity,
+  INCOME_PARITY: checkIncomeParity,
   ANOMALY_UNION: checkAnomalyUnion,
   HISTORY_ORDERED: checkHistoryOrdered,
   HISTORY_SUMS_PORTFOLIOS: checkHistorySumsPortfolios,

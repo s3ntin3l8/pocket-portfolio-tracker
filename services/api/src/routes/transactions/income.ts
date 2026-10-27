@@ -5,6 +5,7 @@ import {
   toDateKey,
   type CoreTransaction,
   aggregatePortfolios,
+  incomeFlow,
   INCOME_TYPES,
 } from "@portfolio/core";
 import { mapPool } from "../../lib/promise-pool.js";
@@ -98,7 +99,8 @@ export function registerIncomeRoutes(app: FastifyInstance) {
               displayName: im?.displayName ?? null,
               type: t.type,
               date: toDateKey(t.executedAt),
-              amount: t.price,
+              // Net cash amount, the same as the default response's events (`incomeFlow`).
+              amount: incomeFlow(t).toString(),
               currency: t.currency,
               perShare: null as string | null,
               quantity: null as string | null,

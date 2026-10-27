@@ -12,6 +12,7 @@ import {
   projectNextYearDividends,
   toDateKey,
   toMonthKey,
+  incomeFlow,
   type CoreTransaction,
   type PortfolioSummary,
   convert,
@@ -31,8 +32,12 @@ export async function buildIncomeStats(
   const now = new Date();
   const incomeTxns = coreTxns.filter((t) => t.type === "dividend" || t.type === "coupon");
   const interestTxns = coreTxns.filter((t) => t.type === "interest");
+  // Non-instrument income that still counts toward the totals (see `otherEvents` below).
+  const otherTxns = coreTxns.filter(
+    (t) => t.type === "interest" || t.type === "bonus_cash" || t.type === "tax",
+  );
 
-  const ccys = [...new Set([...incomeTxns, ...interestTxns].map((t) => t.currency))];
+  const ccys = [...new Set([...incomeTxns, ...otherTxns].map((t) => t.currency))];
   const rates = await getFxRates(app.db, ccys, display);
   // Income figures are pure sums: an amount with no FX rate is excluded (contributes 0)
   // and its currency reported as fxMissingCurrencies — never 1:1, never a failed request.
@@ -59,7 +64,9 @@ export async function buildIncomeStats(
         assetClass: im?.assetClass ?? null,
         type: t.type,
         date: toDateKey(t.executedAt),
-        price: t.price,
+        // The row's net cash amount (`incomeFlow`: per-unit rows scaled by quantity, minus fees):
+        // the same figure the summary's income is built from, so the two cannot disagree.
+        price: incomeFlow(t).toString(),
         currency: t.currency,
         executedAt: t.executedAt,
       };
@@ -73,7 +80,8 @@ export async function buildIncomeStats(
   const sumInterest = (rows: typeof interestTxns) =>
     rows
       .reduce(
-        (sum, t) => sum.plus(new Decimal(convert(t.price, t.currency, display, fx))),
+        (sum, t) =>
+          sum.plus(new Decimal(convert(incomeFlow(t).toString(), t.currency, display, fx))),
         new Decimal(0),
       )
       .toString();
@@ -295,8 +303,21 @@ export async function buildIncomeStats(
     ...futureAnnouncedNextYear.map((d) => ({ amount: d.amount, currency: d.currency })),
   ];
 
+  // Income that is not an instrument's payment: account interest, a broker bonus, and the
+  // standalone tax debit (Vorabpauschale) that reduces income. It belongs in the TOTALS, so this
+  // page agrees with the summary's income, but not in the per-instrument bars or the forecasts.
+  const otherEvents = otherTxns
+    .map((t) => ({
+      type: t.type,
+      amount: incomeFlow(t).toString(),
+      currency: t.currency,
+      executedAt: t.executedAt,
+    }))
+    .filter((e) => Number(e.amount) !== 0);
+
   const stats = aggregateIncome({
     events: enriched,
+    otherEvents,
     displayCurrency: display,
     fx,
     now,

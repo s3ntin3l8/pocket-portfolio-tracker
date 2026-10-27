@@ -795,3 +795,87 @@ describe("projectDividends — perShare and quantity fields", () => {
     expect(Number(result[0].quantity)).toBeCloseTo(10, 6);
   });
 });
+
+describe("aggregateIncome — non-instrument income (#1167)", () => {
+  // A 100 IDR dividend, 50 IDR of account interest, a EUR 10 broker bonus (= 170,000 IDR at the
+  // fixed rate) and a standalone tax debit of 20 IDR (it reduces income and is not a payment).
+  const dividend: IncomeEntry = {
+    instrumentId: "bbca",
+    symbol: "BBCA",
+    name: "BCA",
+    assetClass: "equity",
+    type: "dividend",
+    price: "100",
+    currency: "IDR",
+    executedAt: d("2026-03-01"),
+  };
+  const other = [
+    { type: "interest", amount: "50", currency: "IDR", executedAt: d("2026-04-01") },
+    { type: "bonus_cash", amount: "10", currency: "EUR", executedAt: d("2026-05-01") },
+    { type: "tax", amount: "-20", currency: "IDR", executedAt: d("2026-06-01") },
+  ];
+  const stats = aggregateIncome({
+    events: [dividend],
+    otherEvents: other,
+    displayCurrency: "IDR",
+    fx,
+    now: NOW,
+  });
+
+  it("counts it in every total, so the page agrees with the summary's income", () => {
+    expect(stats.lifetimeTotal).toBe("170130"); // 100 + 50 + 170000 - 20
+    expect(stats.thisYear).toBe("170130");
+    expect(stats.ttm).toBe("170130");
+    expect(stats.byYear).toEqual([{ year: "2026", total: "170130", paymentCount: 3 }]);
+    expect(stats.monthly).toEqual([
+      { month: "2026-03", total: "100" },
+      { month: "2026-04", total: "50" },
+      { month: "2026-05", total: "170000" },
+      { month: "2026-06", total: "-20" },
+    ]);
+  });
+
+  it("does not count a tax debit as a payment", () => {
+    expect(stats.paymentCount).toBe(3); // dividend, interest, bonus
+    // The average is of the three payments (100 + 50 + 170000) / 3, not of the total net of the
+    // tax debit: the debit is neither a payment nor part of the mean (170150 / 3 at 20 digits).
+    expect(stats.averagePerPayment).toBe("56716.666666666666667");
+  });
+
+  it("keeps the per-instrument bars about securities: shares of what they paid, summing to 100%", () => {
+    expect(stats.byInstrument).toHaveLength(1);
+    expect(stats.byInstrument[0]).toMatchObject({ symbol: "BBCA", total: "100", pct: 1 });
+  });
+
+  it("books the rest under the cash class, so the classes add up to the lifetime total", () => {
+    const by = Object.fromEntries(stats.byAssetClass.map((c) => [c.assetClass, c.total]));
+    expect(by).toEqual({ equity: "100", cash: "170030" }); // 50 + 170000 - 20
+  });
+
+  it("adds it to the per-currency totals in native and normalized terms", () => {
+    const idr = stats.byCurrency.find((c) => c.currency === "IDR");
+    const eur = stats.byCurrency.find((c) => c.currency === "EUR");
+    expect(idr).toMatchObject({ totalNative: "130", totalNormalized: "130" }); // 100 + 50 - 20
+    expect(eur).toMatchObject({ totalNative: "10", totalNormalized: "170000" });
+  });
+
+  it("is unchanged when there are none, and never feeds the dividend forecasts", () => {
+    const without = aggregateIncome({ events: [dividend], displayCurrency: "IDR", fx, now: NOW });
+    expect(without.lifetimeTotal).toBe("100");
+    // The run-rate forecast reads only dividends: interest and bonuses do not inflate it.
+    expect(stats.forecastNextYear).toBe(without.forecastNextYear);
+  });
+
+  it("does not divide by a non-positive total when tax debits outweigh income", () => {
+    const negative = aggregateIncome({
+      events: [],
+      otherEvents: [{ type: "tax", amount: "-5", currency: "IDR", executedAt: d("2026-02-01") }],
+      displayCurrency: "IDR",
+      now: NOW,
+    });
+    expect(negative.lifetimeTotal).toBe("-5");
+    expect(negative.byAssetClass).toEqual([{ assetClass: "cash", total: "-5", pct: 0 }]);
+    expect(negative.paymentCount).toBe(0);
+    expect(negative.averagePerPayment).toBe("0");
+  });
+});

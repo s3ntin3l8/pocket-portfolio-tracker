@@ -83,14 +83,12 @@ real data and is deliberately absent. A live figure is never compared with a sto
 | `VALUED_AT_COST_NO_GAIN`  | a holding valued at cost has no measured gain                                                                                                                                                                                                                                                                                                   |
 | `CONTRIB_PARITY`          | the Savings page's `netContributed` is `gain.netContributed`, on the same boundary (abstains if the endpoint answers in another currency)                                                                                                                                                                                                       |
 | `REALIZED_PARITY`         | the trade log's `totalRealized` is the valuation's `totalRealizedPnL` (both use the default average-cost method)                                                                                                                                                                                                                                |
+| `INCOME_PARITY`           | the Income page's `lifetimeTotal` is the valuation's `totalIncome`: both are `incomeFlow` summed over the same rows (dividends, coupons, interest, bonus cash, net of fees and the standalone tax debit). Per-instrument views, yields and forecasts are securities-only and not compared                                                       |
 | `ANOMALY_UNION`           | `/networth/anomalies` is the union of every portfolio's `/anomalies`, keyed by code, transaction, instrument and `meta`                                                                                                                                                                                                                         |
 | `HISTORY_ORDERED`         | every stored-snapshot series (`/networth/history`, `/portfolios/:id/history`) has strictly ascending, unique dates                                                                                                                                                                                                                              |
 | `HISTORY_SUMS_PORTFOLIOS` | the aggregate history's `netWorth` at a date is the plain sum of that date's portfolio snapshots (a portfolio counts only on dates it has one); only when every portfolio is already in the display currency, otherwise it abstains. `marketValue` is deliberately not compared: the aggregate carries a gap leg's last value forward by design |
 
-Deliberately absent: an Income-page parity rule (the Income page counts only dividend/coupon
-rows while the summary's income also includes interest, bonus cash and tax debits — a real
-inconsistency tracked in #1167 that would fire on any account with cash interest), and a
-Tax↔Trades Vorabpauschale rule (it depends on year, cost-basis method and the fund's
+Deliberately absent: a Tax↔Trades Vorabpauschale rule (it depends on year, cost-basis method and the fund's
 Teilfreistellung, so it stays a scenario test: `tax-vorab-estimate-surfaces.test.ts`).
 
 `collectBodies(get)` fetches what the rules read through any `get(url)`; it validates the

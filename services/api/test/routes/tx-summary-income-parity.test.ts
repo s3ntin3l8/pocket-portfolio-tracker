@@ -270,10 +270,12 @@ describe("transaction list summary — income parity with cashFlow() (audit B3/B
     });
     expect(income.statusCode).toBe(200);
     const body = income.json() as { lifetimeTotal: string; interest: { lifetime: string } };
-    // The Income page shows dividends/coupons ("Lifetime received") and interest on its
-    // own line; the list summary folds both into one Income figure.
-    const pageLifetime = new Decimal(body.lifetimeTotal).add(body.interest.lifetime);
-    expect(new Decimal(summary.totalIncome).toString()).toBe(pageLifetime.toString());
+    // One definition of income (#1167): the Income page's lifetime total is the list summary's
+    // figure itself, interest included; the interest line is a subtotal of it, not an addend.
+    expect(new Decimal(summary.totalIncome).toString()).toBe(
+      new Decimal(body.lifetimeTotal).toString(),
+    );
     expect(summary.totalIncome).toBe("440.4");
+    expect(body.interest.lifetime).toBe("9.4");
   });
 });

@@ -49,6 +49,7 @@ function parity(): ParityBodies {
   return {
     contributions: { displayCurrency: "EUR", netContributed: "960" },
     trades: { displayCurrency: "EUR", totalRealized: "140" },
+    income: { displayCurrency: "EUR", lifetimeTotal: "30" },
     anomalies: { anomalies: [{ code: "zero_price", transactionId: "t1" }] },
   };
 }
@@ -202,6 +203,24 @@ describe("integrity rules", () => {
     expect(rules(b)).not.toContain("REALIZED_PARITY");
   });
 
+  it("INCOME_PARITY: the Income page's lifetime total differs from the valuation's income", () => {
+    const b = bodies();
+    b.networthParity.income.lifetimeTotal = "18"; // e.g. interest and a tax debit left out (#1167)
+    const f = checkIntegrity(b).find((x) => x.rule === "INCOME_PARITY");
+    expect(f).toMatchObject({ scope: "networth", expected: "30", actual: "18" });
+  });
+
+  it("INCOME_PARITY: abstains when the endpoint is in another currency", () => {
+    const b = bodies();
+    b.networthParity.income = { displayCurrency: "USD", lifetimeTotal: "1" };
+    expect(rules(b)).not.toContain("INCOME_PARITY");
+    expect(runIntegrity(b).abstentions).toContainEqual({
+      rule: "INCOME_PARITY",
+      scope: "networth",
+      reason: "currency_mismatch",
+    });
+  });
+
   it("REALIZED_PARITY: the trade log's realized total differs from the valuation's", () => {
     const b = bodies();
     b.networthParity.trades.totalRealized = "139";
@@ -351,6 +370,7 @@ describe("integrity rules", () => {
         ...parity(),
         contributions: { displayCurrency: "EUR", netContributed: "1" }, // not CAD: not comparable
         trades: { displayCurrency: "EUR", totalRealized: "1" },
+        income: { displayCurrency: "EUR", lifetimeTotal: "1" },
       },
       history: null,
     });
@@ -362,6 +382,7 @@ describe("integrity rules", () => {
         { rule: "NW_SUM_PORTFOLIOS", scope: "networth", reason: "no_fx_rate" },
         { rule: "CONTRIB_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
         { rule: "REALIZED_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
+        { rule: "INCOME_PARITY", scope: "portfolio:p2", reason: "currency_mismatch" },
         // The foreign currency, not the (consequent) missing series, is the reason given: by
         // both history rules, so one cause is not explained two ways.
         { rule: "HISTORY_SUMS_PORTFOLIOS", scope: "networth", reason: "foreign_currency" },

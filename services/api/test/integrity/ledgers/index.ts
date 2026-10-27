@@ -15,6 +15,7 @@ import { deTaxSlice } from "./de-tax-slice.js";
 import { merger } from "./merger.js";
 import { mixedBoundary } from "./mixed-boundary.js";
 import { history } from "./history.js";
+import { income } from "./income.js";
 
 /** Every golden ledger; the invariant suite must hold on all of them. */
 export const allLedgers: Ledger[] = [
@@ -35,4 +36,5 @@ export const allLedgers: Ledger[] = [
   merger,
   mixedBoundary,
   history,
+  income,
 ];
