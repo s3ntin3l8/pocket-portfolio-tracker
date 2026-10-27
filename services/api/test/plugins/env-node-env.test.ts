@@ -53,6 +53,8 @@ describe("NODE_ENV default is fail-closed", () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ppt-env-"));
     const previousCwd = process.cwd();
     try {
+      // process.chdir throws ERR_WORKER_UNSUPPORTED_OPERATION under Vitest's
+      // threads pool. The repo doesn't pin `pool`; this relies on the forks default.
       process.chdir(dir);
       fs.writeFileSync(path.join(dir, ".env"), "NODE_ENV=development\n", {
         flag: "wx",

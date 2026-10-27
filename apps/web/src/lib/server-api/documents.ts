@@ -25,6 +25,9 @@ export async function resolveInboxScope(): Promise<{
   } catch {
     // A scope we couldn't read must not fall open to every portfolio. An empty
     // id list is the closed scope: nothing to list, nothing to upload into.
+    // That is the same shape as a scope that genuinely has no portfolios. Right
+    // for #1155; a status on this result is where to tell them apart if an
+    // empty inbox behind a broken API ever reads wrong.
     return { portfolios: [], portfolioIds: [] };
   }
 }
