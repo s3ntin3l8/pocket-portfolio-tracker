@@ -660,6 +660,9 @@ describe("ai-tools", () => {
       summary.holdings.pop();
     }
     expect(byName("get_holdings").description).toMatch(/valuedAtCostPartial/);
+    // The basis note appended to the headline tools names the case too.
+    expect(byName("get_net_worth").description).toMatch(/valuedAtCostPartial/);
+    expect(byName("get_portfolio_summary").description).toMatch(/valuedAtCostPartial/);
   });
 
   it("holdings are sorted by value, flag valuedAtCost, and drop lots/sparkline", async () => {
