@@ -170,7 +170,7 @@ describe("AdminProvidersForm", () => {
       </NextIntlClientProvider>,
     );
     expect(screen.getByText("20 / 20 today")).toBeInTheDocument();
-    expect(screen.getByText(/paused until \d/)).toBeInTheDocument();
+    expect(screen.getByText(/paused until Oct 28, 12:00 AM UTC/)).toBeInTheDocument();
   });
 
   it("shows '—' usage cell when usage is null", () => {
