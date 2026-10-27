@@ -125,6 +125,18 @@ describe("collectBodies", () => {
     expect(b.portfolios[0]!.history).toBeNull();
   });
 
+  it("keeps the aggregate history's netWorthCarried flag", async () => {
+    const b = await collectBodies(
+      getter({
+        history: [
+          { date: "2026-06-29", netWorth: "1", marketValue: "1" },
+          { date: "2026-06-30", netWorth: "2", marketValue: "2", netWorthCarried: true },
+        ],
+      }),
+    );
+    expect(b.networthHistory.map((p) => p.netWorthCarried)).toEqual([undefined, true]);
+  });
+
   it("names a malformed history point", async () => {
     await expect(
       collectBodies(getter({ history: [{ date: "2026-06-30", netWorth: "1" }] })),

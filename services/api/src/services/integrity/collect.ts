@@ -96,7 +96,13 @@ function asHistory(body: unknown, what: string): HistoryPoint[] {
   }
   return body.map((pt, i) => {
     const v = needStrings(pt, ["date", "netWorth", "marketValue"], `${what}[${i}]`);
-    return { date: v.date, netWorth: v.netWorth, marketValue: v.marketValue };
+    const carried = (pt as { netWorthCarried?: unknown }).netWorthCarried === true;
+    return {
+      date: v.date,
+      netWorth: v.netWorth,
+      marketValue: v.marketValue,
+      ...(carried ? { netWorthCarried: true } : {}),
+    };
   });
 }
 

@@ -324,9 +324,31 @@ describe("integrity rules", () => {
       { date: "2026-06-29", netWorth: "500", marketValue: "500" },
       { date: "2026-06-30", netWorth: "1760", marketValue: "1760" },
     ];
+    b.networthHistory[1]!.netWorthCarried = true; // p2 was carried on the 30th
     expect(rules(b)).not.toContain("HISTORY_SUMS_PORTFOLIOS");
     b.networthHistory[1]!.netWorth = "1260"; // the old behaviour: the skipped portfolio drops out
     expect(rules(b)).toContain("HISTORY_SUMS_PORTFOLIOS");
+  });
+
+  it("HISTORY_SUMS_PORTFOLIOS: the carried flag must mark exactly the carried dates", () => {
+    const b = bodies();
+    b.portfolios.push({
+      id: "p2",
+      summary: valuation(),
+      parity: parity(),
+      history: [{ date: "2026-06-29", netWorth: "500", marketValue: "500" }],
+    });
+    b.portfolios[0]!.history = [{ date: "2026-06-30", netWorth: "1260", marketValue: "1260" }];
+    b.networthHistory = [
+      { date: "2026-06-29", netWorth: "500", marketValue: "500" },
+      { date: "2026-06-30", netWorth: "1760", marketValue: "1760" },
+    ];
+    const missing = checkIntegrity(b).find((x) => x.rule === "HISTORY_SUMS_PORTFOLIOS");
+    expect(missing).toMatchObject({ expected: "netWorthCarried", actual: "no netWorthCarried" });
+    b.networthHistory[1]!.netWorthCarried = true;
+    b.networthHistory[0]!.netWorthCarried = true; // flagged although nothing was carried
+    const extra = checkIntegrity(b).find((x) => x.rule === "HISTORY_SUMS_PORTFOLIOS");
+    expect(extra).toMatchObject({ expected: "no netWorthCarried", actual: "netWorthCarried" });
   });
 
   it("HISTORY_SUMS_PORTFOLIOS: a date only one side has is a finding", () => {

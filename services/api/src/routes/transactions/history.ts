@@ -311,7 +311,8 @@ export function registerHistoryRoutes(app: FastifyInstance) {
   });
 
   // Aggregate net-worth-over-time across all of the user's portfolios, summing each
-  // day's snapshots converted to the display currency.
+  // day's snapshots converted to the display currency; a portfolio with no snapshot on a day
+  // keeps its last known value (`netWorthCarried` flags such a point).
   app.get<{
     Querystring: { range?: string; include?: string; exclude?: string; holderId?: string };
   }>("/networth/history", { preHandler: app.authenticate }, async (request, reply) => {
@@ -470,7 +471,10 @@ export function registerHistoryRoutes(app: FastifyInstance) {
       // snapshot on a date (e.g. the daily job skipped it for a missing FX rate) keeps its last
       // known value from the day it first has one, instead of dropping out and making the chart
       // dip by the whole portfolio (#1172). A point that carries a leg is flagged so the UI can
-      // disclose it.
+      // disclose it. This covers a MISSING row only: `aggregateValueFlows` also rejects a present
+      // but implausible row and holds the last good `marketValue`, while the row's recorded
+      // `netWorth` is used as-is here. A carried leg stays at its own snapshot date's FX rate,
+      // like the carried `marketValue`.
       const nwByDate = new Map<string, Decimal>();
       const carriedDates = new Set<string>();
       for (const [, pfRows] of perPortfolio) {
