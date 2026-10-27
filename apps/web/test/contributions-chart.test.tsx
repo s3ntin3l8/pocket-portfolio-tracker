@@ -72,6 +72,30 @@ function renderChart(
 
 // ── Overlay path ──────────────────────────────────────────────────────────────
 
+describe("ContributionsChart — carried-forward net worth (#1189)", () => {
+  const withFlags = (flags: boolean[]): PerformancePoint[] =>
+    valueHistory.map((p, i) => (flags[i] ? { ...p, netWorthCarried: true } : p));
+
+  it("says how many days of the value line carry a portfolio forward", () => {
+    renderChart(series, withFlags([false, true, true, false]));
+    expect(
+      screen.getByText(/2 days of the value line include a carried-forward value/),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the singular for one day", () => {
+    renderChart(series, withFlags([false, false, true, false]));
+    expect(
+      screen.getByText(/1 day of the value line includes a carried-forward value/),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no note when no point carries", () => {
+    renderChart(series, valueHistory);
+    expect(screen.queryByText(/carried-forward value/)).not.toBeInTheDocument();
+  });
+});
+
 describe("ContributionsChart — overlay path", () => {
   it("renders the overlay chart when value history is available", () => {
     renderChart(series, valueHistory);

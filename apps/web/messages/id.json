@@ -570,6 +570,7 @@
     "chartContributions": "Kontribusi",
     "chartValue": "Nilai",
     "chartValueUnavailable": "Riwayat nilai belum tersedia — jalankan backfill dari Admin → Jobs.",
+    "carriedNote": "{count, plural, other {# hari pada garis nilai mencakup}} nilai yang dibawa maju untuk portofolio tanpa snapshot pada hari itu.",
     "footerInvested": "Diinvestasikan",
     "footerGain": "Keuntungan",
     "footerNowWorth": "Nilai sekarang",
