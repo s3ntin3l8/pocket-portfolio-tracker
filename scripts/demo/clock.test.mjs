@@ -10,6 +10,7 @@ describe("parseDemoNow", () => {
   it("parses an ISO instant with a zone", () => {
     expect(parseDemoNow("2026-10-15T10:00:00Z")).toBe(Date.UTC(2026, 9, 15, 10));
     expect(parseDemoNow("2026-10-15T12:00:00+02:00")).toBe(Date.UTC(2026, 9, 15, 10));
+    expect(parseDemoNow("2028-02-29T10:00:00Z")).toBe(Date.UTC(2028, 1, 29, 10));
     expect(parseDemoNow("2026-10-15T10:00Z")).toBe(Date.UTC(2026, 9, 15, 10));
   });
 
@@ -18,6 +19,11 @@ describe("parseDemoNow", () => {
     "2026-10-15",
     "2026-10-15T10:00:00",
     "2026-13-45T10:00:00Z",
+    "2026-02-30T00:00:00Z",
+    "2026-04-31T00:00:00Z",
+    "2026-10-15T24:00:00Z",
+    "2026-10-15T10:60:00Z",
+    "2026-10-15T10:00:60Z",
     "1760522400000",
   ])("rejects %s", (value) =>
     expect(() => parseDemoNow(value)).toThrow(/DEMO_NOW must be an ISO instant/),

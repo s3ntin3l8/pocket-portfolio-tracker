@@ -40,12 +40,13 @@ const API_TSCONFIG = path.join(REPO_ROOT, "services/api/tsconfig.json");
 const WEB_DIR = path.join(REPO_ROOT, "apps/web");
 const FREEZE_TIME = path.join(REPO_ROOT, "scripts/demo/freeze-time.mjs");
 export const HANDOFF_FILE = path.join(REPO_ROOT, ".demo/instance.json");
+/** The seeded login's email, passed to the seed as SEED_DEMO_EMAIL. */
+const DEMO_EMAIL = "demo@pocket.invalid";
 /**
  * The seeded user's Auth.js subject, as seed-demo.ts derives it: `local|<email>`
  * when a login password is seeded (`login: true`, i.e. `make demo`), else `demo|pocket`.
- * SEED_DEMO_EMAIL is never passed to the seed, so the email is its default.
  */
-const authSubFor = (login) => (login ? "local|demo@pocket.invalid" : "demo|pocket");
+const authSubFor = (login) => (login ? `local|${DEMO_EMAIL}` : "demo|pocket");
 
 export const DEMO_API_PORT = process.env.DEMO_API_PORT ?? "3910";
 export const DEMO_WEB_PORT = process.env.DEMO_WEB_PORT ?? "3915";
@@ -400,6 +401,7 @@ export async function startDemo({
     ? {
         AUTH_LOCAL_SECRET: randomBytes(32).toString("base64url"),
         SEED_DEMO_PASSWORD: randomBytes(12).toString("base64url"),
+        SEED_DEMO_EMAIL: DEMO_EMAIL,
       }
     : {};
 
@@ -586,7 +588,7 @@ export async function startDemo({
     patFile,
     authSecret,
     demoDir,
-    login: login ? { email: "demo@pocket.invalid", password: local.SEED_DEMO_PASSWORD } : null,
+    login: login ? { email: DEMO_EMAIL, password: local.SEED_DEMO_PASSWORD } : null,
     stop,
   };
 }

@@ -6,7 +6,9 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
-  statSync,
+  fstatSync,
+  openSync,
+  closeSync,
   writeFileSync,
 } from "node:fs";
 import net from "node:net";
@@ -612,7 +614,12 @@ describe("startDemo clock and session hand-off", () => {
   };
 
   it("refuses a bad DEMO_NOW before creating anything", async () => {
-    for (const demoNow of ["yesterday", "2026-10-15", "2026-10-15T10:00:00"]) {
+    for (const demoNow of [
+      "yesterday",
+      "2026-10-15",
+      "2026-10-15T10:00:00",
+      "2026-02-30T00:00:00Z",
+    ]) {
       await expect(startDemo({ quiet: true, demoNow, boot: async () => {} })).rejects.toThrow(
         /DEMO_NOW must be an ISO instant/,
       );
@@ -646,8 +653,11 @@ describe("startDemo clock and session hand-off", () => {
     async (login, sub) => {
       const boot = async (ctx) => writeFileSync(ctx.patFile, "pt_test-secret\n");
       const demo = await startDemo({ quiet: true, login, handoff: true, boot });
-      expect(statSync(HANDOFF_FILE).mode & 0o777).toBe(0o600);
-      const info = JSON.parse(readFileSync(HANDOFF_FILE, "utf8"));
+      // One open file for the mode and the content: no stat-then-read of the path.
+      const fd = openSync(HANDOFF_FILE, "r");
+      const info = JSON.parse(readFileSync(fd, "utf8"));
+      expect(fstatSync(fd).mode & 0o777).toBe(0o600);
+      closeSync(fd);
       expect(info.webUrl).toBe(demo.webUrl);
       expect(info.cookie.name).toBe("authjs.session-token");
       // The cookie is for the user the seed creates, and carries the demo's PAT.
