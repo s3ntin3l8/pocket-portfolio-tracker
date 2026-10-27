@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing integrity dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
+.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing screenshots-audit visual-check integrity dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
 
 # Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
 # docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
@@ -129,14 +129,35 @@ seed-demo: ## Seed the rich demo dataset (deterministic dev PAT); refuses a non-
 demo: ## Isolated throwaway instance with the demo dataset (scratch PGlite, clean env, no .env/Docker); Ctrl-C deletes it
 	node scripts/demo/instance.mjs
 
-screenshots: ## Regenerate README + PWA manifest screenshots from an isolated demo instance
-	node scripts/screenshots.mjs
+# Visual pipeline (s3ntin3l8/visual-kit): README and landing screenshots, audit evidence and the per-change
+# visual check, all rendered in one pinned image against `make demo`. The image is pinned in visual/Dockerfile
+# (Dependabot bumps it); visual/.kit/run.sh is extracted from it. Spec: visual-kit's CONTRACT.md.
+VISUAL_IMAGE := visual-kit-local/pocket
+VISUAL_RUN := VISUAL_KIT_IMAGE=$(VISUAL_IMAGE) visual/.kit/run.sh
+# The four docs/screenshots images the PWA manifest lists; the app can only serve them from apps/web/public.
+MANIFEST_SHOTS := holdings-dark-mobile insights-dark-mobile holdings-dark-desktop tax-dark-desktop
+
+visual/.kit/run.sh: visual/Dockerfile
+	docker build -q -t $(VISUAL_IMAGE) - < visual/Dockerfile
+	mkdir -p visual/.kit && docker run --rm $(VISUAL_IMAGE) host-files | tar -x -C visual/.kit
+
+screenshots: visual/.kit/run.sh ## README screenshots into docs/screenshots (committed) and the PWA manifest copies. FORCE=1 replaces a folder visual-kit did not write
+	$(VISUAL_RUN) readme $(if $(FORCE),--force)
+	mkdir -p apps/web/public/screenshots
+	for s in $(MANIFEST_SHOTS); do cp docs/screenshots/$$s.png apps/web/public/screenshots/$$s.png; done
+
+screenshots-landing: visual/.kit/run.sh ## Landing-page stills and loops into OUT (default ./landing-shots) for personal-landing
+	$(VISUAL_RUN) landing --out "$(or $(OUT),landing-shots)" $(if $(FORCE),--force)
+
+screenshots-audit: visual/.kit/run.sh ## Audit evidence for AUDIT=YYYY-MM-<scope>-<topic> into docs/audit/assets/ (local only)
+	@test -n "$(AUDIT)" || { echo "AUDIT=YYYY-MM-<scope>-<topic> is required"; exit 1; }
+	$(VISUAL_RUN) audit --slug "$(AUDIT)" $(if $(FORCE),--force)
+
+visual-check: visual/.kit/run.sh ## Before/after of the routes a UI change touches (ROUTES=/en/holdings,tax) against BASE (default: merge base)
+	$(VISUAL_RUN) check $(if $(ROUTES),--routes "$(ROUTES)") $(if $(BASE),--base "$(BASE)") $(if $(FORCE),--force)
 
 integrity: ## Run the analysis-integrity invariants against a running API with POCKET_TOKEN (see docs/integrity.md)
 	node scripts/integrity-report.mjs
-
-screenshots-landing: ## Landing-page stills + loop into OUT (default ./landing-shots); needs ffmpeg for the loop
-	node scripts/screenshots.mjs --profile landing --out "$(or $(OUT),landing-shots)"
 
 seed-demo-login: ## Seed demo data with local-password login instead of DEV_AUTH_TOKEN (requires SEED_DEMO_PASSWORD; see AUTH_LOCAL_SECRET)
 	@if [ -z "$(SEED_DEMO_PASSWORD)" ]; then \

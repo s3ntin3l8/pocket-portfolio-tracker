@@ -1,0 +1,31 @@
+name: Visual check
+
+# Advisory: renders the routes a UI change touches on the merge base and on the PR in visual-kit's pinned
+# image and comments what changed (pixels, axe, console errors, overflow, unnamed controls). The report is
+# the `visual-check-report` artifact. Locally: `make visual-check ROUTES=/en/holdings`.
+on:
+  pull_request:
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "services/api/**"
+      - "scripts/demo/**"
+      - "package-lock.json"
+      - "visual/**"
+      - ".github/visual-setup.sh"
+      - ".github/workflows/visual.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  visual-check:
+    if: ${{ github.event.pull_request.draft == false }}
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: s3ntin3l8/.github/.github/workflows/visual-check.yml@main
+    with:
+      node-version: "26"
+      timeout-minutes: 45

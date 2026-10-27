@@ -25,6 +25,11 @@ npm run lint && npm run typecheck && npm run test:coverage && npm run format:che
 
 If `npm run format:check` fails, `npm run format` applies the fix in place.
 
+If you changed what a screen looks like, run `make visual-check ROUTES=<routes>` (needs Docker; it
+compares the merge base with your tree and writes `visual/.out/check/report/`), put the result in
+the PR's **Visual check** section, and regenerate the README images with `make screenshots`
+(see "Reproducing the screenshots" in the README).
+
 If you changed the Drizzle schema (`packages/db/src/schema/*.ts`), also run
 `npm run db:generate --workspace @portfolio/db` and commit the generated
 migration under `packages/db/drizzle/`.

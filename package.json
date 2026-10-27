@@ -25,7 +25,7 @@
     "test:coverage:sharded": "vitest run --coverage --coverage.thresholds.lines=0 --coverage.thresholds.functions=0 --coverage.thresholds.branches=0 --coverage.thresholds.statements=0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "screenshots": "node scripts/screenshots.mjs",
+    "screenshots": "make screenshots",
     "integrity": "node scripts/integrity-report.mjs",
     "demo": "node scripts/demo/instance.mjs"
   },

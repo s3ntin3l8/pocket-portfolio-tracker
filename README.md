@@ -22,26 +22,26 @@ worth are all derived, never stored.
 
 <table>
   <tr>
-    <td><img src="apps/web/public/screenshots/holdings-light-wide.png" alt="Holdings — light" /></td>
-    <td><img src="apps/web/public/screenshots/holdings-dark-wide.png" alt="Holdings — dark" /></td>
+    <td><img src="docs/screenshots/holdings-light-desktop.png" alt="Holdings — light" /></td>
+    <td><img src="docs/screenshots/holdings-dark-desktop.png" alt="Holdings — dark" /></td>
   </tr>
   <tr>
-    <td><img src="apps/web/public/screenshots/activity-light-wide.png" alt="Activity — light" /></td>
-    <td><img src="apps/web/public/screenshots/tax-dark-wide.png" alt="Tax — dark" /></td>
+    <td><img src="docs/screenshots/activity-light-desktop.png" alt="Activity — light" /></td>
+    <td><img src="docs/screenshots/tax-dark-desktop.png" alt="Tax — dark" /></td>
   </tr>
 </table>
 
 <table>
   <tr>
-    <td><img src="apps/web/public/screenshots/holdings-dark-narrow.png" width="200" alt="Holdings — mobile, dark" /></td>
-    <td><img src="apps/web/public/screenshots/activity-light-narrow.png" width="200" alt="Activity — mobile, light" /></td>
-    <td><img src="apps/web/public/screenshots/insights-dark-narrow.png" width="200" alt="Insights — mobile, dark" /></td>
-    <td><img src="apps/web/public/screenshots/tax-light-narrow.png" width="200" alt="Tax — mobile, light" /></td>
+    <td><img src="docs/screenshots/holdings-dark-mobile.png" width="200" alt="Holdings — mobile, dark" /></td>
+    <td><img src="docs/screenshots/activity-light-mobile.png" width="200" alt="Activity — mobile, light" /></td>
+    <td><img src="docs/screenshots/insights-dark-mobile.png" width="200" alt="Insights — mobile, dark" /></td>
+    <td><img src="docs/screenshots/tax-light-mobile.png" width="200" alt="Tax — mobile, light" /></td>
   </tr>
 </table>
 
 Captured from a scripted demo dataset spanning every asset class (equities, ETFs, gold, a
-bond, a mutual fund, cash) — regenerate anytime the UI changes with `npm run screenshots`
+bond, a mutual fund, cash) — regenerate anytime the UI changes with `make screenshots`
 (see [Reproducing the screenshots](#reproducing-the-screenshots)).
 
 ## Architecture
@@ -119,20 +119,27 @@ Target one workspace with `--workspace @portfolio/<name>` (e.g.
 
 ## Reproducing the screenshots
 
-`npm run screenshots` (or `make screenshots`) regenerates every image in
-`apps/web/public/screenshots/` (used above and by the PWA install dialog's manifest
-`screenshots`) from a fully scripted, throwaway demo: it seeds a rich mock dataset into an
-isolated PGlite database (`services/api/src/db/seed-demo.ts`), boots the API and web app
-against it on dedicated loopback ports, authenticates via a seeded personal-access token
-(no real Authentik login needed — see `apps/web/scripts/mint-session.mjs`), captures each
-hero screen with Playwright in light/dark and mobile/desktop, then tears everything down.
+`make screenshots` (or `npm run screenshots`) regenerates every image in `docs/screenshots/`
+(used above) from a fully scripted, throwaway demo, and copies the four the PWA install dialog's
+manifest `screenshots` lists into `apps/web/public/screenshots/`. It runs
+[visual-kit](https://github.com/s3ntin3l8/visual-kit) in Docker (its image pinned in
+`visual/Dockerfile`, with Chromium, fonts and ffmpeg inside, so the output does not depend on the
+host): visual-kit starts `make demo`, which seeds a rich mock dataset into an isolated PGlite
+database (`services/api/src/db/seed-demo.ts`) and boots the API and web app against it on
+dedicated loopback ports, logs in with the demo's own session (`visual/hooks.mjs` fetches it
+through `visual/host-hooks.sh` from `.demo/instance.json`, no real Authentik login needed),
+captures each hero screen in light/dark and mobile/desktop, then tears everything down. The
+scenes, the viewports and the fixed clock (`DEMO_NOW`) are in `visual/scenes.json`; the spec is
+visual-kit's `CONTRACT.md`. Docker is required.
 
 Other entry points:
 
-| Command                          | What it does                                                                                                             |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `make demo`                      | The same demo instance, left running; prints a URL and a throwaway login.                                                |
-| `make screenshots-landing OUT=…` | 2× dark stills plus a short holdings-chart loop (webm/mp4/poster) for the project landing page; the loop needs `ffmpeg`. |
+| Command                          | What it does                                                                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `make demo`                      | The same demo instance, left running; prints a URL and a throwaway login.                                                                    |
+| `make screenshots-landing OUT=…` | Dark stills plus a short holdings-chart loop (webm/mp4/poster) for the project landing page, in the delivery format personal-landing checks. |
+| `make screenshots-audit AUDIT=…` | Every route in light/dark on desktop, tablet and phone into `docs/audit/assets/` (local evidence for an audit).                              |
+| `make visual-check ROUTES=…`     | Before/after of the routes a UI change touches, against the merge base: pixels, axe, console errors, overflow, unnamed controls.             |
 
 `DEMO_NOW=<ISO instant>` (e.g. `DEMO_NOW=2026-10-15T10:00:00Z make demo`) moves the clock of the
 seed, the API and the web app to that instant (`scripts/demo/freeze-time.mjs`; it then ticks
@@ -158,8 +165,6 @@ afterwards, the API runs from a directory without a `.env` and Next.js is told t
 ports must be free, and the guard refuses to start if any database, data path or secret
 points outside the scratch directory. It never invokes Docker, so a production compose
 stack on the same host is out of reach.
-
-Requires Playwright's Chromium binary once: `npx playwright install chromium`.
 
 ## Configuration
 

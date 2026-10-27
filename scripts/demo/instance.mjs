@@ -14,7 +14,7 @@ import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
  * PGlite database, boot the API and web app against it, tear it all down on stop.
  *
  *   make demo          # interactive: prints a URL and a throwaway login
- *   make screenshots   # uses startDemo() from scripts/screenshots.mjs
+ *   make screenshots   # visual-kit starts this via `make demo` (see visual/)
  *
  * Isolation is enforced, not just documented (see ./env.mjs): a clean env with no
  * inherited secrets, all state under one mkdtemp dir, loopback-only dedicated

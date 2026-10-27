@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import net from "node:net";
-import os from "node:os";
 import path from "node:path";
 
 /**
@@ -31,13 +30,6 @@ const GENERATED_SECRETS = new Set([
 
 const SECRET_KEY = /(SECRET|PASSWORD|_KEY|_TOKEN|_PAT)$|ENCRYPTION/;
 const PATH_KEY = /(_DIR|_PATH|_FILE)$/;
-/** Path-ish keys that legitimately point outside the scratch dir. */
-const PATH_ALLOW = new Set(["PLAYWRIGHT_BROWSERS_PATH", "SCREENSHOTS_OUT_DIR"]);
-
-/** Where Playwright keeps its browsers, resolved before HOME is redirected. */
-export function playwrightBrowsersPath(parent = process.env) {
-  return parent.PLAYWRIGHT_BROWSERS_PATH ?? path.join(os.homedir(), ".cache", "ms-playwright");
-}
 
 /**
  * A clean environment for a demo child process. HOME and TMPDIR point into the
@@ -91,7 +83,6 @@ export function assertDemoEnv(
       problems.push(`${key} looks like a real secret; the demo never sets it`);
     if (
       PATH_KEY.test(key) &&
-      !PATH_ALLOW.has(key) &&
       // Relative values resolve against the process's working directory.
       !inside(demoDir, path.resolve(cwd ?? demoDir, value))
     )

@@ -20,11 +20,6 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    // Its audit functions are handed to page.evaluate() and run in the browser.
-    files: ["scripts/ui-walkthrough.mjs"],
-    languageOptions: { globals: { ...globals.node, ...globals.browser } },
-  },
-  {
     ignores: [
       "**/dist/**",
       "**/node_modules/**",
