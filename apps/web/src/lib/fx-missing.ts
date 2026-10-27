@@ -18,3 +18,22 @@ export function collectFxMissing(
   }
   return [...out].sort();
 }
+
+/** The two fields of a holding the FX predicates read (structural, so any valuation row fits). */
+interface FxFlagged {
+  fxMissing?: boolean;
+  marketValueDisplay: string | null;
+}
+
+/**
+ * `fxMissing` is OR-merged across depots on the all-portfolios view, while the display figures
+ * are the sums of the depots that could convert. A flagged row with NO display value is wholly
+ * excluded (shown "No FX rate", P&L "—", out of every total); a flagged row that still has one is
+ * PARTIAL: its figures are real and counted, only a depot's share is left out (#1181). Every
+ * surface that counts or lists FX-affected holdings goes through these two, so the hero banner,
+ * the table footnote and the P&L cells cannot drift apart.
+ */
+export const noDisplayFigures = (h: FxFlagged): boolean =>
+  Boolean(h.fxMissing && h.marketValueDisplay === null);
+export const fxPartial = (h: FxFlagged): boolean =>
+  Boolean(h.fxMissing && h.marketValueDisplay !== null);

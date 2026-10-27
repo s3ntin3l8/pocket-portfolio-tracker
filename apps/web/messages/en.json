@@ -1473,6 +1473,9 @@
     "fxMissingBadge": "No FX rate",
     "fxMissingTooltip": "No FX rate; excluded from totals",
     "fxMissingFooterNote": "Excludes {count, plural, one {1 holding} other {# holdings}} with no exchange rate available.",
+    "fxPartialBadge": "Partial",
+    "fxPartialTooltip": "Part of this holding (a depot with no FX rate) is left out; the figures cover the rest",
+    "fxPartialFooterNote": "{count, plural, one {1 holding is} other {# holdings are}} partial: at least one depot has no exchange rate and is left out of its figures.",
     "fxMissingCashFooterNote": "Excludes cash in {currencies} (no exchange rate available).",
     "hero": {
       "label": "Total portfolio value",

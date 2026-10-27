@@ -1473,6 +1473,9 @@
     "fxMissingBadge": "Tanpa kurs",
     "fxMissingTooltip": "Tidak ada kurs; tidak dihitung dalam total",
     "fxMissingFooterNote": "Tidak termasuk {count, plural, other {# kepemilikan}} tanpa kurs yang tersedia.",
+    "fxPartialBadge": "Sebagian",
+    "fxPartialTooltip": "Sebagian kepemilikan (depot tanpa kurs) tidak dihitung; angka mencakup sisanya",
+    "fxPartialFooterNote": "{count, plural, other {# kepemilikan}} sebagian: setidaknya satu depot tanpa kurs tidak dihitung dalam angkanya.",
     "fxMissingCashFooterNote": "Tidak termasuk kas dalam {currencies} (kurs tidak tersedia).",
     "hero": {
       "label": "Total nilai portofolio",

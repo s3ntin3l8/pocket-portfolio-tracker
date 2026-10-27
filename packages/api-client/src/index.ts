@@ -1163,7 +1163,10 @@ export interface HoldingValuation extends Holding {
   unrealizedPnL: string | null;
   /** Market value FX-converted to the display currency (null when unpriced). */
   marketValueDisplay: string | null;
-  /** Cost basis FX-converted to the display currency; null when the holding is `fxMissing`. */
+  /**
+   * Cost basis FX-converted to the display currency; null when the holding is `fxMissing` and
+   * has no display figures at all (a partial merged row keeps the sum of its convertible depots).
+   */
   costBasisDisplay: string | null;
   /** Unrealized P&L in the display currency (null when unpriced). */
   unrealizedPnLDisplay: string | null;
@@ -1176,8 +1179,15 @@ export interface HoldingValuation extends Holding {
   valuedAtCost?: boolean;
   /**
    * True when this holding's currency has no known FX rate into the display currency
-   * (audit B2): display-currency fields are null and it's excluded from totals rather
-   * than converted 1:1. Undefined when FX resolved normally.
+   * (audit B2). For a wholly unconvertible holding the display-currency fields are null and it
+   * is excluded from totals rather than converted 1:1. Undefined when FX resolved normally.
+   *
+   * On a row merged across depots (all-portfolios view) the flag is OR-merged while the display
+   * figures are the sums of the depots that could convert: a flagged row that still has a
+   * `marketValueDisplay` is PARTIAL (its figures are real and counted, at least one depot's
+   * share is left out); only one without it is wholly excluded (#1181). The same OR-merge applies
+   * to `valuedAtCost` (a merged row can mix an at-cost depot with a priced one and still shows
+   * "—" for P&L; tracked in #1193).
    */
   fxMissing?: boolean;
   previousClose: string | null;
