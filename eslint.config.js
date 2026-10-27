@@ -20,6 +20,11 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // visual-kit app hooks: node on the host side, and page.evaluate() callbacks that run in the browser.
+    files: ["visual/**/*.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     ignores: [
       "**/dist/**",
       "**/node_modules/**",

@@ -1,7 +1,7 @@
 {
   "$schema": "https://raw.githubusercontent.com/s3ntin3l8/visual-kit/main/schema/scenes.schema.json",
   "demo": {
-    "start": "[ -d node_modules ] || npm ci --no-audit --no-fund; make demo",
+    "start": "[ -d node_modules ] || npm ci --no-audit --no-fund && make demo",
     "url": "http://localhost:3915",
     "readyOutput": "DEMO_READY",
     "startTimeoutSec": 600,
