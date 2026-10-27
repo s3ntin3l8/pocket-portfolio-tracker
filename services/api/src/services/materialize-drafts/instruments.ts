@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { instruments, transactions } from "@portfolio/db";
 import type { ParsedTransaction, AssetClass } from "@portfolio/schema";
 import {
@@ -153,8 +153,9 @@ export async function resolveDraftInstruments(
       const [inst] = await ctx.db
         .select({ id: instruments.id })
         .from(instruments)
-        // Stored verbatim by findOrCreateInstrument, so compare case-insensitively.
-        .where(sql`upper(${instruments.isin}) = ${isin}`)
+        // Stored verbatim by findOrCreateInstrument; two equality probes keep the isin index
+        // usable (upper(isin) would seq-scan the global table).
+        .where(inArray(instruments.isin, [isin, isin.toLowerCase()]))
         .limit(1);
       if (!inst) continue;
       let held = batchIds.has(inst.id);
