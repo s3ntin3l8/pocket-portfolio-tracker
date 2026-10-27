@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.7](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.6...v0.2.7) (2026-10-27)
+
+
+### Bug Fixes
+
+* **market-data:** fill history before a feed's first candle from the next provider ([#1195](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1195)) ([6fd1b87](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6fd1b87b5ac6ce3fe6e9dbbbbd38d8d3f2ff9b4b))
+
 ## [0.2.6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.5...v0.2.6) (2026-10-27)
 
 
