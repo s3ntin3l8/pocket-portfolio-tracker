@@ -180,8 +180,8 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   derivations replay it). The web shows `FxMissingBanner` when it's non-empty. The daily/intraday
   snapshot jobs and the backfill skip a portfolio rather than persist a partial value (#816). The one
   exception is the backfill when the missing currency appears only on price rows (not a declared or
-  transaction currency): it drops just those rows, so that instrument is valued at cost where it has no
-  convertible price (#1179) — the live valuation still excludes it, so a snapshot row can include a
+  transaction currency): it drops just those rows, so that instrument is valued at cost until its first
+  convertible price, then follows the usual carry-forward window (#1179) — the live valuation still excludes it, so a snapshot row can include a
   holding at cost that `summarizePortfolio` flags `fxMissing`.
   `convert()` still throws `FxRateMissingError` as a last resort — reaching it is a bug (logged).
   Never add a `?? "1"` fallback.

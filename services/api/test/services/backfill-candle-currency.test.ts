@@ -206,6 +206,11 @@ describe("backfill — candle currency differs from the instrument's declared cu
       expect(Number(snaps.find((s) => s.date === "2026-08-01")!.marketValue), `run ${run}`).toBe(
         20,
       );
+      // The last convertible close carries for MAX_PRICE_CARRY_FORWARD_DAYS, then the
+      // priced-then-gapped holding drops out of marketValue (the usual hasEverPriced rule).
+      const mv = (date: string) => Number(snaps.find((s) => s.date === date)!.marketValue);
+      expect(mv("2026-08-10"), `run ${run}`).toBe(20);
+      expect(mv("2026-08-13"), `run ${run}`).toBe(0);
     }
   });
 
