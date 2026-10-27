@@ -27,6 +27,11 @@ jobs:
       # ~5m30s to ~2m, live-validated via a smoke-test PR (#408) before adopting here.
       test-shards: "4"
       turbo-cache: true
+      # Also restore `.next/cache` for `next build`. turbo.json excludes `.next/cache/**`
+      # from task outputs, so this is not redundant with the turbo cache: the web build
+      # compiles in ~5-14s warm vs ~21-28s cold. Explicit so a changed ci-node default
+      # can't drop it silently.
+      next-cache: true
       strict-checks: true
       # Only the files this push touched can have introduced a secret.
       # detect-secrets matches a known secret by filename, hash and type -- not
