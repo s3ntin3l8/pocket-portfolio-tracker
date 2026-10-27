@@ -4,6 +4,7 @@ import type { ApiToken, IbkrConnection, TrConnection } from "@portfolio/api-clie
 import { FileInput } from "lucide-react";
 import { ApiTokens } from "@/components/api-tokens";
 import { BrokerageIcon } from "@/components/brokerage-icon";
+import { HistoryRecheck } from "@/components/history-recheck";
 import { IntegrityCheck } from "@/components/integrity-check";
 import { McpConnectCard } from "@/components/mcp-connect-card";
 import { cn } from "@/lib/utils";
@@ -94,6 +95,17 @@ export async function DataConnectionsSection({
         <Card className="overflow-hidden">
           <div className="p-4">
             <IntegrityCheck />
+          </div>
+        </Card>
+      </div>
+
+      <div>
+        <p className="mb-2 px-0.5 text-xs font-bold uppercase tracking-label text-text-2">
+          {t("historyRecheckTitle")}
+        </p>
+        <Card className="overflow-hidden">
+          <div className="p-4">
+            <HistoryRecheck />
           </div>
         </Card>
       </div>

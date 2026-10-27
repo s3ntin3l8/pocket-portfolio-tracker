@@ -22,7 +22,7 @@ cash** with live IDX prices and a real-time gold ticker.
   `MCP_WRITE_SCOPE`, never admin, cannot mint tokens; `docs/mcp.md`);
   upserts the user by `sub`, and exposes the `app.authenticate` preHandler — every
   route scopes queries to `request.user`. **Routes** (`src/routes/*.ts`, one file per
-  domain): `me` (profile + PATs), `account-holders`, `portfolios`, `transactions`
+  domain): `me` (profile + PATs; `POST /me/jobs/backfill` re-runs the caller's own price-history backfill, write-scoped, rate-limited, audited), `account-holders`, `portfolios`, `transactions`
   (also holdings/trades/tax/income/allocation/forecasts/contributions — the largest
   route file), `corporate-actions`, `mergers`, `loans` (skip an installment / early payoff of a cicilan, `docs/loans.md`), `imports` (+`imports/parse`,
   `imports/confirm`), `documents`, `instruments`, `quotes`, `search`, `storage`,

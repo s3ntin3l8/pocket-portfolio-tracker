@@ -256,6 +256,16 @@ USD, GBP or CHF; any other currency is never filled. Without
 this, a primary feed that silently skips weeks leaves the holding unpriced for the gap and the
 backfill valuing it at 0/cost there.
 
+### Re-running a history backfill
+
+A signed-in user can re-run the backfill for their own portfolios from Settings › Data & connections
+› Price history (`POST /me/jobs/backfill`, a write-scoped credential; read-only tokens get 403). It
+enqueues `backfill-stale-history` with `{ force: true, userId: <caller> }`, never for another
+user, and optionally `retryDeadFeeds` to re-ask feeds in the dead-feed cooldown. A repeat inside the
+singleton window returns 409, more than three per hour per user 429, and each request is written to
+the admin audit log. It reports "queued", not "finished". Admins can still trigger any job (any
+user, any scope) from Admin › Jobs.
+
 ## Admin overrides
 
 The `provider_settings` table (`packages/db/src/schema.ts`) overlays the registry defaults
