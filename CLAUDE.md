@@ -379,8 +379,9 @@ coverage run as `test:coverage`, but with `coverage.thresholds` disabled per-sha
 (a single shard's inherently-partial coverage would otherwise trip the 70% gate); the
 merged coverage across all 4 shards is what's actually checked against
 `coverage-fail-under`, in a `test-merge` job that runs after the shard matrix. Turbo's
-build/lint/typecheck cache is also persisted across runs (`turbo-cache: true`), and so is Next's
-own `.next/cache` (`next-cache`, on by default in `ci-node.yml`; turbo's `outputs` exclude it, so the two don't overlap).
+build/lint/typecheck cache is also persisted across runs (`turbo-cache: true`), and so is
+Next's own `.next/cache` (`next-cache: true`; turbo's `outputs` exclude it, so the two don't
+overlap).
 Sharding + caching cut the job from ~5m30s to ~2m (live-validated via a smoke-test PR
 before adopting).
 Caller jobs invoking reusable workflows with write scopes **must declare a
