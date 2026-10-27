@@ -129,6 +129,23 @@ so the effective chain per asset is:
 - **Mutual fund (reksa dana):** Reksa Dana NAV → Fixture
 - **Crypto (CRYPTO):** CoinGecko → Yahoo → Fixture
 
+### Quota circuit breaker
+
+A provider that says its quota is used up is not called again until the window resets, so a
+keyed primary on a small plan (EODHD's free tier is 20 calls/day) does not waste a round trip
+per instrument on every refresh before the fallback answers. Three signals open it:
+
+- HTTP **402** (daily limit exceeded): skipped until the next UTC midnight.
+- HTTP **429**: skipped for 10 minutes.
+- A provider with a free usage endpoint and a hard daily cap (`quotaProbe`, today EODHD's
+  `/user`, the same figure the Admin → Providers page shows) that reports `used >= limit`:
+  skipped until midnight before any call is made. It is read at most once a minute, a failed
+  probe never blocks, and it resumes as soon as the endpoint reports headroom again.
+
+The breaker lives in `MarketDataService` (in memory, per process) and covers quotes, history,
+dividends, profile and search. To make a free-tier EODHD key a fallback instead of the primary,
+move Yahoo above it in Admin → Providers (priority is a stored setting, not a code default).
+
 Gold is sourced multiple ways on purpose: **spot** (market `XAU`, via Twelve Data / GoldAPI,
 with a keyless Yahoo fallback on the `XAU<CCY>=X` pair) prices paper/abstract gold, while each
 **buyback** market (`ANTAM`, `GALERI24`, `UBS`) values
