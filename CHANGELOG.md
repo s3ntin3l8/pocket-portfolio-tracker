@@ -1,5 +1,46 @@
 # Changelog
 
+## [0.2.6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.5...v0.2.6) (2026-10-27)
+
+
+### Features
+
+* **api:** integrity report for real data (GET /me/integrity + CLI) ([#1166](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1166)) ([2f9efaf](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2f9efaf8435f176655918129d889b1a9feac11a3))
+* **bonds:** support floating-rate Indonesian retail bonds (SBR/ST) ([#1138](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1138)) ([df3878a](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/df3878a9a92c4ecc16c28502b8dfafdcef6e850c))
+* integrity check in the MCP server and Settings ([#1174](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1174)) ([2b54794](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2b5479488607b483242634b524753fbbdbbfcd1a))
+* **market-data:** justETF price history and gap-fill across providers ([#1180](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1180)) ([b6a5979](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b6a597982b15dbfcbf63881270d2079c2f0a6f6f))
+* **tax-de:** credit Indonesian income withholding against the German estimate ([#1088](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1088)) ([8974b20](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8974b2000b294fb99be548365fac71f1eb383225)), closes [#1084](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1084)
+* **tax-id:** PPh 22 on a gold-bar sale above Rp10 million ([#1089](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1089)) ([a1fa47d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/a1fa47d7442b1f4e65942d7e9a5881b9cdae880c)), closes [#1085](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1085)
+* **web:** disclose carried-forward days on the savings value line ([#1192](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1192)) ([d6b0895](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d6b0895f46054606daa828090ef1fc766b23295a))
+
+
+### Bug Fixes
+
+* a holding with no FX rate has no display-currency cost ([#1178](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1178)) ([d2c3a32](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d2c3a32b05693e17fc7b4998d4e8a0c0fca52257))
+* **backfill:** exclude only the unconvertible instrument when a price currency has no FX rate ([#1186](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1186)) ([0b77c37](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0b77c377bb1375d35a0cbd088095418ec596344a))
+* **backfill:** heal price gaps in the middle of history; gap-aware feed health ([#1182](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1182)) ([c8a4324](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/c8a4324f5f766df28f03abe4ac531f4f63f9d409))
+* **backfill:** store price history in the candle's real currency ([#1177](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1177)) ([8310f39](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8310f3908526edb2ddb11b49a6f677a6815ec4aa))
+* **core:** a merged holding is at cost only when every valued depot is; mixed rows are partial ([#1194](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1194)) ([4cccbf5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4cccbf5484218ca1f1a5955b2d53de675f3c016f))
+* **history:** carry a skipped portfolio's net worth forward in the aggregate ([#1190](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1190)) ([124e7be](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/124e7be43abced463bb0c48510c2a7d1fd042f9e))
+* **import:** classify duplicates by transaction source and scope the cash boundary ([#1093](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1093)) ([149bcea](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/149bceae36b39049905847d2a967f674831ab506))
+* **income:** the Income page totals follow the one income definition ([#1188](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1188)) ([9e897ed](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9e897ed7185e25319b247077ec517661ce29fa50))
+* **tax-id:** convert Indonesian tax amounts at the payment date ([#1086](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1086)) ([5f46b21](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/5f46b219399644a2dc655a53964d815b236fc545)), closes [#1083](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1083)
+* **tax:** stop a failed carry-forward load from wiping the loss pots ([#1141](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1141)) ([1a6b898](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1a6b898cd87ca59801b9c01f2bdc39fb1423d08f))
+* **web:** a partly convertible merged holding shows its measured P&L as partial ([#1191](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1191)) ([ece51a3](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ece51a37d6adff9d434e42554b6b5d302860d86c))
+* **web:** clear pending search timers when their component unmounts ([#1151](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1151)) ([9f12fd2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9f12fd2c3b282c6b2d35ebd58476a8329fe1b82c))
+* **web:** every chart is honest and readable ([#1144](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1144)) ([04df4cc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/04df4cc623156c68a71269655833163e8f9bf4ea))
+* **web:** failures explain themselves ([#1152](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1152)) ([8f607f4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8f607f4e4829b1ef2cbe3bd9880d8f1b9d587399))
+* **web:** move focus on route change and expose the toggle state ([#1145](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1145)) ([ab2c823](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ab2c823780ffe56299ac1da60ef06162f81de789))
+* **web:** name the tables, the landmarks and the small targets ([#1142](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1142)) ([27369c2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/27369c2f377af3d7b6e8aadfc3c13c11d5933528))
+* **web:** one name per concept ([#1146](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1146)) ([e44990c](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/e44990c23753823c9c6440b3009ab5a0e5d28f2c))
+* **web:** resolve the scope consistently on Activity and Holdings ([#1143](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1143)) ([32ddc38](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/32ddc3898a467d4019ae6a49279258ef53acd21b))
+* **web:** the numbers and the words are locale-correct ([#1153](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1153)) ([1b2d506](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1b2d5061e7937bcc278a6b3929239a4e81c84cbe))
+
+
+### Performance Improvements
+
+* **backfill:** grade price gaps in SQL instead of loading the stored window ([#1187](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1187)) ([abafeb2](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/abafeb252020767cf6613fe789e63a34babf12a8))
+
 ## [0.2.5](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.4...v0.2.5) (2026-10-20)
 
 
