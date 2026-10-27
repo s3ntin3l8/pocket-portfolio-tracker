@@ -226,7 +226,8 @@ the quote priority chain above.
 
 `MarketDataService.getHistoryFrom` returns the first provider's non-empty series. When the
 caller passes `gapFillDays` (the backfill passes `MAX_PRICE_CARRY_FORWARD_DAYS`), holes in
-that series longer than the threshold — and a stale tail up to today — are patched from the
+that series longer than the threshold — a stale tail up to today, and the stretch between the
+requested start date and the series' first candle — are patched from the
 providers behind it (for an ETF with an ISIN, ultimately JustETF). The primary wins on
 overlap and the fallback is asked in the primary's own quote currency; a fallback candle in any
 other currency is dropped, so the merged series stays single-currency. A failing fallback is

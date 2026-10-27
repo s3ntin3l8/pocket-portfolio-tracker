@@ -133,7 +133,7 @@ export class MarketDataService {
         if (candles.length > 0) {
           return opts.gapFillDays === undefined
             ? candles
-            : this.fillGaps(ref, candles, providers.slice(i + 1), opts.gapFillDays);
+            : this.fillGaps(ref, candles, providers.slice(i + 1), opts.gapFillDays, fromDate);
         }
       } catch (err) {
         lastError = err;
@@ -160,12 +160,20 @@ export class MarketDataService {
    * `close` alone (sparklines) never see an FX-sized seam. A failing fallback is skipped and
    * reported through `onProviderError`; a fill that produced nothing is remembered for
    * `FILL_RETRY_MS` so a stale-but-alive feed isn't re-scraped on every call.
+   *
+   * A series that starts more than `minGapDays` after the requested `fromDate` has a
+   * leading hole too — a feed that only keeps recent history (or lost the older part of a
+   * line) would otherwise leave everything before its first candle unpriced, and the
+   * stored rows there never refreshed. The fallback is asked for it like any interior hole;
+   * an instrument that genuinely listed later simply yields nothing (memoized as an empty
+   * fill).
    */
   private async fillGaps(
     ref: InstrumentRef,
     primary: Candle[],
     fallbacks: MarketDataProvider[],
     minGapDays: number,
+    fromDate: string,
   ): Promise<Candle[]> {
     const merged = new Map(primary.map((c) => [c.date, c]));
     const today = new Date().toISOString().slice(0, 10);
@@ -173,7 +181,7 @@ export class MarketDataService {
     const fillRef = { ...ref, currency };
     for (const provider of fallbacks) {
       if (!provider.getHistoryFrom) continue;
-      const gaps = findGaps([...merged.keys()].sort(), today, minGapDays);
+      const gaps = findGaps([...merged.keys()], today, minGapDays, fromDate);
       if (gaps.length === 0) break;
       const memoKey = `${provider.name}|${ref.market}|${ref.symbol}|${gaps[0]!.from}|${currency}`;
       if ((this.emptyFills.get(memoKey) ?? 0) > Date.now()) continue;
@@ -418,15 +426,21 @@ function addDays(date: string, days: number): string {
 /**
  * Inclusive date windows with no candle, for every stretch between consecutive candle
  * dates (and from the last candle to `today`) longer than `minGapDays`. The window before
- * the first candle is not a gap — that is the instrument not existing yet.
+ * the first candle is not a gap — that is the instrument not existing yet — unless the
+ * caller passes `from` (the start it asked for): then the stretch from `from` to the first
+ * candle is a gap too, with `from` itself included.
  */
 export function findGaps(
   dates: string[],
   today: string,
   minGapDays: number,
+  from?: string,
 ): { from: string; to: string }[] {
   const sortedDates = [...new Set(dates)].sort();
   const gaps: { from: string; to: string }[] = [];
+  if (from !== undefined && sortedDates.length > 0 && dayDiff(from, sortedDates[0]!) > minGapDays) {
+    gaps.push({ from, to: addDays(sortedDates[0]!, -1) });
+  }
   for (let i = 1; i <= sortedDates.length; i++) {
     const prev = sortedDates[i - 1]!;
     const next = i < sortedDates.length ? sortedDates[i]! : today;

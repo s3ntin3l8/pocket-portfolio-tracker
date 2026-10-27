@@ -526,6 +526,40 @@ describe("MarketDataService", () => {
       expect(candles.map((c) => c.date)).toEqual([...candles.map((c) => c.date)].sort());
     });
 
+    it("fills the stretch before the primary's first candle back to fromDate", async () => {
+      const calls: string[] = [];
+      const from = "2026-07-01";
+      const early: MarketDataProvider = {
+        name: "early",
+        supports: () => true,
+        getHistoryFrom: async (r, f) => {
+          calls.push(`${f}|${r.currency}`);
+          return ["2026-07-01", "2026-07-15", day(3)].map((date) => ({
+            date,
+            close: "7",
+            currency: r.currency,
+          }));
+        },
+      };
+      const svc = new MarketDataService([primary, early]);
+      const candles = await svc.getHistoryFrom(etf, from, { gapFillDays: 10 });
+      const byDate = new Map(candles.map((c) => [c.date, c]));
+      expect(byDate.get("2026-07-15")).toMatchObject({ close: "7", currency: "USD" });
+      expect(byDate.get(day(3))).toMatchObject({ close: "100", currency: "USD" }); // primary wins
+      expect(calls[0]).toBe(`${from}|USD`);
+    });
+
+    it("does not treat a short lead-in before the first candle as a gap", async () => {
+      const calls: string[] = [];
+      const svc = new MarketDataService([primary, fallback(calls)]);
+      // fromDate 5 days before the primary's first candle: within the window, no fill.
+      const from = new Date(Date.parse(`${day(1)}T00:00:00Z`) - 5 * 86_400_000)
+        .toISOString()
+        .slice(0, 10);
+      await svc.getHistoryFrom(etf, from, { gapFillDays: 10 });
+      expect(calls[0]).toBe(`${day(6)}|USD`);
+    });
+
     it("does nothing without gapFillDays or when the primary has no long hole", async () => {
       const calls: string[] = [];
       const svc = new MarketDataService([primary, fallback(calls)]);
@@ -3432,6 +3466,20 @@ describe("FixtureProvider quote timestamp", () => {
 });
 
 describe("findGaps", () => {
+  it("with `from`, the stretch before the first candle is a gap that includes `from`", () => {
+    expect(findGaps(["2026-08-20"], "2026-08-20", 10, "2026-08-01")).toEqual([
+      { from: "2026-08-01", to: "2026-08-19" },
+    ]);
+    // within the window → no leading gap; no candles at all → nothing to anchor on
+    expect(findGaps(["2026-08-05"], "2026-08-05", 10, "2026-08-01")).toEqual([]);
+    expect(findGaps([], "2026-08-20", 10, "2026-08-01")).toEqual([]);
+    // Leading window comes FIRST: fillGaps asks the fallback only from gaps[0].from.
+    expect(findGaps(["2026-08-20", "2026-09-30"], "2026-09-30", 10, "2026-08-01")).toEqual([
+      { from: "2026-08-01", to: "2026-08-19" },
+      { from: "2026-08-21", to: "2026-09-29" },
+    ]);
+  });
+
   it("returns nothing for no dates", () => {
     expect(findGaps([], "2026-09-01", 10)).toEqual([]);
   });
