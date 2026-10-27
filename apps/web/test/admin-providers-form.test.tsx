@@ -174,6 +174,7 @@ describe("AdminProvidersForm", () => {
     const hint = screen.getByText(/paused until/);
     expect(hint).toHaveTextContent("Oct 28");
     expect(hint).toHaveTextContent("UTC");
+    expect(hint).toHaveTextContent(/\d{1,2}:\d{2}/); // an hour:minute, not just a date
   });
 
   it("shows '—' usage cell when usage is null", () => {
