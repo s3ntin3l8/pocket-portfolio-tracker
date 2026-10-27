@@ -9,6 +9,7 @@ export const GLOSSARY = `# Pocket glossary
 - **Cash boundary (cashCounted):** savings-style portfolios count cash inside (contribution = deposits − withdrawals).
   Invest-only portfolios count cash outside (contribution = net invested capital; cash excluded from value).
 - **valuedAtCost:** a holding with no usable price is shown at its cost, so it has no measured gain. Say so.
+- **valuedAtCostPartial:** an all-portfolios row where only some depots are valued at cost: its gain is real but only partly measured. Say so.
 - **fxMissingCurrencies:** amounts in these currencies are excluded from totals (no FX rate). Disclose it.
 - **Income** (dividends, interest, coupons) is return, never contribution.
 - **transfer_in / transfer_out** move shares between depots at carried cost; they are not sales and carry no P&L.

@@ -198,7 +198,8 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   Applies in `summarizePortfolio`/`netWorth` (`packages/core`) and in the historical backfill's
   day-by-day reconstruction (`buildDailyValueFlows`, `services/api/src/services/backfill/core.ts`)
   — `HoldingValuation.valuedAtCost` / `PortfolioSummary.holdings[].valuedAtCost` flags it for the
-  UI to disclose. The historical path additionally distinguishes "never priced at all" (cost
+  UI to disclose (on a row merged across depots it means EVERY valued depot is at cost; a mix is
+  `valuedAtCostPartial`, a real but partly measured P&L, #1193). The historical path additionally distinguishes "never priced at all" (cost
   fallback) from "priced before, but this particular gap exceeds the carry-forward window"
   (stays excluded, unchanged) via an explicit `hasEverPriced` callback — collapsing that
   distinction would make a genuinely-priced holding with an ordinary data gap bounce to cost and

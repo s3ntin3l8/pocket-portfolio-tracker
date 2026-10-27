@@ -102,6 +102,7 @@ function compactHolding(h: HoldingValuation) {
     unrealizedPnLDisplay: h.unrealizedPnLDisplay,
     dayChangePct: h.dayChangePct,
     valuedAtCost: h.valuedAtCost ?? false,
+    valuedAtCostPartial: h.valuedAtCostPartial ?? false,
     fxMissing: h.fxMissing ?? false,
   };
 }
@@ -261,7 +262,9 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     description:
       "Current holdings with quantity, average cost, cost basis, price, market value and unrealized " +
       "P&L in the display currency. valuedAtCost=true means no usable price: valued at cost, no " +
-      "measured gain. fxMissing=true means excluded from totals (no FX rate).",
+      "measured gain. valuedAtCostPartial=true (all-portfolios rows) means only some depots are valued " +
+      "at cost: the P&L is real but partly measured. fxMissing=true means excluded from totals " +
+      "(no FX rate).",
     inputSchema: z.object({
       portfolioId: optionalPortfolioId,
       holderId,

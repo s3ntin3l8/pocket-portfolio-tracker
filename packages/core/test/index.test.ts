@@ -977,6 +977,16 @@ describe("aggregatePortfolios", () => {
     expect(mergedReversed.valuedAtCost).toBeUndefined();
     expect(mergedReversed.valuedAtCostPartial).toBe(true);
 
+    // A single summary passes through the tally unchanged (an at-cost valuation always has a
+    // display value): at cost stays at cost, priced stays unflagged.
+    const solo = aggregatePortfolios([b], "IDR").holdings.find((h) => h.instrumentId === "i1")!;
+    expect(solo.valuedAtCost).toBe(true);
+    expect(solo.valuedAtCostPartial).toBeUndefined();
+    const soloPriced = aggregatePortfolios([a], "IDR").holdings.find(
+      (h) => h.instrumentId === "i1",
+    )!;
+    expect(soloPriced.valuedAtCost).toBeUndefined();
+
     // Every leg at cost: the merged row is at cost, and not partial.
     const bothAtCost = aggregatePortfolios([b, b], "IDR").holdings.find(
       (h) => h.instrumentId === "i1",

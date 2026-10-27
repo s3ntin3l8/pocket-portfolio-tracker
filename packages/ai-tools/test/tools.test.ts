@@ -633,6 +633,16 @@ describe("ai-tools", () => {
     expect(out.netWorth).toBe("1750"); // money stays a string
   });
 
+  it("projects valuedAtCostPartial on every holding and documents it (#1193)", async () => {
+    const t = byName("get_holdings");
+    const out = (await t.handler(t.inputSchema.parse({}))) as {
+      holdings: Record<string, unknown>[];
+    };
+    // The default fixture has no partial row: every row reports the flag explicitly (false).
+    expect(out.holdings.every((h) => h.valuedAtCostPartial === false)).toBe(true);
+    expect(byName("get_holdings").description).toMatch(/valuedAtCostPartial/);
+  });
+
   it("holdings are sorted by value, flag valuedAtCost, and drop lots/sparkline", async () => {
     const t = byName("get_holdings");
     const out = (await t.handler(t.inputSchema.parse({}))) as {
@@ -640,6 +650,7 @@ describe("ai-tools", () => {
     };
     expect(out.holdings.map((h) => h.instrumentId)).toEqual(["i1", "i2"]);
     expect(out.holdings[1]!.valuedAtCost).toBe(true);
+    expect(out.holdings[1]!.valuedAtCostPartial).toBe(false);
     expect(out.holdings[0]).not.toHaveProperty("lots");
     expect(out.holdings[0]).not.toHaveProperty("sparkline");
   });
