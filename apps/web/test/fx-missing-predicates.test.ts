@@ -14,6 +14,15 @@ describe("noDisplayFigures / fxPartial (#1181)", () => {
     expect(fxPartial(h)).toBe(true);
   });
 
+  it("fxMissing alone decides, whatever valuedAtCost says (the seam #1193 may move)", () => {
+    const h = { fxMissing: true, valuedAtCost: true, marketValueDisplay: "1000" };
+    expect(fxPartial(h)).toBe(true);
+    expect(noDisplayFigures(h)).toBe(false);
+    const atCostOnly = { valuedAtCost: true, marketValueDisplay: "1000" };
+    expect(fxPartial(atCostOnly)).toBe(false);
+    expect(noDisplayFigures(atCostOnly)).toBe(false);
+  });
+
   it("an unflagged row is neither, whatever its value", () => {
     for (const marketValueDisplay of [null, "1000"]) {
       const h = { marketValueDisplay };

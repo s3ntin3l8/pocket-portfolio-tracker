@@ -56,7 +56,7 @@ export interface HoldingValuation extends Holding {
    * figures are the sums of the depots that could convert: a flagged row that still has a
    * `marketValueDisplay` is PARTIAL (its figures are real and counted, one depot's share is
    * left out), only one without it is wholly excluded (#1181). `valuedAtCost` is OR-merged the
-   * same way and its merged row still renders "—" for P&L (tracked separately).
+   * same way and its merged row still renders "—" for P&L (tracked in #1193).
    */
   fxMissing?: boolean;
   /** Prior session's close (instrument currency), when known. */
