@@ -3466,6 +3466,15 @@ describe("FixtureProvider quote timestamp", () => {
 });
 
 describe("findGaps", () => {
+  it("with `from`, the stretch before the first candle is a gap that includes `from`", () => {
+    expect(findGaps(["2026-08-20"], "2026-08-20", 10, "2026-08-01")).toEqual([
+      { from: "2026-08-01", to: "2026-08-19" },
+    ]);
+    // within the window → no leading gap; no candles at all → nothing to anchor on
+    expect(findGaps(["2026-08-05"], "2026-08-05", 10, "2026-08-01")).toEqual([]);
+    expect(findGaps([], "2026-08-20", 10, "2026-08-01")).toEqual([]);
+  });
+
   it("returns nothing for no dates", () => {
     expect(findGaps([], "2026-09-01", 10)).toEqual([]);
   });

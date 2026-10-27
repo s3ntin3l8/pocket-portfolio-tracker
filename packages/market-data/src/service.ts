@@ -181,11 +181,7 @@ export class MarketDataService {
     const fillRef = { ...ref, currency };
     for (const provider of fallbacks) {
       if (!provider.getHistoryFrom) continue;
-      const dates = [...merged.keys()].sort();
-      const gaps = findGaps(dates, today, minGapDays);
-      if (dayDiff(fromDate, dates[0]!) > minGapDays) {
-        gaps.unshift({ from: fromDate, to: addDays(dates[0]!, -1) });
-      }
+      const gaps = findGaps([...merged.keys()], today, minGapDays, fromDate);
       if (gaps.length === 0) break;
       const memoKey = `${provider.name}|${ref.market}|${ref.symbol}|${gaps[0]!.from}|${currency}`;
       if ((this.emptyFills.get(memoKey) ?? 0) > Date.now()) continue;
@@ -430,15 +426,21 @@ function addDays(date: string, days: number): string {
 /**
  * Inclusive date windows with no candle, for every stretch between consecutive candle
  * dates (and from the last candle to `today`) longer than `minGapDays`. The window before
- * the first candle is not a gap — that is the instrument not existing yet.
+ * the first candle is not a gap — that is the instrument not existing yet — unless the
+ * caller passes `from` (the start it asked for): then the stretch from `from` to the first
+ * candle is a gap too, with `from` itself included.
  */
 export function findGaps(
   dates: string[],
   today: string,
   minGapDays: number,
+  from?: string,
 ): { from: string; to: string }[] {
   const sortedDates = [...new Set(dates)].sort();
   const gaps: { from: string; to: string }[] = [];
+  if (from !== undefined && sortedDates.length > 0 && dayDiff(from, sortedDates[0]!) > minGapDays) {
+    gaps.push({ from, to: addDays(sortedDates[0]!, -1) });
+  }
   for (let i = 1; i <= sortedDates.length; i++) {
     const prev = sortedDates[i - 1]!;
     const next = i < sortedDates.length ? sortedDates[i]! : today;

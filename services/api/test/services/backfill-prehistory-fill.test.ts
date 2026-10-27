@@ -70,6 +70,10 @@ describe("backfill — leading history missing from the primary feed", () => {
       currency: "EUR",
       executedAt: new Date("2026-08-01T10:00:00.000Z"),
     });
+    // A stale, mislabelled row inside the leading stretch must be rewritten, not kept.
+    await db
+      .insert(prices)
+      .values({ instrumentId: instr.id, date: day(5), close: "99", currency: "EUR" });
     await db.delete(fxRates).where(eq(fxRates.base, "USD"));
     await db.insert(fxRates).values(
       Array.from({ length: 40 }, (_, i) => ({
