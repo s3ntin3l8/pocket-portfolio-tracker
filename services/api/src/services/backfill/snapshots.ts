@@ -146,24 +146,32 @@ export async function writeSnapshotSeries(
     return 0;
   }
 
-  // A currency missing only on some instrument's price rows (a provider quoting in a
-  // currency the FX source can't publish) excludes just that instrument's prices: it then
-  // has no priced history and falls to the cost-basis path, instead of freezing the
-  // snapshots of every other holding in the portfolio (#1179).
+  // A currency missing only on some price rows (a provider quoting in a currency the FX
+  // source can't publish) drops just those ROWS, not the instrument: a mixed series keeps
+  // its convertible history (and `hasEverPriced`), while a fully unconvertible one ends up
+  // empty and falls to the cost-basis path — instead of freezing the snapshots of every
+  // other holding in the portfolio (#1179).
   const rawPrices: RawPriceMap = new Map();
-  const excluded: { instrumentId: string; currencies: string[] }[] = [];
+  const excluded: { instrumentId: string; currencies: string[]; rows: number }[] = [];
   for (const [instrId, dateMap] of allRawPrices) {
-    const bad = [
-      ...new Set([...dateMap.values()].map((p) => p.currency).filter((c) => unconvertible.has(c))),
-    ];
-    if (bad.length > 0) excluded.push({ instrumentId: instrId, currencies: bad.sort() });
-    else rawPrices.set(instrId, dateMap);
+    const kept = new Map([...dateMap].filter(([, p]) => !unconvertible.has(p.currency)));
+    if (kept.size < dateMap.size) {
+      const currencies = [...new Set([...dateMap.values()].map((p) => p.currency))].filter((c) =>
+        unconvertible.has(c),
+      );
+      excluded.push({
+        instrumentId: instrId,
+        currencies: currencies.sort(),
+        rows: dateMap.size - kept.size,
+      });
+    }
+    rawPrices.set(instrId, kept);
   }
   if (excluded.length > 0) {
     process.stderr.write(
       JSON.stringify({
         level: "warn",
-        msg: "backfill: instrument excluded from pricing, FX rate missing",
+        msg: "backfill: price rows excluded, FX rate missing",
         portfolioId,
         baseCurrency,
         instruments: excluded,

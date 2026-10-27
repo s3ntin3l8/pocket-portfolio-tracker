@@ -156,7 +156,7 @@ describe("backfill — candle currency differs from the instrument's declared cu
     try {
       await backfillPortfolioHistory(db, both, 10_000, pf.id);
       const warned = stderr.mock.calls.map((c) => String(c[0])).join("");
-      expect(warned).toContain("instrument excluded from pricing");
+      expect(warned).toContain("price rows excluded");
       expect(warned).toContain('"currencies":["USD"]');
     } finally {
       stderr.mockRestore();
@@ -170,6 +170,43 @@ describe("backfill — candle currency differs from the instrument's declared cu
     expect(day, "snapshot must still be written").toBeDefined();
     // EUR holding at market (1 × 12) + the USD-quoting holding at cost (2 × 9).
     expect(Number(day!.marketValue)).toBe(30);
+  });
+
+  it("keeps the convertible rows of a mixed-currency series and survives a re-run", async () => {
+    const { db, pf, instr } = await seed("mixed");
+    await db.delete(fxRates).where(eq(fxRates.base, "USD"));
+    await db.delete(fxRates).where(eq(fxRates.base, "SGD"));
+    await db.insert(fxRates).values(
+      ["2026-08-01", "2026-08-02"].map((date) => ({
+        base: "USD",
+        quote: "EUR",
+        rate: "0.5",
+        date,
+      })),
+    );
+    // USD rows on 08-01/02 convert; SGD rows on 08-03/04 have no rate at all.
+    const mixed = new Map([
+      ["2026-08-01", { close: "20", currency: "USD" }],
+      ["2026-08-02", { close: "20", currency: "USD" }],
+      ["2026-08-03", { close: "20", currency: "SGD" }],
+      ["2026-08-04", { close: "20", currency: "SGD" }],
+    ]);
+    await db
+      .insert(prices)
+      .values([...mixed].map(([date, p]) => ({ instrumentId: instr.id, date, ...p })));
+    const empty = new MarketDataService([]);
+
+    for (let run = 0; run < 2; run++) {
+      await backfillPortfolioHistory(db, empty, 10_000, pf.id);
+      const snaps = await db
+        .select()
+        .from(portfolioSnapshots)
+        .where(eq(portfolioSnapshots.portfolioId, pf.id));
+      // 2 units × 20 USD × 0.5 = 20 EUR at market, not the cost of 18.
+      expect(Number(snaps.find((s) => s.date === "2026-08-01")!.marketValue), `run ${run}`).toBe(
+        20,
+      );
+    }
   });
 
   it("still skips the portfolio when a transaction currency has no rate", async () => {
