@@ -89,6 +89,8 @@ export function ContributionsChart({
 
   // Days where a portfolio had no snapshot and its last net worth was carried forward in the
   // aggregate series (#1172); the value line plots net worth, so say so.
+  // Counted off `valueHistory`, which `mergeContributionValue` maps 1:1 into the plotted rows: if
+  // that merge ever filters points, count off `merged` instead so the note stays exact.
   const carriedDays = valueHistory.filter((p) => p.netWorthCarried === true).length;
 
   const money = (v: number) => formatMoney(v, currency, locale);
