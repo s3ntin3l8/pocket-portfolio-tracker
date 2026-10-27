@@ -4,15 +4,53 @@ import type {
   ImportRecord,
   ImportDetail,
   UnmappedEventType,
+  Portfolio,
 } from "@portfolio/api-client";
-import { getServerApi, getSelectedPortfolioId } from "./_shared";
+import { documentsForPortfolios, inboxPortfolios } from "@/lib/inbox-documents";
+import {
+  getServerApi,
+  getSelectedPortfolioId,
+  listPortfoliosCached,
+  resolveEffectiveScope,
+} from "./_shared";
+
+/** Portfolios the inbox may list and upload into for the current scope (#1155). */
+export async function resolveInboxScope(): Promise<{
+  portfolios: Portfolio[];
+  portfolioIds: string[] | null;
+}> {
+  try {
+    const portfolios = await listPortfoliosCached();
+    return inboxPortfolios(portfolios, await resolveEffectiveScope(portfolios));
+  } catch {
+    // A scope we couldn't read must not fall open to every portfolio. An empty
+    // id list is the closed scope: nothing to list, nothing to upload into.
+    // That is the same shape as a scope that genuinely has no portfolios. Right
+    // for #1155; a status on this result is where to tell them apart if an
+    // empty inbox behind a broken API ever reads wrong.
+    return { portfolios: [], portfolioIds: [] };
+  }
+}
 
 export async function loadDocuments(category?: DocumentCategory): Promise<InboxDocument[]> {
   const api = await getServerApi();
   if (!api) return [];
   try {
     const portfolioId = await getSelectedPortfolioId();
-    return await api.listDocuments(category, portfolioId ?? undefined);
+    // Portfolio scope: the inbox endpoint filters itself.
+    if (portfolioId) return await api.listDocuments(category, portfolioId);
+
+    // Holder scope: GET /documents takes one portfolioId, not a holder. The portfolio
+    // list and the inbox read don't depend on each other — fetch them together, then
+    // keep only the holder's portfolios. No holder scope (or a holder who doesn't
+    // qualify) keeps the all-portfolios list (#1155).
+    const [portfolios, docs] = await Promise.all([
+      listPortfoliosCached(),
+      api.listDocuments(category),
+    ]);
+    const { portfolioIds } = inboxPortfolios(portfolios, await resolveEffectiveScope(portfolios));
+    if (portfolioIds == null) return docs;
+    return documentsForPortfolios(docs, new Set(portfolioIds));
   } catch {
     return [];
   }

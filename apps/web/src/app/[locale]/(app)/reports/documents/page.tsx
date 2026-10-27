@@ -1,33 +1,24 @@
 import { getTranslations, setRequestLocale } from "next-intl/server";
 import { PageHeader } from "@/components/page-header";
 import { TaxReportsInbox } from "@/components/tax-reports-inbox";
-import { loadDocuments, resolveSelection } from "@/lib/server-api";
+import { loadDocuments, resolveInboxScope } from "@/lib/server-api";
 
 export default async function TaxReportsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
   const t = await getTranslations("TaxReports");
 
-  const [documents, selection] = await Promise.all([
-    loadDocuments("tax_report"),
-    resolveSelection(),
-  ]);
-  // Uploads require a real portfolioId (routes/documents.ts) — default to the
-  // switcher-selected portfolio, or the first one in the aggregate ("All portfolios")
-  // scope, exactly like transactions/new/page.tsx's NewEntryTabs wiring.
-  const portfolios =
-    selection.status === "ok"
-      ? selection.portfolios.map((p) => ({
-          id: p.id,
-          name: p.name,
-          brokerage: p.brokerage,
-          accountHolder: p.accountHolder,
-        }))
-      : [];
-  const initialPortfolioId =
-    selection.status === "ok" && selection.portfolios.length > 0
-      ? (selection.selectedId ?? selection.portfolios[0].id)
-      : "";
+  const [documents, scope] = await Promise.all([loadDocuments("tax_report"), resolveInboxScope()]);
+  // The picker and its default stay inside the same scope as the list. A holder scope
+  // used to offer every portfolio and default to portfolios[0], which can be another
+  // holder's — the upload succeeded and then vanished from the scoped refresh (#1155).
+  const portfolios = scope.portfolios.map((p) => ({
+    id: p.id,
+    name: p.name,
+    brokerage: p.brokerage,
+    accountHolder: p.accountHolder,
+  }));
+  const initialPortfolioId = scope.portfolios[0]?.id ?? "";
 
   return (
     <div className="space-y-6">
@@ -36,6 +27,7 @@ export default async function TaxReportsPage({ params }: { params: Promise<{ loc
         initialDocuments={documents}
         portfolios={portfolios}
         initialPortfolioId={initialPortfolioId}
+        scopedPortfolioIds={scope.portfolioIds}
       />
     </div>
   );

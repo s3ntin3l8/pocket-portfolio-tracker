@@ -44,6 +44,21 @@ const PF = [
   { id: "p2", name: "DKB", baseCurrency: "EUR" },
 ];
 
+function doc(id: string, portfolioId: string | null) {
+  return {
+    id,
+    category: "tax_report" as const,
+    taxYear: 2025,
+    source: "upload",
+    originalFilename: `${id}.pdf`,
+    mimeType: "application/pdf",
+    sizeBytes: 1,
+    portfolioId,
+    portfolioLabel: null,
+    storedAt: "2026-01-01T00:00:00.000Z",
+  };
+}
+
 beforeEach(() => {
   h.accessToken = "tok"; // signed in by default
   h.cookies = {};
@@ -690,6 +705,92 @@ describe("aggregate + misc loaders", () => {
     expect(getContributions).not.toHaveBeenCalled();
 
     h.cookies = {};
+  });
+
+  it("loadDocuments keeps a holder scope to that holder's portfolios", async () => {
+    const docs = [doc("d1", "p1"), doc("d2", "p2"), doc("d3", "p3"), doc("d4", null)];
+    const listDocuments = vi.fn(async (_category?: string, portfolioId?: string) =>
+      portfolioId ? docs.filter((d) => d.portfolioId === portfolioId) : docs,
+    );
+    h.client.listDocuments = listDocuments;
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "EUR", accountHolderId: "h1" },
+      { id: "p2", name: "B", baseCurrency: "EUR", accountHolderId: "h1" },
+      { id: "p3", name: "C", baseCurrency: "EUR", accountHolderId: "h2" },
+    ];
+
+    // All portfolios: the whole inbox, including a row with no portfolio.
+    h.cookies = {};
+    expect((await api.loadDocuments("tax_report")).map((d) => d.id)).toEqual([
+      "d1",
+      "d2",
+      "d3",
+      "d4",
+    ]);
+    expect(listDocuments).toHaveBeenCalledWith("tax_report");
+
+    // Holder scope: only that holder's portfolios. The other holder's document,
+    // and a document attached to no portfolio, stay out.
+    h.cookies = { pf: "holder:h1" };
+    listDocuments.mockClear();
+    expect((await api.loadDocuments("tax_report")).map((d) => d.id)).toEqual(["d1", "d2"]);
+    expect(listDocuments).toHaveBeenCalledWith("tax_report");
+
+    // A holder who owns one portfolio doesn't qualify — same as the other loaders,
+    // the page falls back to the all-portfolios list.
+    h.cookies = { pf: "holder:h2" };
+    expect((await api.loadDocuments("tax_report")).map((d) => d.id)).toEqual([
+      "d1",
+      "d2",
+      "d3",
+      "d4",
+    ]);
+
+    // Portfolio scope: the API filters, the loader doesn't second-guess it.
+    h.cookies = { pf: "p3" };
+    listDocuments.mockClear();
+    expect((await api.loadDocuments("tax_report")).map((d) => d.id)).toEqual(["d3"]);
+    expect(listDocuments).toHaveBeenCalledWith("tax_report", "p3");
+
+    h.cookies = {};
+    h.client.listDocuments = async () => {
+      throw new Error("down");
+    };
+    expect(await api.loadDocuments()).toEqual([]);
+  });
+
+  it("resolveInboxScope offers only the portfolios the list will show", async () => {
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "EUR", accountHolderId: "h1" },
+      { id: "p2", name: "B", baseCurrency: "EUR", accountHolderId: "h1" },
+      { id: "p3", name: "C", baseCurrency: "EUR", accountHolderId: "h2" },
+    ];
+
+    h.cookies = {};
+    expect(await api.resolveInboxScope()).toMatchObject({ portfolioIds: null });
+
+    // Holder scope: the picker must not default to another holder's portfolio.
+    h.cookies = { pf: "holder:h1" };
+    const holder = await api.resolveInboxScope();
+    expect(holder.portfolios.map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(holder.portfolioIds).toEqual(["p1", "p2"]);
+
+    h.cookies = { pf: "p3" };
+    const one = await api.resolveInboxScope();
+    expect(one.portfolios.map((p) => p.id)).toEqual(["p3"]);
+    expect(one.portfolioIds).toEqual(["p3"]);
+
+    // A single-portfolio holder doesn't qualify — the aggregate, same as the loader.
+    h.cookies = { pf: "holder:h2" };
+    expect(await api.resolveInboxScope()).toMatchObject({ portfolioIds: null });
+    h.cookies = {};
+  });
+
+  it("resolveInboxScope fails closed when the portfolio list throws", async () => {
+    h.client.listPortfolios = async () => {
+      throw new Error("down");
+    };
+    expect(await api.resolveInboxScope()).toEqual({ portfolios: [], portfolioIds: [] });
   });
 
   it("loadInstrumentResult only reports not_found for a real 404, never a transient error", async () => {

@@ -6,7 +6,9 @@ import type { PickablePortfolio } from "../src/components/portfolio-picker";
 import messages from "../messages/en.json";
 
 const refresh = vi.fn();
-const listDocuments = vi.fn(async () => [] as InboxDocument[]);
+const listDocuments = vi.fn(
+  async (_category?: string, _portfolioId?: string): Promise<InboxDocument[]> => [],
+);
 const uploadDocument = vi.fn(async () => ({ id: "doc1", duplicate: false }));
 const getDocumentUrl = vi.fn(async () => ({
   url: "https://x/doc.pdf",
@@ -34,11 +36,13 @@ function renderInbox(opts: {
   portfolios?: PickablePortfolio[];
   initialPortfolioId?: string;
   initialDocuments?: InboxDocument[];
+  scopedPortfolioIds?: string[] | null;
 }) {
   const {
     portfolios = [{ id: "p1", name: "Main", brokerage: null, accountHolder: null }],
     initialPortfolioId = "p1",
     initialDocuments = [],
+    scopedPortfolioIds = null,
   } = opts;
   return render(
     <NextIntlClientProvider locale="en" messages={messages}>
@@ -46,6 +50,7 @@ function renderInbox(opts: {
         initialDocuments={initialDocuments}
         portfolios={portfolios}
         initialPortfolioId={initialPortfolioId}
+        scopedPortfolioIds={scopedPortfolioIds}
       />
     </NextIntlClientProvider>,
   );
@@ -162,5 +167,63 @@ describe("TaxReportsInbox", () => {
     expect(dataRowsDesc[0]).toHaveTextContent("newer.pdf");
     expect(dataRowsDesc[1]).toHaveTextContent("older.pdf");
     expect(yearBtn.closest("th")).toHaveAttribute("aria-sort", "descending");
+  });
+
+  it("refreshes inside the holder scope instead of the whole inbox", async () => {
+    const rows: InboxDocument[] = [
+      {
+        id: "mine",
+        category: "tax_report",
+        taxYear: 2025,
+        source: "upload",
+        originalFilename: "mine.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+        portfolioId: "p1",
+        portfolioLabel: "Main",
+        storedAt: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "other",
+        category: "tax_report",
+        taxYear: 2025,
+        source: "upload",
+        originalFilename: "other.pdf",
+        mimeType: "application/pdf",
+        sizeBytes: 10,
+        portfolioId: "p9",
+        portfolioLabel: "Elsewhere",
+        storedAt: "2026-01-02T00:00:00.000Z",
+      },
+    ];
+    listDocuments.mockImplementation(async (_category?: string, portfolioId?: string) =>
+      rows.filter((d) => d.portfolioId === portfolioId),
+    );
+    const { container } = renderInbox({
+      portfolios: [
+        { id: "p1", name: "Main", brokerage: null, accountHolder: null },
+        { id: "p2", name: "Second", brokerage: null, accountHolder: null },
+      ],
+      scopedPortfolioIds: ["p1", "p2"],
+    });
+
+    fireEvent.change(fileInput(container), { target: { files: [pdfFile()] } });
+
+    await waitFor(() => {
+      expect(listDocuments).toHaveBeenCalledWith("tax_report", "p1");
+      expect(listDocuments).toHaveBeenCalledWith("tax_report", "p2");
+    });
+    expect(listDocuments).not.toHaveBeenCalledWith("tax_report");
+    expect(screen.getAllByText("mine.pdf").length).toBeGreaterThan(0);
+    expect(screen.queryByText("other.pdf")).not.toBeInTheDocument();
+  });
+
+  it("refreshes a single portfolio through the portfolio filter", async () => {
+    listDocuments.mockImplementation(async () => []);
+    const { container } = renderInbox({ scopedPortfolioIds: ["p1"] });
+
+    fireEvent.change(fileInput(container), { target: { files: [pdfFile()] } });
+
+    await waitFor(() => expect(listDocuments).toHaveBeenCalledWith("tax_report", "p1"));
   });
 });

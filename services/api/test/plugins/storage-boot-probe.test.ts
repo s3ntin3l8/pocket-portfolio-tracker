@@ -37,8 +37,9 @@ const saved = {
 
 /**
  * Boot an app with the real storage plugin and hand it to `check`. The storage env is set
- * explicitly, never deleted: outside NODE_ENV=test the env plugin loads dotenv, and a key
- * that is absent could come from a local `.env` (dotenv doesn't override a present one).
+ * explicitly, never deleted: dotenv does not override a key that is already set, and
+ * `shouldLoadDotenv` skips `.env` under Vitest (#1154) — an absent key must not be
+ * the thing that decides what this case booted with.
  */
 async function boot(
   env: { NODE_ENV: string; STORAGE_ENDPOINT?: string },
