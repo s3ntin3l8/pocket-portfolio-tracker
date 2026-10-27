@@ -20,10 +20,21 @@ const MAX_EMPTY_FILL_MEMO = 1000;
 const QUOTE_CONCURRENCY = 4;
 /** Provider failures tolerated per `getQuotes` run before it is skipped for the rest. */
 const PROVIDER_ERROR_BUDGET = 5;
-/** A 429 pauses the provider briefly; a 402 (daily quota) until the next UTC midnight. */
+/** A 429 from a `quotaProbe` provider pauses it briefly; a 402 (daily quota) until the next UTC midnight. */
 const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000;
+/** Upper bound on how long a read path waits for a quota probe (the usage endpoint can be slow). */
+const QUOTA_PROBE_TIMEOUT_MS = 2000;
 /** How often a `quotaProbe` provider's usage endpoint is read. */
 const QUOTA_PROBE_INTERVAL_MS = 60 * 1000;
+
+/** Resolve to null instead of waiting out a slow usage endpoint. */
+function withProbeTimeout<T>(p: Promise<T>): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), QUOTA_PROBE_TIMEOUT_MS);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
 
 function nextUtcMidnight(now: number): number {
   const d = new Date(now);
@@ -53,8 +64,11 @@ export interface MarketDataServiceOptions {
 export class MarketDataService {
   /** Gap-fill attempts that added nothing → when they may be retried (see `fillGaps`). */
   private readonly emptyFills = new Map<string, number>();
-  /** Circuit breaker: provider name → epoch ms until which it is not called (quota/429). */
-  private readonly blockedUntil = new Map<string, number>();
+  /**
+   * Circuit breaker: provider name → epoch ms until which it is not called, and why. A
+   * usage probe may lift a quota block (headroom reappeared) but never a 429 cooldown.
+   */
+  private readonly blockedUntil = new Map<string, { until: number; reason: "quota" | "rate" }>();
   private readonly lastProbeAt = new Map<string, number>();
 
   constructor(
@@ -73,9 +87,9 @@ export class MarketDataService {
   }
 
   private isBlocked(provider: MarketDataProvider): boolean {
-    const until = this.blockedUntil.get(provider.name);
-    if (until === undefined) return false;
-    if (until > Date.now()) return true;
+    const block = this.blockedUntil.get(provider.name);
+    if (block === undefined) return false;
+    if (block.until > Date.now()) return true;
     this.blockedUntil.delete(provider.name);
     return false;
   }
@@ -84,19 +98,28 @@ export class MarketDataService {
   getBlockedProviders(): { provider: string; until: Date }[] {
     return this.providers
       .filter((p) => this.isBlocked(p))
-      .map((p) => ({ provider: p.name, until: new Date(this.blockedUntil.get(p.name)!) }));
+      .map((p) => ({ provider: p.name, until: new Date(this.blockedUntil.get(p.name)!.until) }));
   }
 
   /**
-   * Every provider failure goes through here: a quota signal (HTTP 402 daily limit, 429
-   * rate limit) trips the breaker so the provider isn't asked again — each wasted call
-   * burns the budget it just ran out of — then the usual `onProviderError` fires.
+   * Every provider failure goes through here: a quota signal trips the breaker so the
+   * provider isn't asked again — each wasted call burns the budget it just ran out of —
+   * then the usual `onProviderError` fires. HTTP 402 (daily limit) is unambiguous for any
+   * provider. A 429 is only a provider-wide pause for a `quotaProbe` provider (a hard
+   * plan cap); for the scraped/keyless endpoints it is the normal per-request throttle
+   * shape and must not remove the provider from every other instrument's lookup.
    */
   private providerFailed(provider: MarketDataProvider, method: string, err: unknown): void {
-    if (err instanceof MarketDataError && (err.status === 402 || err.status === 429)) {
+    if (err instanceof MarketDataError && !this.isBlocked(provider)) {
       const now = Date.now();
-      const until = err.status === 402 ? nextUtcMidnight(now) : now + RATE_LIMIT_COOLDOWN_MS;
-      if (!this.isBlocked(provider)) this.blockedUntil.set(provider.name, until);
+      if (err.status === 402) {
+        this.blockedUntil.set(provider.name, { until: nextUtcMidnight(now), reason: "quota" });
+      } else if (err.status === 429 && provider.quotaProbe) {
+        this.blockedUntil.set(provider.name, {
+          until: now + RATE_LIMIT_COOLDOWN_MS,
+          reason: "rate",
+        });
+      }
     }
     this.opts.onProviderError?.(provider.name, method, err);
   }
@@ -104,9 +127,10 @@ export class MarketDataService {
   /**
    * For providers whose usage endpoint is free and reports a hard daily cap (`quotaProbe`),
    * stop calling them once `used >= limit` — before paying for the 402 — and resume as soon
-   * as the endpoint reports headroom again (e.g. purchased extra calls). Read at most once a
-   * minute per provider; a failed or unparseable probe never blocks (fail open — the
-   * reactive 402 trigger in `providerFailed` is the backstop).
+   * as the endpoint reports headroom again (e.g. purchased extra calls) — but never lifts a
+   * 429 cooldown early. Read at most once a minute per provider and bounded to
+   * `QUOTA_PROBE_TIMEOUT_MS` on the request path; a failed, slow or unparseable probe never
+   * blocks (fail open — the reactive 402 trigger in `providerFailed` is the backstop).
    */
   private async probeQuotas(): Promise<void> {
     const now = Date.now();
@@ -116,11 +140,14 @@ export class MarketDataService {
         if (now - (this.lastProbeAt.get(provider.name) ?? 0) < QUOTA_PROBE_INTERVAL_MS) return;
         this.lastProbeAt.set(provider.name, now);
         try {
-          const usage = await provider.getUsage();
+          const usage = await withProbeTimeout(provider.getUsage());
           if (usage?.window !== "day" || usage.used == null || usage.limit == null) return;
           if (usage.used >= usage.limit) {
             if (!this.isBlocked(provider)) {
-              this.blockedUntil.set(provider.name, nextUtcMidnight(now));
+              this.blockedUntil.set(provider.name, {
+                until: nextUtcMidnight(now),
+                reason: "quota",
+              });
               this.opts.onProviderError?.(
                 provider.name,
                 "quota",
@@ -131,7 +158,7 @@ export class MarketDataService {
                 ),
               );
             }
-          } else {
+          } else if (this.blockedUntil.get(provider.name)?.reason === "quota") {
             this.blockedUntil.delete(provider.name);
           }
         } catch {

@@ -313,6 +313,7 @@
     "usageUsedOfLimit": "{used} / {limit} {window}",
     "usageUsed": "{used} {window}",
     "usageLocalHint": "hitungan lokal",
+    "usagePausedUntil": "dijeda hingga {time}",
     "credentialSet": "Atur kunci API",
     "credentialRotate": "Ganti kunci",
     "credentialClear": "Hapus kunci",

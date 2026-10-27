@@ -87,17 +87,23 @@ describe("quota circuit breaker", () => {
     expect(svc.getBlockedProviders()).toEqual([]);
   });
 
-  it("pauses a 429 only briefly, and ignores errors that are not quota signals", async () => {
+  it("pauses a quota provider's 429 only briefly, and ignores errors that are not quota signals", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-27T10:00:00Z"));
     let status = 429;
-    const flaky = provider("flaky", async () => {
-      throw new MarketDataError("nope", "flaky", status);
-    });
+    const flaky = provider(
+      "flaky",
+      async () => {
+        throw new MarketDataError("nope", "flaky", status);
+      },
+      { quotaProbe: true, getUsage: async () => ({ window: "day", used: 1, limit: 20 }) },
+    );
     const yahoo = provider("yahoo", async () => quote("10"));
     const svc = new MarketDataService([flaky, yahoo]);
 
     await svc.getQuote(ref);
+    // Even though the usage probe (every minute) reports headroom, the 429 cooldown holds.
+    vi.setSystemTime(new Date("2026-10-27T10:02:00Z"));
     await svc.getQuote(ref);
     expect(flaky.calls).toBe(1);
     vi.setSystemTime(new Date("2026-10-27T10:11:00Z")); // past the 10 min cooldown
@@ -106,6 +112,35 @@ describe("quota circuit breaker", () => {
     await svc.getQuote(ref);
     expect(flaky.calls).toBe(3);
     expect(svc.getBlockedProviders()).toEqual([]);
+  });
+
+  it("does not take a keyless provider out of every lookup because of one 429", async () => {
+    const scraped = provider("scraped", async () => {
+      throw new MarketDataError("throttled", "scraped", 429);
+    });
+    const svc = new MarketDataService([scraped, provider("fixture", async () => quote("1"))]);
+    await svc.getQuote(ref);
+    await svc.getQuote(ref);
+    expect(scraped.calls).toBe(2); // asked again; only the throttled request degraded
+    expect(svc.getBlockedProviders()).toEqual([]);
+  });
+
+  it("reports a failing profile lookup and trips the breaker on its 402", async () => {
+    const quota: MarketDataProvider = {
+      name: "quota",
+      supports: () => true,
+      getQuote: async () => null,
+      getProfile: async () => {
+        throw new MarketDataError("limit", "quota", 402);
+      },
+    };
+    const errors: string[] = [];
+    const svc = new MarketDataService([quota], {
+      onProviderError: (p, m) => errors.push(`${p}.${m}`),
+    });
+    expect(await svc.getProfile(ref)).toBeNull();
+    expect(errors).toEqual(["quota.getProfile"]);
+    expect(svc.getBlockedProviders().map((b) => b.provider)).toEqual(["quota"]);
   });
 
   it("covers history, dividends, profile and search, not just quotes", async () => {
@@ -180,6 +215,15 @@ describe("quota circuit breaker", () => {
         const svc = new MarketDataService([eod]);
         expect((await svc.getQuote(ref))?.price).toBe("7");
       }
+    });
+
+    it("does not wait on a slow usage endpoint", async () => {
+      vi.useFakeTimers();
+      const eod = probed(() => new Promise<ProviderUsage | null>(() => {})); // never resolves
+      const svc = new MarketDataService([eod]);
+      const pending = svc.getQuote(ref);
+      await vi.advanceTimersByTimeAsync(2500);
+      expect((await pending)?.price).toBe("7");
     });
 
     it("resumes when the probe reports headroom again (extra calls bought)", async () => {

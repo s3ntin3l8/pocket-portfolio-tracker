@@ -313,6 +313,7 @@
     "usageUsedOfLimit": "{used} / {limit} {window}",
     "usageUsed": "{used} {window}",
     "usageLocalHint": "local count",
+    "usagePausedUntil": "paused until {time}",
     "credentialSet": "Set API key",
     "credentialRotate": "Rotate key",
     "credentialClear": "Clear key",

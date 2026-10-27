@@ -133,17 +133,19 @@ so the effective chain per asset is:
 
 A provider that says its quota is used up is not called again until the window resets, so a
 keyed primary on a small plan (EODHD's free tier is 20 calls/day) does not waste a round trip
-per instrument on every refresh before the fallback answers. Three signals open it:
+per instrument on every refresh before the fallback answers. Three signals open it (the Admin → Providers page shows "paused until" while one is open):
 
 - HTTP **402** (daily limit exceeded): skipped until the next UTC midnight.
-- HTTP **429**: skipped for 10 minutes.
+- HTTP **429** from a provider with a hard plan cap (`quotaProbe`): skipped for 10 minutes. For
+  the scraped/keyless providers a 429 is the normal per-request throttle and only affects that
+  request, never the provider as a whole.
 - A provider with a free usage endpoint and a hard daily cap (`quotaProbe`, today EODHD's
   `/user`, the same figure the Admin → Providers page shows) that reports `used >= limit`:
   skipped until midnight before any call is made. It is read at most once a minute, a failed
   probe never blocks, and it resumes as soon as the endpoint reports headroom again.
 
 The breaker lives in `MarketDataService` (in memory, per process) and covers quotes, history,
-dividends, profile and search. To make a free-tier EODHD key a fallback instead of the primary,
+dividends, profile, search and name lookup. To make a free-tier EODHD key a fallback instead of the primary,
 move Yahoo above it in Admin → Providers (priority is a stored setting, not a code default).
 
 Gold is sourced multiple ways on purpose: **spot** (market `XAU`, via Twelve Data / GoldAPI,
