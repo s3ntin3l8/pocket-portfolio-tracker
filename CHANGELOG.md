@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.7...v0.2.8) (2026-10-27)
+
+
+### Features
+
+* **backfill:** let a user re-run their own price-history backfill ([#1208](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1208)) ([0913c00](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0913c0058cd91300197d0f3ed96fc8db363cb6eb))
+
+
+### Bug Fixes
+
+* **backfill:** never re-fetch an instrument whose feed is dead ([#1205](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1205)) ([cdeae5b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/cdeae5b9fe7918bb56910ee3448e9772e0f2e8be))
+* hermetic NODE_ENV default and holder-scoped inbox documents ([#1198](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1198)) ([767bc15](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/767bc153c4e85b8f5e278f857a40587eae6d8353))
+* **imports:** a standalone tax row has no instrument ([#1203](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1203)) ([db4e61d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/db4e61d9dcf72d2a001721cfcce8a81fad667b32))
+* **imports:** link a Vorabpauschale CSV row to the fund it names ([#1209](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1209)) ([58fad35](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/58fad353b7874b14f443231a75bb26222966619e))
+* **market-data:** stop calling a provider after it reports its quota exhausted ([#1204](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1204)) ([394472b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/394472b05e7d5f1d0e0c566a577f850c5f891343))
+* **reconcile:** a manual correction never registers as new cash drift ([#1199](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1199)) ([8203046](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/8203046d5f079fd7866806ee962699bd512b106f))
+
 ## [0.2.7](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.6...v0.2.7) (2026-10-27)
 
 
