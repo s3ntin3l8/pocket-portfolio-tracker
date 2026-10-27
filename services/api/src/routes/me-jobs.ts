@@ -21,7 +21,8 @@ export async function meJobsRoute(app: FastifyInstance) {
     // Opt back in to feeds cooling down as dead (delisted symbols); see the dead-feed guard.
     const retryDeadFeeds = body?.retryDeadFeeds === true;
 
-    const allowed = limiter.hit(user.id);
+    // Only a request that actually queues costs a slot: a 409/503 enqueued nothing.
+    const allowed = limiter.check(user.id);
     if (!allowed.ok) {
       return reply
         .code(429)
@@ -39,6 +40,8 @@ export async function meJobsRoute(app: FastifyInstance) {
       if (result.alreadyInFlight) return reply.code(409).send({ error: "already_in_flight" });
       return reply.code(503).send({ error: "scheduler_unavailable" });
     }
+
+    limiter.hit(user.id);
 
     await app.db.insert(adminAuditLog).values({
       actorSub: user.authSub,

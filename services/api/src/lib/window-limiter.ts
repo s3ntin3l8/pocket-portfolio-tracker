@@ -7,7 +7,23 @@ export function createWindowLimiter(opts: { max: number; windowMs: number; now?:
   const hits = new Map<string, number[]>();
   const now = opts.now ?? Date.now;
 
+  function recent(key: string): { recent: number[]; t: number; cutoff: number } {
+    const t = now();
+    const cutoff = t - opts.windowMs;
+    return { recent: (hits.get(key) ?? []).filter((ts) => ts > cutoff), t, cutoff };
+  }
+
   return {
+    /** Like `hit` but records nothing: would the next `hit` be refused? */
+    check(key: string): { ok: true } | { ok: false; retryAfterSec: number } {
+      const { recent: r, t } = recent(key);
+      if (r.length < opts.max) return { ok: true };
+      const oldest = r[0] ?? t;
+      return {
+        ok: false,
+        retryAfterSec: Math.max(1, Math.ceil((oldest + opts.windowMs - t) / 1000)),
+      };
+    },
     /** Records a hit and returns `{ ok: true }`, or `{ ok: false, retryAfterSec }` when over. */
     hit(key: string): { ok: true } | { ok: false; retryAfterSec: number } {
       const t = now();

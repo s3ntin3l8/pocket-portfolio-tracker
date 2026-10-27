@@ -262,8 +262,10 @@ A signed-in user can re-run the backfill for their own portfolios from Settings 
 › Price history (`POST /me/jobs/backfill`, a write-scoped credential; read-only tokens get 403). It
 enqueues `backfill-stale-history` with `{ force: true, userId: <caller> }`, never for another
 user, and optionally `retryDeadFeeds` to re-ask feeds in the dead-feed cooldown. A repeat inside the
-singleton window returns 409, more than three per hour per user 429, and each request is written to
-the admin audit log. It reports "queued", not "finished". Admins can still trigger any job (any
+singleton window returns 409, and more than three queued re-checks per hour per user 429 (a
+rejected request costs no slot); each accepted request is written to the admin audit log. A forced
+re-check re-fetches the full history of every held instrument from the providers, so it is
+deliberately rationed. It reports "queued", not "finished". Admins can still trigger any job (any
 user, any scope) from Admin › Jobs.
 
 ## Admin overrides

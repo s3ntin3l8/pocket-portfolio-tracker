@@ -38,14 +38,18 @@ async function mintPat(ownerJwt: string, scope: "read" | "write") {
 }
 
 /** A fake pg-boss that records sends and collapses repeats like a singleton key does. */
-function fakeBoss() {
+function fakeBoss({ dedupe = true }: { dedupe?: boolean } = {}) {
   const sent: Array<{ name: string; data: Record<string, unknown> }> = [];
   const keys = new Set<string>();
   setActiveBoss({
-    send: async (name: string, data: Record<string, unknown>, opts: { singletonKey?: string }) => {
-      if (opts.singletonKey !== undefined) {
-        if (keys.has(opts.singletonKey)) return null;
-        keys.add(opts.singletonKey);
+    send: async (
+      name: string,
+      data: Record<string, unknown>,
+      sendOpts: { singletonKey?: string },
+    ) => {
+      if (dedupe && sendOpts.singletonKey !== undefined) {
+        if (keys.has(sendOpts.singletonKey)) return null;
+        keys.add(sendOpts.singletonKey);
       }
       sent.push({ name, data });
       return "job-id";
@@ -175,8 +179,28 @@ describe("POST /me/jobs/backfill", () => {
     expect(res.json()).toMatchObject({ error: "scheduler_unavailable" });
   });
 
+  it("does not charge the rate limit for requests that queue nothing", async () => {
+    const t = await jwt("mj-nocharge");
+    // No scheduler: every attempt is a 503 and must not eat the hourly allowance.
+    for (let i = 0; i < 5; i++) {
+      const res = await app.inject({ method: "POST", url: "/me/jobs/backfill", headers: auth(t) });
+      expect(res.statusCode).toBe(503);
+    }
+    const sent = fakeBoss();
+    try {
+      const ok = await app.inject({ method: "POST", url: "/me/jobs/backfill", headers: auth(t) });
+      expect(ok.statusCode).toBe(200);
+      const dup = await app.inject({ method: "POST", url: "/me/jobs/backfill", headers: auth(t) });
+      expect(dup.statusCode).toBe(409);
+      expect(sent).toHaveLength(1);
+    } finally {
+      setActiveBoss(null);
+    }
+  });
+
   it("rate-limits a user after three requests with a retry-after", async () => {
-    fakeBoss();
+    // Dedup off: the rate limit is what is under test, not the singleton window.
+    const sent = fakeBoss({ dedupe: false });
     try {
       const t = await jwt("mj-rate");
       const codes: number[] = [];
@@ -193,7 +217,8 @@ describe("POST /me/jobs/backfill", () => {
           expect(res.json()).toMatchObject({ error: "backfill_rate_limited" });
         }
       }
-      expect(codes[3]).toBe(429);
+      expect(codes).toEqual([200, 200, 200, 429]);
+      expect(sent).toHaveLength(3);
     } finally {
       setActiveBoss(null);
     }
