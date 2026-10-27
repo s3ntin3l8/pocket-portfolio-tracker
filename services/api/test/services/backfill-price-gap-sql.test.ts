@@ -6,6 +6,8 @@
  */
 import { describe, it, expect, afterAll } from "vitest";
 import { instruments, prices } from "@portfolio/db";
+import { MAX_PRICE_CARRY_FORWARD_DAYS } from "@portfolio/core";
+import { findGaps } from "@portfolio/market-data";
 import { ensureDb, closeDb } from "../../src/db/client.js";
 import { priceGapRemains } from "../../src/services/backfill/shared.js";
 
@@ -66,6 +68,47 @@ describe("priceGapRemains (SQL)", () => {
     const { db, id } = await seed(["2026-04-01", "2026-04-05"]);
     expect(await priceGapRemains(db, id, "2026-04-01", ["2026-04-30"], "2026-04-10")).toBe(true);
     expect(await priceGapRemains(db, id, "2026-04-01", [], "2026-04-02")).toBe(false);
+  });
+
+  it("grades only the trailing rule when stored dates run past `today`", async () => {
+    const { db, id } = await seed(["2026-04-20", "2026-04-21"]);
+    expect(await priceGapRemains(db, id, "2026-04-20", [], "2026-04-10")).toBe(false);
+  });
+
+  it("anchors on the newest pre-fetchFrom row only", async () => {
+    // Two old rows 19 days apart must not read as a hole; only the newest one anchors.
+    const { db, id } = await seed(["2026-01-01", "2026-01-20"]);
+    expect(await priceGapRemains(db, id, "2026-01-21", ["2026-01-22"], "2026-01-25")).toBe(false);
+  });
+
+  it("agrees with findGaps over randomized series", async () => {
+    let state = 12345;
+    const rand = (n: number) => {
+      state = (state * 1103515245 + 12345) % 2 ** 31;
+      return state % n;
+    };
+    for (let k = 0; k < 40; k++) {
+      const all: string[] = [];
+      for (let d = 0; d < 120; d++) if (rand(100) < 25 + rand(60)) all.push(day("2026-01-01", d));
+      const fetchFrom = day("2026-01-01", rand(100));
+      const today = day("2026-01-01", 20 + rand(120));
+      const stored = all.filter((_, i) => i % 2 === 0);
+      const fetched = all.filter((d, i) => i % 2 === 1 && d >= fetchFrom);
+      const { db, id } = await seed(stored);
+      const anchor = stored
+        .filter((d) => d < fetchFrom)
+        .sort()
+        .pop();
+      const series = [
+        ...(anchor ? [anchor] : []),
+        ...stored.filter((d) => d >= fetchFrom),
+        ...fetched,
+      ];
+      const expected = findGaps(series, today, MAX_PRICE_CARRY_FORWARD_DAYS).length > 0;
+      expect(await priceGapRemains(db, id, fetchFrom, fetched, today), `series ${k}`).toBe(
+        expected,
+      );
+    }
   });
 
   it("is false with no rows and no fetched dates", async () => {
