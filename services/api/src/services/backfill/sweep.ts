@@ -11,14 +11,13 @@ import {
   computeHoldings,
   toDateKey,
   MAX_PRICE_CARRY_FORWARD_DAYS,
-  DEAD_FEED_MISS_THRESHOLD,
   type CorporateAction,
 } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
 import type { DB } from "../../db/client.js";
 import { toCoreTxns } from "../tx-core.js";
 import { backfillPortfolioHistory, type BackfillResult } from "./core.js";
-import { firstHeldDateFrom, isManualPriceBond } from "./shared.js";
+import { firstHeldDateFrom, isDeadFeedCoolingDown, isManualPriceBond } from "./shared.js";
 
 export interface SweepResult {
   scanned: number;
@@ -49,7 +48,18 @@ export interface SweepOptions {
    * the whole fan-out, so a swallowed send failure here must not be counted as `queued`).
    * Direct callers (tests, dev scripts) that omit this keep today's synchronous behavior.
    */
-  enqueue?: (portfolioId: string, fromDate?: string, tailOnly?: boolean) => Promise<boolean>;
+  enqueue?: (
+    portfolioId: string,
+    fromDate?: string,
+    tailOnly?: boolean,
+    retryDeadFeeds?: boolean,
+  ) => Promise<boolean>;
+  /**
+   * Ask the providers even for feeds cooling down as dead (see `isDeadFeedCoolingDown`).
+   * Deliberately separate from `force`: a forced re-backfill re-derives snapshots, it must
+   * not silently re-hit a delisted symbol. Set by an operator who knows the feed is back.
+   */
+  retryDeadFeeds?: boolean;
 }
 
 /** How far back the sweep looks for a hole in the MIDDLE of a held instrument's prices. */
@@ -216,11 +226,12 @@ export async function backfillStalePortfolios(
     const h = feedHealthByInstr.get(instrumentId);
     return !!h && h.assetClass === "bond" && (isManualPriceBond(h) || !h.faceValue);
   }
-  function isCoolingDownDeadFeed(instrumentId: string): boolean {
+  function skipsDeadFeed(instrumentId: string): boolean {
+    // `retryDeadFeeds` (an operator who knows the feed is back) must reach the selection
+    // too, or a portfolio stale only because of its dead feed is never enqueued at all.
+    if (opts.retryDeadFeeds) return false;
     const health = feedHealthByInstr.get(instrumentId);
-    if (!health || health.priceFeedMissCount < DEAD_FEED_MISS_THRESHOLD) return false;
-    if (!health.priceFeedLastMissAt) return false;
-    return daysBetween(toDateKey(health.priceFeedLastMissAt), today) < DEAD_FEED_MISS_THRESHOLD;
+    return !!health && isDeadFeedCoolingDown(health, today);
   }
 
   // Per portfolio, the OLDEST latest-price-date across its CURRENTLY HELD instruments —
@@ -231,7 +242,7 @@ export async function backfillStalePortfolios(
   const worstLatestPriceByPortfolio = new Map<string, string | null>();
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
-      if (isCoolingDownDeadFeed(instrumentId) || isUnhealableBond(instrumentId)) continue;
+      if (skipsDeadFeed(instrumentId) || isUnhealableBond(instrumentId)) continue;
       const latest = latestPriceByInstr.get(instrumentId) ?? null;
       const cur = worstLatestPriceByPortfolio.get(portfolioId);
       if (cur === undefined) {
@@ -303,7 +314,7 @@ export async function backfillStalePortfolios(
   for (const [portfolioId, heldIds] of heldInstrIdsByPortfolio) {
     for (const instrumentId of heldIds) {
       const gaps = midGapsByInstr.get(instrumentId);
-      if (!gaps || isUnhealableBond(instrumentId) || isCoolingDownDeadFeed(instrumentId)) continue;
+      if (!gaps || isUnhealableBond(instrumentId) || skipsDeadFeed(instrumentId)) continue;
       const firstHeld = firstHeldDateFrom(txByPortfolio.get(portfolioId) ?? [], instrumentId);
       if (!firstHeld) continue;
       for (const g of gaps) {
@@ -350,19 +361,16 @@ export async function backfillStalePortfolios(
     const tailOnly = !needsFullHeal && Boolean(fromDate);
 
     if (opts.enqueue) {
-      const ok = await opts.enqueue(portfolioId, fromDate, tailOnly);
+      const ok = await opts.enqueue(portfolioId, fromDate, tailOnly, opts.retryDeadFeeds);
       if (ok) result.queued++;
       else result.enqueueFailed++;
       continue;
     }
 
-    const backfillResult = await backfillPortfolioHistory(
-      db,
-      marketData,
-      ttlMs,
-      portfolioId,
-      fromDate ? { fromDate, tailOnly } : {},
-    );
+    const backfillResult = await backfillPortfolioHistory(db, marketData, ttlMs, portfolioId, {
+      ...(fromDate ? { fromDate, tailOnly } : {}),
+      ...(opts.retryDeadFeeds ? { retryDeadFeeds: true } : {}),
+    });
     result.healed++;
     result.portfolios.push({ portfolioId, result: backfillResult });
   }

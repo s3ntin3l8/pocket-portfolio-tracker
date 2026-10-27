@@ -1,6 +1,6 @@
 import { eq, and, inArray, isNull, or, sql } from "drizzle-orm";
 import { corporateActions, instruments, portfolios, prices, transactions } from "@portfolio/db";
-import { MAX_PRICE_CARRY_FORWARD_DAYS, toDateKey } from "@portfolio/core";
+import { DEAD_FEED_MISS_THRESHOLD, MAX_PRICE_CARRY_FORWARD_DAYS, toDateKey } from "@portfolio/core";
 import type { DB } from "../../db/client.js";
 
 /**
@@ -193,4 +193,25 @@ export async function priceGapRemains(
     ? (result as { gap: boolean }[])
     : ((result as unknown as { rows: { gap: boolean }[] }).rows ?? []);
   return rows[0]?.gap === true;
+}
+
+/**
+ * #737 — a feed that has failed `DEAD_FEED_MISS_THRESHOLD`+ times in a row (counted on
+ * `instruments.priceFeedMissCount`/`priceFeedLastMissAt` by every backfill fetch) is past
+ * "temporarily lagging": for the next `DEAD_FEED_MISS_THRESHOLD` days after its last miss it
+ * is cooling down, and neither the sweep nor a backfill fetch asks the providers again.
+ * After that the next attempt runs; a still-dead feed records a new miss and cools down
+ * again, so one dead symbol (delisted, bankrupt, a bogus symbol) costs one fetch a week.
+ */
+export function isDeadFeedCoolingDown(
+  health: { priceFeedMissCount: number; priceFeedLastMissAt: Date | null },
+  today: string,
+): boolean {
+  if (health.priceFeedMissCount < DEAD_FEED_MISS_THRESHOLD) return false;
+  if (!health.priceFeedLastMissAt) return false;
+  const days =
+    (Date.parse(`${today}T00:00:00Z`) -
+      Date.parse(`${toDateKey(health.priceFeedLastMissAt)}T00:00:00Z`)) /
+    86_400_000;
+  return days < DEAD_FEED_MISS_THRESHOLD;
 }

@@ -11,6 +11,7 @@ import {
   firstHeldDateFrom,
   isManualPriceBond,
   laterDateKey,
+  isDeadFeedCoolingDown,
   priceGapRemains,
 } from "./shared.js";
 import { buildFlowDateFn, writeSnapshotSeries, type RawPriceMap } from "./snapshots.js";
@@ -26,6 +27,14 @@ export interface BackfillOptions {
    * re-fetch on every sweep run. See issue #737.
    */
   tailOnly?: boolean;
+  /**
+   * Ask the providers even for an instrument whose feed is cooling down as dead
+   * (`isDeadFeedCoolingDown`). Off by default: a dead feed (delisted, bankrupt, a bogus
+   * symbol) is skipped under every trigger, `force` included, because the fetch can't
+   * change a number — valuation reads the stored prices, and a holding with none is valued
+   * at cost. A caller that knows the feed is back (a manual re-check) sets this.
+   */
+  retryDeadFeeds?: boolean;
 }
 
 export interface BackfillResult {
@@ -35,6 +44,9 @@ export interface BackfillResult {
   truncated: string[];
   /** Instruments for which no price candle could be found at all this run. */
   unpriced: string[];
+  /** Dead feeds not asked this run (cooling down, see `isDeadFeedCoolingDown`) — they stay
+   *  valued from their stored prices/cost, and this keeps "why is X unvalued" answerable. */
+  skippedDeadFeeds?: string[];
 }
 
 /**
@@ -66,6 +78,7 @@ export async function backfillPortfolioHistory(
 
   const truncated: string[] = [];
   const unpriced: string[] = [];
+  const skippedDeadFeeds: string[] = [];
   const rawPrices: RawPriceMap = new Map();
 
   const goldBuybackByMarket = new Map<string, string>();
@@ -175,6 +188,13 @@ export async function backfillPortfolioHistory(
         const proxyClose = k.mul(new Decimal(spot)).toString();
         instrPrices.set(date, { close: proxyClose, currency: instr.currency });
       }
+      continue;
+    }
+
+    // A dead feed is not asked again until its cooldown lapses (any trigger, force included):
+    // the stored prices are merged below, so skipping changes no valuation.
+    if (!opts.retryDeadFeeds && isDeadFeedCoolingDown(instr, today)) {
+      skippedDeadFeeds.push(instr.id);
       continue;
     }
 
@@ -346,7 +366,7 @@ export async function backfillPortfolioHistory(
   const flowDateOf = await buildFlowDateFn(db, instrIds);
   const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf);
 
-  return { instruments: instrRows.length, days, truncated, unpriced };
+  return { instruments: instrRows.length, days, truncated, unpriced, skippedDeadFeeds };
 }
 
 /**

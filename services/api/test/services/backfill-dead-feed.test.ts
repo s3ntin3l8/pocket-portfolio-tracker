@@ -1,699 +1,242 @@
 /**
- * Tests for #745 (fan-out via `opts.enqueue`), #737 (a permanently-dead price feed
- * must not re-trigger an unbounded provider fetch every sweep run), and #749 (a
- * provider that THROWS — network error, rate limit, auth failure — is not the same as
- * a provider that resolves with zero candles; they must be tracked separately).
- *
- * Coverage:
- * 1. `backfillPortfolioHistory({ tailOnly: true })` does NOT fall back to a max-range
- *    `getHistory` call when `getHistoryFrom` returns no candles — the whole point of a
- *    tail-only heal is that an empty window means "nothing new", not "fetch everything".
- * 2. `instruments.priceFeedMissCount`/`priceFeedLastMissAt` track consecutive misses and
- *    reset on a hit.
- * 3. `backfillStalePortfolios` stops marking a portfolio stale purely because of an
- *    instrument that is past `DEAD_FEED_MISS_THRESHOLD` misses and still cooling down.
- * 4. `backfillStalePortfolios({ enqueue })` enqueues instead of running inline: `queued`
- *    increments, `healed` stays 0, `portfolios` stays empty.
- * 5. #749 — `priceFeedMissCount` counts ALL failures (throws AND empty results) so that
- *    the dead-feed threshold isn't delayed by mixed-mode failures; `priceFeedErrorCount`
- *    tracks only the throw path for observability. A successful fetch resets BOTH
- *    counters. The sweep's `isCoolingDownDeadFeed` checks `priceFeedMissCount`, which
- *    now correctly reflects the total failure rate.
+ * A dead feed (delisted, bankrupt, a bogus symbol: DEAD_FEED_MISS_THRESHOLD+ misses, the
+ * last one inside the cooldown) must not be asked again by ANY backfill trigger, `force`
+ * included — the fetch can't change a number, since valuation reads the stored prices and a
+ * holding with none is valued at cost. After the cooldown, or with `retryDeadFeeds`, it is
+ * asked again.
  */
 import { describe, it, expect, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { instruments, portfolios, prices, scrapedQuotes, transactions, users } from "@portfolio/db";
+import {
+  instruments,
+  portfolios,
+  portfolioSnapshots,
+  prices,
+  transactions,
+  users,
+} from "@portfolio/db";
+import { DEAD_FEED_MISS_THRESHOLD } from "@portfolio/core";
 import {
   MarketDataService,
-  type MarketDataProvider,
-  type InstrumentRef,
   type Candle,
+  type InstrumentRef,
+  type MarketDataProvider,
 } from "@portfolio/market-data";
-import { DEAD_FEED_MISS_THRESHOLD } from "@portfolio/core";
-import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
-import { backfillPortfolioHistory, backfillStalePortfolios } from "../../src/services/backfill.js";
+import { ensureDb, closeDb } from "../../src/db/client.js";
+import {
+  backfillPortfolioHistory,
+  backfillStalePortfolios,
+  fetchInstrumentPrices,
+} from "../../src/services/backfill.js";
+import { planFanOut } from "../../src/services/backfill/fan-out.js";
 
-/** Reports zero candles for `getHistoryFrom` always; `getHistory("max")` would return
- * real candles if called — tests assert it is NOT called under `tailOnly`. */
-class GoneQuietProvider implements MarketDataProvider {
-  readonly name = "gone-quiet";
-  maxCallCount = 0;
+const DAY = 86_400_000;
+const ago = (n: number) => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
 
-  constructor(
-    private readonly symbol: string,
-    private readonly currency: string,
-  ) {}
+let seq = 0;
 
-  supports(): boolean {
-    return true;
-  }
-  async getQuote(): Promise<null> {
-    return null;
-  }
-  async getHistoryFrom(): Promise<Candle[]> {
-    return [];
-  }
-  async getHistory(ref: InstrumentRef): Promise<Candle[]> {
-    if (ref.symbol !== this.symbol) return [];
-    this.maxCallCount++;
-    return [{ date: "2020-01-01", close: "100", currency: this.currency }];
-  }
+/** A provider that records every history request and returns a flat series for `symbol`. */
+function spyProvider(symbol: string, calls: string[]): MarketDataProvider {
+  return {
+    name: "spy",
+    supports: () => true,
+    getQuote: async () => null,
+    getHistoryFrom: async (ref: InstrumentRef, from: string): Promise<Candle[]> => {
+      calls.push(ref.symbol);
+      if (ref.symbol !== symbol) return [];
+      return Array.from({ length: 30 }, (_, i) => ({
+        date: ago(30 - i),
+        close: "12",
+        currency: "EUR",
+      })).filter((c) => c.date >= from);
+    },
+  };
 }
 
-/** Throws on every fetch — simulates a network error / rate-limit / auth failure
- * (issue #749). Distinct from GoneQuietProvider: GoneQuietProvider resolves with `[]`,
- * this one rejects with an Error. */
-class ThrowingProvider implements MarketDataProvider {
-  readonly name = "throwing";
-  constructor(
-    private readonly symbol: string,
-    private readonly message = "fetch failed: 503 Service Unavailable",
-  ) {}
-
-  supports(): boolean {
-    return true;
+async function seed(opts: { missCount: number; lastMissDaysAgo?: number; sold?: boolean }) {
+  const db = await ensureDb();
+  const tag = `deadfeed${++seq}`;
+  const [u] = await db
+    .insert(users)
+    .values({ authSub: `${tag}-user`, email: `${tag}@example.com` })
+    .returning();
+  const [pf] = await db
+    .insert(portfolios)
+    .values({ userId: u.id, name: tag, baseCurrency: "EUR", cashCounted: false })
+    .returning();
+  const [instr] = await db
+    .insert(instruments)
+    .values({
+      symbol: tag.toUpperCase(),
+      market: "XETRA",
+      assetClass: "equity",
+      currency: "EUR",
+      name: tag,
+      priceFeedMissCount: opts.missCount,
+      priceFeedLastMissAt:
+        opts.missCount > 0 ? new Date(Date.now() - (opts.lastMissDaysAgo ?? 0) * DAY) : null,
+    })
+    .returning();
+  await db.insert(transactions).values({
+    portfolioId: pf.id,
+    instrumentId: instr.id,
+    type: "buy",
+    quantity: "2",
+    price: "10",
+    fees: "0",
+    currency: "EUR",
+    executedAt: new Date(`${ago(40)}T10:00:00.000Z`),
+  });
+  if (opts.sold) {
+    await db.insert(transactions).values({
+      portfolioId: pf.id,
+      instrumentId: instr.id,
+      type: "sell",
+      quantity: "2",
+      price: "11",
+      fees: "0",
+      currency: "EUR",
+      executedAt: new Date(`${ago(35)}T10:00:00.000Z`),
+    });
   }
-  async getQuote(): Promise<null> {
-    return null;
-  }
-  async getHistoryFrom(_ref: InstrumentRef): Promise<Candle[]> {
-    if (!_ref) throw new Error("sanity");
-    throw new Error(this.message);
-  }
-  async getHistory(): Promise<Candle[]> {
-    throw new Error(this.message);
-  }
+  return { db, pf, instr, symbol: tag.toUpperCase() };
 }
 
-/** Throws for the configured symbol but resolves normally otherwise — lets a single
- * test exercise the error-on-some-symbols path without taking down the whole provider. */
-class SelectiveThrowProvider implements MarketDataProvider {
-  readonly name = "selective-throw";
-  constructor(
-    private readonly throwsOn: string,
-    private readonly message = "auth key revoked",
-  ) {}
-
-  supports(): boolean {
-    return true;
-  }
-  async getQuote(): Promise<null> {
-    return null;
-  }
-  async getHistoryFrom(ref: InstrumentRef): Promise<Candle[]> {
-    if (ref.symbol === this.throwsOn) throw new Error(this.message);
-    return [{ date: "2020-01-01", close: "100", currency: ref.currency }];
-  }
-  async getHistory(ref: InstrumentRef): Promise<Candle[]> {
-    if (ref.symbol === this.throwsOn) throw new Error(this.message);
-    return [{ date: "2020-01-01", close: "100", currency: ref.currency }];
-  }
-}
-
-const INCEPTION = "2026-02-01";
-
-describe("backfill dead-feed handling (#737, #745)", () => {
+describe("backfill — a dead feed is not asked again", () => {
   afterAll(async () => {
     await closeDb();
   });
 
-  it("tailOnly suppresses the max-range provider fallback on a zero-candle result", async () => {
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "dead-feed-tail-user", email: "dead-feed-tail@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Dead Feed Tail", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "GONEQUIET",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Gone Quiet Corp",
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
+  it("skips a dead feed in the inline backfill and values it from the stored prices", async () => {
+    const { db, pf, instr, symbol } = await seed({ missCount: DEAD_FEED_MISS_THRESHOLD });
+    await db.insert(prices).values(
+      Array.from({ length: 6 }, (_, i) => ({
         instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-
-    const provider = new GoneQuietProvider("GONEQUIET", "USD");
-    const svc = new MarketDataService([provider]);
-
-    const result = await backfillPortfolioHistory(db, svc, 10_000, pf.id, {
-      fromDate: "2026-06-01",
-      tailOnly: true,
-    });
-
-    expect(provider.maxCallCount).toBe(0);
-    expect(result.unpriced).toContain(instr.id);
-
-    const [row] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
-    expect(row.priceFeedMissCount).toBe(1);
-    expect(row.priceFeedLastMissAt).not.toBeNull();
-
-    // A non-tailOnly (from-inception) heal DOES fall back to the max-range fetch.
-    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
-    expect(provider.maxCallCount).toBe(1);
-
-    // ...and a successful fetch resets the miss counter.
-    const [rowAfterHit] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
-    expect(rowAfterHit.priceFeedMissCount).toBe(0);
-    expect(rowAfterHit.priceFeedLastMissAt).toBeNull();
+        date: ago(40 - i),
+        close: "15",
+        currency: "EUR",
+      })),
+    );
+    const calls: string[] = [];
+    await backfillPortfolioHistory(
+      db,
+      new MarketDataService([spyProvider(symbol, calls)]),
+      10_000,
+      pf.id,
+    );
+    expect(calls).toEqual([]);
+    const result = await backfillPortfolioHistory(
+      db,
+      new MarketDataService([spyProvider(symbol, calls)]),
+      10_000,
+      pf.id,
+    );
+    expect(result.skippedDeadFeeds).toEqual([instr.id]);
+    const snaps = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.portfolioId, pf.id));
+    // The stored 15 (not the cost of 10, not the spy's 12) values the 2 units.
+    expect(Number(snaps.find((s) => s.date === ago(38))!.marketValue)).toBe(30);
+    const [after] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
+    expect(after!.priceFeedMissCount).toBe(DEAD_FEED_MISS_THRESHOLD); // no new miss recorded
   });
 
-  it("stops marking a portfolio stale once its only stale instrument is past the dead-feed threshold and still cooling down", async () => {
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "dead-feed-sweep-user", email: "dead-feed-sweep@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Dead Feed Sweep", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "STALEDEAD",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Stale Dead Corp",
-        // Already past the dead-feed threshold, with its last miss "today" — cooling down.
-        priceFeedMissCount: DEAD_FEED_MISS_THRESHOLD,
-        priceFeedLastMissAt: new Date(),
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-    // Snapshot history already reaches inception, and the only priced-instrument data
-    // point is far older than MAX_PRICE_CARRY_FORWARD_DAYS — the ONLY reason this
-    // portfolio would otherwise be flagged trailing-stale.
-    await db.insert(prices).values({
+  it("skips a dead feed in the per-instrument fan-out chunk, held or closed", async () => {
+    for (const sold of [false, true]) {
+      const { db, pf, instr, symbol } = await seed({ missCount: DEAD_FEED_MISS_THRESHOLD, sold });
+      const calls: string[] = [];
+      const res = await fetchInstrumentPrices(
+        db,
+        new MarketDataService([spyProvider(symbol, calls)]),
+        {
+          portfolioId: pf.id,
+          instrumentId: instr.id,
+          chunkStart: ago(40),
+          chunkEnd: ago(0),
+        },
+      );
+      expect(calls, `sold=${sold}`).toEqual([]);
+      expect(res.days).toBe(0);
+      expect(res.skippedDeadFeed).toBe(true);
+    }
+  });
+
+  it("asks again once the cooldown has lapsed", async () => {
+    const { db, pf, instr, symbol } = await seed({
+      missCount: DEAD_FEED_MISS_THRESHOLD,
+      lastMissDaysAgo: DEAD_FEED_MISS_THRESHOLD + 1,
+    });
+    const calls: string[] = [];
+    await fetchInstrumentPrices(db, new MarketDataService([spyProvider(symbol, calls)]), {
+      portfolioId: pf.id,
       instrumentId: instr.id,
-      date: "2026-01-01",
-      close: "50",
-      currency: "USD",
+      chunkStart: ago(40),
+      chunkEnd: ago(0),
     });
-    await backfillPortfolioHistory(getDb(), new MarketDataService([]), 10_000, pf.id);
-
-    const svc = new MarketDataService([]);
-    const result = await backfillStalePortfolios(db, svc, 10_000, {});
-
-    expect(result.portfolios.find((p) => p.portfolioId === pf.id)).toBeUndefined();
+    expect(calls).toEqual([symbol]);
   });
 
-  it("enqueues instead of running inline when opts.enqueue is supplied", async () => {
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "dead-feed-enqueue-user", email: "dead-feed-enqueue@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Enqueue Me", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: null,
-        type: "deposit",
-        quantity: "0",
-        price: "100",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
+  it("retryDeadFeeds asks a cooling-down dead feed, inline and through the fan-out plan", async () => {
+    const { db, pf, instr, symbol } = await seed({ missCount: DEAD_FEED_MISS_THRESHOLD });
+    const calls: string[] = [];
+    const svc = new MarketDataService([spyProvider(symbol, calls)]);
+    await backfillPortfolioHistory(db, svc, 10_000, pf.id, { retryDeadFeeds: true });
+    expect(calls).toEqual([symbol]);
 
-    const enqueued: { portfolioId: string; fromDate?: string; tailOnly?: boolean }[] = [];
-    const result = await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
-      enqueue: async (portfolioId, fromDate, tailOnly) => {
-        enqueued.push({ portfolioId, fromDate, tailOnly });
-        return true;
-      },
-    });
+    const plan = await planFanOut(db, pf.id, { retryDeadFeeds: true });
+    expect(plan.subJobs.every((j) => j.retryDeadFeeds === true)).toBe(true);
+    const plain = await planFanOut(db, pf.id);
+    expect(plain.subJobs.some((j) => "retryDeadFeeds" in j)).toBe(false);
 
-    expect(enqueued.some((e) => e.portfolioId === pf.id)).toBe(true);
-    expect(result.healed).toBe(0);
-    expect(result.queued).toBeGreaterThan(0);
-    expect(result.enqueueFailed).toBe(0);
-    expect(result.portfolios).toHaveLength(0);
-  });
-
-  it("counts a failed enqueue send separately from a successful one", async () => {
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({
-        authSub: "dead-feed-enqueue-fail-user",
-        email: "dead-feed-enqueue-fail@example.com",
-      })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Enqueue Fails", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: null,
-        type: "deposit",
-        quantity: "0",
-        price: "100",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-
-    // Simulates a DB hiccup on the send — enqueueBackfillPortfolio returns false in this
-    // case (issue found in PR #746 review: the sweep used to count this as `queued`
-    // regardless of the actual send outcome).
-    const result = await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
-      enqueue: async () => false,
-    });
-
-    expect(result.queued).toBe(0);
-    expect(result.enqueueFailed).toBeGreaterThan(0);
-  });
-
-  it("scopes the sweep to a single user via opts.userId", async () => {
-    const db = await ensureDb();
-    const [u1] = await db
-      .insert(users)
-      .values({ authSub: "scope-user-1", email: "scope-user-1@example.com" })
-      .returning();
-    const [u2] = await db
-      .insert(users)
-      .values({ authSub: "scope-user-2", email: "scope-user-2@example.com" })
-      .returning();
-    const [pf1] = await db
-      .insert(portfolios)
-      .values({ userId: u1.id, name: "Scope Me", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    const [pf2] = await db
-      .insert(portfolios)
-      .values({ userId: u2.id, name: "Not Scope Me", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf1.id,
-        instrumentId: null,
-        type: "deposit",
-        quantity: "0",
-        price: "100",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-      {
-        portfolioId: pf2.id,
-        instrumentId: null,
-        type: "deposit",
-        quantity: "0",
-        price: "100",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-
-    const enqueued: string[] = [];
-    await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
-      userId: u1.id,
-      enqueue: async (portfolioId) => {
-        enqueued.push(portfolioId);
-        return true;
-      },
-    });
-
-    expect(enqueued).toContain(pf1.id);
-    expect(enqueued).not.toContain(pf2.id);
-  });
-});
-
-describe("backfill error vs miss distinction (#749)", () => {
-  afterAll(async () => {
-    await closeDb();
-  });
-
-  it("a provider throw increments both priceFeedMissCount and priceFeedErrorCount", async () => {
-    // #749 — priceFeedMissCount counts ALL failures (throws AND empty results) so that
-    // the dead-feed threshold isn't delayed by mixed-mode failures. priceFeedErrorCount
-    // is observability-only — it tells an operator at a glance whether failures are
-    // network/HTTP errors vs. legitimately empty feeds.
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "error-vs-miss-user", email: "error-vs-miss@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Error vs Miss", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "ERRAPI",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Erroring API Corp",
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-
-    const svc = new MarketDataService([new ThrowingProvider("ERRAPI")]);
-    const result = await backfillPortfolioHistory(db, svc, 10_000, pf.id, {
-      fromDate: "2026-06-01",
-      tailOnly: true,
-    });
-
-    expect(result.unpriced).toContain(instr.id);
-
-    const [row] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
-    expect(row.priceFeedMissCount).toBe(1);
-    expect(row.priceFeedLastMissAt).not.toBeNull();
-    expect(row.priceFeedErrorCount).toBe(1);
-    expect(row.priceFeedLastErrorAt).not.toBeNull();
-  });
-
-  it("a successful fetch resets both miss and error counters", async () => {
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "error-recovery-user", email: "error-recovery@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Error Recovery", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    // Pre-seed BOTH counters past their defaults so we can prove both reset on a hit.
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "RECOVERED",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Recovered Corp",
-        priceFeedMissCount: 3,
-        priceFeedLastMissAt: new Date(),
-        priceFeedErrorCount: 5,
-        priceFeedLastErrorAt: new Date(),
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-
-    const provider = new SelectiveThrowProvider("OTHER-SYMBOL");
-    const svc = new MarketDataService([provider]);
-    await backfillPortfolioHistory(db, svc, 10_000, pf.id);
-
-    const [row] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
-    expect(row.priceFeedMissCount).toBe(0);
-    expect(row.priceFeedLastMissAt).toBeNull();
-    expect(row.priceFeedErrorCount).toBe(0);
-    expect(row.priceFeedLastErrorAt).toBeNull();
-  });
-
-  it("a miss-only failure increments priceFeedMissCount but not priceFeedErrorCount", async () => {
-    // The inverse of the throw test: a provider that returns [] (legitimate empty
-    // result) should increment priceFeedMissCount but leave priceFeedErrorCount at 0,
-    // confirming the two bookkeeping paths are truly independent.
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "miss-only-user", email: "miss-only@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Miss Only", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "GONEQUIET2",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Gone Quiet 2 Corp",
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-
-    const svc = new MarketDataService([new GoneQuietProvider("GONEQUIET2", "USD")]);
-    const result = await backfillPortfolioHistory(db, svc, 10_000, pf.id, {
-      fromDate: "2026-06-01",
-      tailOnly: true,
-    });
-
-    expect(result.unpriced).toContain(instr.id);
-
-    const [row] = await db.select().from(instruments).where(eq(instruments.id, instr.id));
-    expect(row.priceFeedMissCount).toBe(1);
-    expect(row.priceFeedLastMissAt).not.toBeNull();
-    expect(row.priceFeedErrorCount).toBe(0);
-    expect(row.priceFeedLastErrorAt).toBeNull();
-  });
-
-  it("the sweep stops marking a portfolio stale once its only stale instrument is past the failure threshold (via throw)", async () => {
-    // #749 — priceFeedMissCount now counts throws too, so a feed that's been erroring
-    // (e.g. auth key revoked) for a week accumulates priceFeedMissCount at the same rate
-    // as one returning empty results, and the cooldown kicks in at the same threshold.
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "error-sweep-user", email: "error-sweep@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "Error Sweep", baseCurrency: "USD", cashCounted: false })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "ERRORED",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Errored Corp",
-        priceFeedMissCount: DEAD_FEED_MISS_THRESHOLD,
-        priceFeedLastMissAt: new Date(),
-        priceFeedErrorCount: DEAD_FEED_MISS_THRESHOLD,
-        priceFeedLastErrorAt: new Date(),
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-    // The only priced data point is far older than MAX_PRICE_CARRY_FORWARD_DAYS —
-    // without the dead-feed cooldown exclusion, this portfolio would otherwise be
-    // flagged trailing-stale purely because of the erroring feed.
-    await db.insert(prices).values({
+    await fetchInstrumentPrices(db, svc, {
+      portfolioId: pf.id,
       instrumentId: instr.id,
-      date: "2026-01-01",
-      close: "50",
-      currency: "USD",
+      chunkStart: ago(40),
+      chunkEnd: ago(0),
+      retryDeadFeeds: true,
     });
-    await backfillPortfolioHistory(getDb(), new MarketDataService([]), 10_000, pf.id);
-
-    const svc = new MarketDataService([]);
-    const result = await backfillStalePortfolios(db, svc, 10_000, {});
-
-    expect(result.portfolios.find((p) => p.portfolioId === pf.id)).toBeUndefined();
+    expect(calls).toEqual([symbol, symbol]);
   });
 
-  it("the sweep still marks a portfolio stale when failure count is below the threshold", async () => {
-    // Inverse of the cooldown test — missCount < DEAD_FEED_MISS_THRESHOLD must NOT
-    // trigger the cooldown, so a fresh (sub-threshold) failing feed still causes a
-    // nightly re-fetch. The feed only earns the cooldown once it has been failing
-    // consistently (whether by throw, empty result, or a mix of both).
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "error-subthreshold-user", email: "error-subthreshold@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({
-        userId: u.id,
-        name: "Error Sub-Threshold",
-        baseCurrency: "USD",
-        cashCounted: false,
-      })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "SUBTHRESH",
-        market: "NASDAQ",
-        assetClass: "equity",
-        currency: "USD",
-        name: "Sub-Threshold Corp",
-        // Pre-seed 2 below the threshold: the backfillPortfolioHistory call below
-        // will increment priceFeedMissCount by 1 (the empty MarketDataService
-        // produces no candles), bringing it to DEAD_FEED_MISS_THRESHOLD - 1 — still
-        // below the threshold, so the sweep must NOT exclude it from staleness.
-        priceFeedMissCount: DEAD_FEED_MISS_THRESHOLD - 2,
-        priceFeedLastMissAt: new Date(),
-        priceFeedErrorCount: DEAD_FEED_MISS_THRESHOLD - 2,
-        priceFeedLastErrorAt: new Date(),
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "1",
-        price: "50",
-        fees: "0",
-        currency: "USD",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-    await db.insert(prices).values({
-      instrumentId: instr.id,
-      date: "2026-01-01",
-      close: "50",
-      currency: "USD",
-    });
-    // The backfill creates a snapshot so the sweep sees earliestSnapshot <= inception
-    // and evaluates trailing staleness (rather than a full heal). It also increments
-    // priceFeedMissCount by 1, keeping it below the threshold.
-    await backfillPortfolioHistory(getDb(), new MarketDataService([]), 10_000, pf.id);
-
-    const svc = new MarketDataService([]);
-    const result = await backfillStalePortfolios(db, svc, 10_000, {});
-
-    // The portfolio SHOULD appear as trailing-stale (daily price is far older than
-    // MAX_PRICE_CARRY_FORWARD_DAYS, missCount hasn't yet hit the threshold to exclude
-    // it from staleness scoring).
-    expect(result.portfolios.find((p) => p.portfolioId === pf.id)).toBeDefined();
+  it("an alive feed (below the threshold) is fetched as before", async () => {
+    const { db, pf, symbol } = await seed({ missCount: DEAD_FEED_MISS_THRESHOLD - 1 });
+    const calls: string[] = [];
+    await backfillPortfolioHistory(
+      db,
+      new MarketDataService([spyProvider(symbol, calls)]),
+      10_000,
+      pf.id,
+    );
+    expect(calls).toEqual([symbol]);
   });
 
-  it("logs XAU spot fetch errors distinctly without crashing the backfill", async () => {
-    // Covers the XAU spot history error catch block in core.ts (the5 missing codecov
-    // lines). When a gold instrument has a buyback row but the XAU spot fetch throws,
-    // the error is logged and the gold instrument is skipped — backfill continues for
-    // other instruments without crashing.
-    const db = await ensureDb();
-    const [u] = await db
-      .insert(users)
-      .values({ authSub: "xau-error-user", email: "xau-error@example.com" })
-      .returning();
-    const [pf] = await db
-      .insert(portfolios)
-      .values({ userId: u.id, name: "XAU Error", baseCurrency: "IDR", cashCounted: false })
-      .returning();
-    const [instr] = await db
-      .insert(instruments)
-      .values({
-        symbol: "ANTAM",
-        market: "ANTAM",
-        assetClass: "gold",
-        currency: "IDR",
-        name: "Antam Gold",
-      })
-      .returning();
-    await db.insert(transactions).values([
-      {
-        portfolioId: pf.id,
-        instrumentId: instr.id,
-        type: "buy",
-        quantity: "10",
-        price: "1000000",
-        fees: "0",
-        currency: "IDR",
-        executedAt: new Date(`${INCEPTION}T10:00:00.000Z`),
-      },
-    ]);
-    // Gold buyback row — triggers the XAU spot fetch path
-    await db.insert(scrapedQuotes).values({
-      key: "gold:antam-buyback",
-      value: "900000",
-      source: "test",
+  it("the stale sweep leaves a dead-feed-only stale portfolio alone unless retryDeadFeeds", async () => {
+    const { db, pf, instr } = await seed({ missCount: DEAD_FEED_MISS_THRESHOLD });
+    // Looks fully backfilled from inception, but the newest price is long stale.
+    await db.insert(portfolioSnapshots).values({
+      portfolioId: pf.id,
+      date: ago(40),
+      netWorth: "20",
+      marketValue: "20",
+      effectiveFlow: "0",
+      currency: "EUR",
     });
-
-    // Provider that throws specifically on XAU symbols (XAUIDR = the XAU spot pair)
-    const svc = new MarketDataService([
-      new SelectiveThrowProvider("XAUIDR", "XAU spot API timeout"),
-    ]);
-
-    // Must not throw — the XAU error is caught and logged
-    const result = await backfillPortfolioHistory(db, svc, 10_000, pf.id);
-
-    // The gold instrument is skipped silently (xauSpotHistory stays null after the
-    // error) — no prices row, but backfill completed without crashing.
-    expect(result.instruments).toBe(1);
-    const [priceRow] = await db.select().from(prices).where(eq(prices.instrumentId, instr.id));
-    expect(priceRow).toBeUndefined();
+    await db
+      .insert(prices)
+      .values({ instrumentId: instr.id, date: ago(30), close: "10", currency: "EUR" });
+    const run = async (retryDeadFeeds?: boolean) => {
+      const calls: { portfolioId: string; retry?: boolean }[] = [];
+      await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
+        retryDeadFeeds,
+        enqueue: async (portfolioId, _from, _tail, retry) => {
+          calls.push({ portfolioId, retry });
+          return true;
+        },
+      });
+      return calls.filter((c) => c.portfolioId === pf.id);
+    };
+    expect(await run()).toEqual([]);
+    expect(await run(true)).toEqual([{ portfolioId: pf.id, retry: true }]);
   });
 });
