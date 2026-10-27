@@ -194,7 +194,9 @@ describe("TaxReportsInbox", () => {
         storedAt: "2026-01-02T00:00:00.000Z",
       },
     ];
-    listDocuments.mockImplementation(async () => rows);
+    listDocuments.mockImplementation(async (_category: string, portfolioId?: string) =>
+      rows.filter((d) => d.portfolioId === portfolioId),
+    );
     const { container } = renderInbox({
       portfolios: [
         { id: "p1", name: "Main", brokerage: null, accountHolder: null },
@@ -205,8 +207,11 @@ describe("TaxReportsInbox", () => {
 
     fireEvent.change(fileInput(container), { target: { files: [pdfFile()] } });
 
-    await waitFor(() => expect(listDocuments).toHaveBeenCalledWith("tax_report"));
-    expect(listDocuments).not.toHaveBeenCalledWith("tax_report", expect.anything());
+    await waitFor(() => {
+      expect(listDocuments).toHaveBeenCalledWith("tax_report", "p1");
+      expect(listDocuments).toHaveBeenCalledWith("tax_report", "p2");
+    });
+    expect(listDocuments).not.toHaveBeenCalledWith("tax_report");
     expect(screen.getAllByText("mine.pdf").length).toBeGreaterThan(0);
     expect(screen.queryByText("other.pdf")).not.toBeInTheDocument();
   });

@@ -4,14 +4,28 @@ import type {
   ImportRecord,
   ImportDetail,
   UnmappedEventType,
+  Portfolio,
 } from "@portfolio/api-client";
-import { documentsForPortfolios } from "@/lib/inbox-documents";
+import { documentsForPortfolios, inboxPortfolios } from "@/lib/inbox-documents";
 import {
   getServerApi,
   getSelectedPortfolioId,
   listPortfoliosCached,
-  resolveHolderScope,
+  resolveEffectiveScope,
 } from "./_shared";
+
+/** Portfolios the inbox may list and upload into for the current scope (#1155). */
+export async function resolveInboxScope(): Promise<{
+  portfolios: Portfolio[];
+  portfolioIds: string[] | null;
+}> {
+  try {
+    const portfolios = await listPortfoliosCached();
+    return inboxPortfolios(portfolios, await resolveEffectiveScope(portfolios));
+  } catch {
+    return { portfolios: [], portfolioIds: null };
+  }
+}
 
 export async function loadDocuments(category?: DocumentCategory): Promise<InboxDocument[]> {
   const api = await getServerApi();
@@ -21,19 +35,17 @@ export async function loadDocuments(category?: DocumentCategory): Promise<InboxD
     // Portfolio scope: the inbox endpoint filters itself.
     if (portfolioId) return await api.listDocuments(category, portfolioId);
 
-    // Holder scope: GET /documents has no holder filter (each inbox row is attached to
-    // one portfolio). Compose it the same way the other holder views do — the holder's
-    // portfolios, then only their documents — so a holder page doesn't list every
-    // portfolio's inbox (#1155). No holder scope (or a holder who doesn't qualify)
-    // keeps the all-portfolios list.
-    const portfolios = await listPortfoliosCached();
-    const holderId = await resolveHolderScope(portfolios);
-    const docs = await api.listDocuments(category);
-    if (!holderId) return docs;
-    const owned = new Set(
-      portfolios.filter((p) => p.accountHolderId === holderId).map((p) => p.id),
-    );
-    return documentsForPortfolios(docs, owned);
+    // Holder scope: GET /documents takes one portfolioId, not a holder. The portfolio
+    // list and the inbox read don't depend on each other — fetch them together, then
+    // keep only the holder's portfolios. No holder scope (or a holder who doesn't
+    // qualify) keeps the all-portfolios list (#1155).
+    const [portfolios, docs] = await Promise.all([
+      listPortfoliosCached(),
+      api.listDocuments(category),
+    ]);
+    const { portfolioIds } = inboxPortfolios(portfolios, await resolveEffectiveScope(portfolios));
+    if (portfolioIds == null) return docs;
+    return documentsForPortfolios(docs, new Set(portfolioIds));
   } catch {
     return [];
   }

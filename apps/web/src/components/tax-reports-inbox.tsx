@@ -6,7 +6,6 @@ import { FileText, Upload, Download, Trash2 } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import type { InboxDocument } from "@portfolio/api-client";
-import { documentsForPortfolios } from "@/lib/inbox-documents";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -62,9 +61,9 @@ export function TaxReportsInbox({
   portfolios: PickablePortfolio[];
   initialPortfolioId: string;
   /**
-   * Portfolios the current scope may show. `null` is the all-portfolios view.
-   * A holder scope has no inbox query of its own, so a refresh filters to these
-   * ids; a single portfolio is passed straight to `listDocuments` (#1155).
+   * Portfolios the current scope may show and upload into. `null` is the
+   * all-portfolios view. A refresh asks the API per id, so a holder scope does
+   * not download every portfolio's inbox and then drop rows in the browser (#1155).
    */
   scopedPortfolioIds?: string[] | null;
 }) {
@@ -89,12 +88,14 @@ export function TaxReportsInbox({
         setDocuments(await api.listDocuments("tax_report"));
         return;
       }
-      if (scopedPortfolioIds.length === 1) {
-        setDocuments(await api.listDocuments("tax_report", scopedPortfolioIds[0]));
-        return;
-      }
-      const docs = await api.listDocuments("tax_report");
-      setDocuments(documentsForPortfolios(docs, new Set(scopedPortfolioIds)));
+      const lists = await Promise.all(
+        scopedPortfolioIds.map((id) => api.listDocuments("tax_report", id)),
+      );
+      setDocuments(
+        lists
+          .flat()
+          .sort((a, b) => (a.storedAt < b.storedAt ? 1 : a.storedAt > b.storedAt ? -1 : 0)),
+      );
     } catch {
       // Keep the current list — the page still works from its server-rendered snapshot.
     }

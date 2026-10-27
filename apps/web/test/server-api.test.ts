@@ -759,6 +759,33 @@ describe("aggregate + misc loaders", () => {
     expect(await api.loadDocuments()).toEqual([]);
   });
 
+  it("resolveInboxScope offers only the portfolios the list will show", async () => {
+    h.client.listPortfolios = async () => [
+      { id: "p1", name: "A", baseCurrency: "EUR", accountHolderId: "h1" },
+      { id: "p2", name: "B", baseCurrency: "EUR", accountHolderId: "h1" },
+      { id: "p3", name: "C", baseCurrency: "EUR", accountHolderId: "h2" },
+    ];
+
+    h.cookies = {};
+    expect(await api.resolveInboxScope()).toMatchObject({ portfolioIds: null });
+
+    // Holder scope: the picker must not default to another holder's portfolio.
+    h.cookies = { pf: "holder:h1" };
+    const holder = await api.resolveInboxScope();
+    expect(holder.portfolios.map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(holder.portfolioIds).toEqual(["p1", "p2"]);
+
+    h.cookies = { pf: "p3" };
+    const one = await api.resolveInboxScope();
+    expect(one.portfolios.map((p) => p.id)).toEqual(["p3"]);
+    expect(one.portfolioIds).toEqual(["p3"]);
+
+    // A single-portfolio holder doesn't qualify — the aggregate, same as the loader.
+    h.cookies = { pf: "holder:h2" };
+    expect(await api.resolveInboxScope()).toMatchObject({ portfolioIds: null });
+    h.cookies = {};
+  });
+
   it("loadInstrumentResult only reports not_found for a real 404, never a transient error", async () => {
     h.client.getInstrumentHistory = async () => [];
     h.client.listCorporateActions = async () => [];

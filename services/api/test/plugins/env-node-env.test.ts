@@ -1,22 +1,13 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it, expect, afterEach, afterAll } from "vitest";
 import { users, apiTokens } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb } from "../../src/db/client.js";
 import { hashToken, PAT_PREFIX } from "../../src/plugins/auth.js";
-import { shouldLoadDotenv } from "../../src/plugins/env.js";
 
 describe("NODE_ENV default is fail-closed", () => {
   const saved = process.env.NODE_ENV;
-
-  it("does not load a developer .env when NODE_ENV is unset under Vitest", () => {
-    // The README setup (`cp .env.example .env`) puts NODE_ENV=development in that
-    // file. Unset NODE_ENV must stay unset — not be filled back in from .env —
-    // or the fail-closed default below is a lie on every developer machine.
-    expect(shouldLoadDotenv({ ...process.env, NODE_ENV: undefined, VITEST: "true" })).toBe(false);
-    expect(shouldLoadDotenv({ NODE_ENV: "test" })).toBe(false);
-    expect(shouldLoadDotenv({})).toBe(true);
-    expect(shouldLoadDotenv({ NODE_ENV: "development" })).toBe(true);
-  });
   afterEach(() => {
     if (saved === undefined) delete process.env.NODE_ENV;
     else process.env.NODE_ENV = saved;
@@ -52,7 +43,25 @@ describe("NODE_ENV default is fail-closed", () => {
   }
 
   it("defaults to production and a PAT is not admin when NODE_ENV is unset", async () => {
-    expect(await patIsAdmin(undefined, "env-unset")).toBe(false);
+    // The README setup (`cp .env.example .env`) puts NODE_ENV=development in that
+    // file, and @fastify/env reads cwd/.env. Plant one for this boot so the
+    // assertion fails in CI if `dotenv:` goes back to `NODE_ENV !== "test"` —
+    // that check is true the moment this test deletes NODE_ENV (#1154).
+    const envPath = path.resolve(".env");
+    const previous = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : null;
+    const planted =
+      previous == null
+        ? "NODE_ENV=development\n"
+        : /^\s*NODE_ENV\s*=/m.test(previous)
+          ? previous
+          : `${previous.replace(/\n?$/, "\n")}NODE_ENV=development\n`;
+    fs.writeFileSync(envPath, planted);
+    try {
+      expect(await patIsAdmin(undefined, "env-unset")).toBe(false);
+    } finally {
+      if (previous == null) fs.rmSync(envPath, { force: true });
+      else fs.writeFileSync(envPath, previous);
+    }
   });
 
   it("a PAT is admin only when NODE_ENV is explicitly development", async () => {
