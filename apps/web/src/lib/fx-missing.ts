@@ -21,7 +21,6 @@ export function collectFxMissing(
 
 /** The two fields of a holding the FX predicates read (structural, so any valuation row fits). */
 interface FxFlagged {
-  valuedAtCost?: boolean;
   fxMissing?: boolean;
   marketValueDisplay: string | null;
 }
