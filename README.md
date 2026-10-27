@@ -134,6 +134,13 @@ Other entry points:
 | `make demo`                      | The same demo instance, left running; prints a URL and a throwaway login.                                                |
 | `make screenshots-landing OUT=…` | 2× dark stills plus a short holdings-chart loop (webm/mp4/poster) for the project landing page; the loop needs `ffmpeg`. |
 
+`DEMO_NOW=<ISO instant>` (e.g. `DEMO_NOW=2026-10-15T10:00:00Z make demo`) moves the clock of the
+seed, the API and the web app to that instant (`scripts/demo/freeze-time.mjs`; it then ticks
+as normal), so relative dates, ranges and "today" read the same on any day. Without it the demo
+follows the real date. Once ready, `make demo` prints `DEMO_READY url=<web url>` and, while it
+runs, keeps `.demo/instance.json` (web URL plus a session cookie for the seeded user; private,
+removed on stop) for tools that drive the demo from outside.
+
 On a slow or heavily loaded host, raise `DEMO_HEALTH_TIMEOUT_MS` (default `90000`), the time
 each readiness probe (API `/health`, then the web app) may take, e.g.
 `DEMO_HEALTH_TIMEOUT_MS=240000 make demo`. If startup fails at any step, the demo runs the

@@ -1,5 +1,13 @@
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -39,6 +47,7 @@ let healthTimeoutMs;
 let parsePsRows;
 let descendantGroups;
 let signalGroup;
+let HANDOFF_FILE;
 
 beforeAll(async () => {
   scratchRoot = mkdtempSync(path.join(tmpdir(), "pocket-demo-instance-test-"));
@@ -58,6 +67,7 @@ beforeAll(async () => {
     parsePsRows,
     descendantGroups,
     signalGroup,
+    HANDOFF_FILE,
   } = await import("./instance.mjs"));
 });
 
@@ -584,5 +594,63 @@ describe("healthTimeoutMs", () => {
 
   it.each(["0", "-5", "1.5", "abc", "1e400", String(2 ** 31)])("rejects %s", (value) => {
     expect(() => healthTimeoutMs(value)).toThrow(/positive integer/);
+  });
+});
+
+describe("startDemo clock and session hand-off", () => {
+  afterEach(() => rmSync(HANDOFF_FILE, { force: true }));
+
+  it("refuses a bad DEMO_NOW before creating anything", async () => {
+    for (const demoNow of ["yesterday", "2026-10-15", "2026-10-15T10:00:00"]) {
+      await expect(startDemo({ quiet: true, demoNow, boot: async () => {} })).rejects.toThrow(
+        /DEMO_NOW must be an ISO instant/,
+      );
+    }
+    expect(readdirSync(scratchRoot)).toEqual([]);
+  });
+
+  it("hands DEMO_NOW and the freeze preload to the seed, API and web, and only then", async () => {
+    const seen = {};
+    const boot = async (ctx) => {
+      for (const key of ["seedEnv", "apiEnv", "webEnv"]) seen[key] = ctx[key];
+    };
+    const demo = await startDemo({ quiet: true, demoNow: "2026-10-15T10:00:00Z", boot });
+    await demo.stop();
+    for (const env of Object.values(seen)) {
+      expect(env.DEMO_NOW).toBe("2026-10-15T10:00:00Z");
+      expect(env.NODE_OPTIONS).toMatch(/^--import file:\/\/.*\/scripts\/demo\/freeze-time\.mjs$/);
+    }
+    await startDemo({ quiet: true, demoNow: undefined, boot }).then((d) => d.stop());
+    for (const env of Object.values(seen)) {
+      expect(env.DEMO_NOW).toBeUndefined();
+      expect(env.NODE_OPTIONS).toBeUndefined();
+    }
+  });
+
+  it("writes .demo/instance.json (0600) while the demo runs and removes it on stop", async () => {
+    const boot = async (ctx) => writeFileSync(ctx.patFile, "pt_test-secret\n");
+    const demo = await startDemo({ quiet: true, handoff: true, boot });
+    expect(statSync(HANDOFF_FILE).mode & 0o777).toBe(0o600);
+    const info = JSON.parse(readFileSync(HANDOFF_FILE, "utf8"));
+    expect(info.webUrl).toBe(demo.webUrl);
+    expect(info.cookie.name).toBe("authjs.session-token");
+    expect(info.cookie.value.length).toBeGreaterThan(50);
+    await demo.stop();
+    expect(existsSync(HANDOFF_FILE)).toBe(false);
+  }, 20_000);
+
+  it("writes nothing without handoff, and nothing when startup fails", async () => {
+    const demo = await startDemo({ quiet: true, boot: async () => {} });
+    expect(existsSync(HANDOFF_FILE)).toBe(false);
+    await demo.stop();
+    writeFileSync(HANDOFF_FILE, "stale", { flag: "w" });
+    await expect(
+      startDemo({
+        quiet: true,
+        handoff: true,
+        boot: async () => Promise.reject(new Error("boom")),
+      }),
+    ).rejects.toThrow("boom");
+    expect(existsSync(HANDOFF_FILE)).toBe(false);
   });
 });

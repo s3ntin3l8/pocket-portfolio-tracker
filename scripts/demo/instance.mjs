@@ -2,10 +2,11 @@
 import { execFileSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, rmSync } from "node:fs";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseDemoNow } from "./clock.mjs";
 import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
 
 /**
@@ -24,12 +25,23 @@ import { assertDemoEnv, assertPortsFree, demoEnv } from "./env.mjs";
  * propagates. A stop mid-build or mid-seed kills that step's process group first,
  * and a SIGKILL also takes down the groups the step spawned (turbo's per-task groups).
  * DEMO_HEALTH_TIMEOUT_MS (default 90000) bounds each readiness probe.
+ *
+ * DEMO_NOW=<ISO instant> moves the clock of the seed, the API and Next to that
+ * instant (see ./freeze-time.mjs), so relative dates read the same on any day.
+ *
+ * `make demo` (handoff) prints `DEMO_READY url=<web url>` once ready and, while it
+ * runs, keeps `.demo/instance.json` with a session cookie for the seeded user, for
+ * the visual-kit host hook (visual/host-hooks.sh). The file is removed on stop.
  */
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const BIN = (name) => path.join(REPO_ROOT, "node_modules", ".bin", name);
 const API_TSCONFIG = path.join(REPO_ROOT, "services/api/tsconfig.json");
 const WEB_DIR = path.join(REPO_ROOT, "apps/web");
+const FREEZE_TIME = path.join(REPO_ROOT, "scripts/demo/freeze-time.mjs");
+export const HANDOFF_FILE = path.join(REPO_ROOT, ".demo/instance.json");
+/** The seeded user's Auth.js subject (DEMO_AUTH_SUB in seed-demo.ts). */
+const DEMO_AUTH_SUB = "demo|pocket";
 
 export const DEMO_API_PORT = process.env.DEMO_API_PORT ?? "3910";
 export const DEMO_WEB_PORT = process.env.DEMO_WEB_PORT ?? "3915";
@@ -300,6 +312,13 @@ async function bootDemo({
     cwd: REPO_ROOT,
     env: demoEnv(demoDir, { TURBO_TELEMETRY_DISABLED: "1" }),
   });
+  // One real base for every process, taken just before the seed: they all read the
+  // same "now" (DEMO_NOW at seed start, ticking), and the seed's data is never in
+  // the API's future.
+  if (seedEnv.DEMO_NOW) {
+    const base = String(Date.now());
+    for (const env of [seedEnv, apiEnv, webEnv]) env.DEMO_CLOCK_BASE = base;
+  }
   console.log("[demo] seeding demo data...");
   await run(
     BIN("tsx"),
@@ -328,15 +347,44 @@ async function bootDemo({
 }
 
 /**
+ * Write `.demo/instance.json`: the web URL and a session cookie minted from the
+ * demo's own PAT and AUTH_SECRET, the same forged cookie the old capture script
+ * used. Private (0600), and gone when the demo stops.
+ */
+async function writeHandoff({ webUrl, patFile, authSecret }) {
+  const { mintSessionCookie } = await import("../../apps/web/scripts/mint-session.mjs");
+  const cookie = await mintSessionCookie({
+    patSecret: (await readFile(patFile, "utf8")).trim(),
+    authSub: DEMO_AUTH_SUB,
+    secret: authSecret,
+  });
+  await mkdir(path.dirname(HANDOFF_FILE), { recursive: true });
+  await writeFile(HANDOFF_FILE, `${JSON.stringify({ webUrl, cookie }, null, 2)}\n`, {
+    mode: 0o600,
+  });
+}
+
+/**
  * Start the demo. `login: true` also seeds a local-password user (throwaway
  * credentials, generated per run) so a human can sign in from a browser.
+ *
+ * `handoff` keeps `.demo/instance.json` (web URL and a session cookie) while the
+ * demo runs. `demoNow` (default $DEMO_NOW) fixes the clock of the seed and servers.
  *
  * `boot` replaces the build/seed/spawn/wait sequence; tests use it to fail
  * startup without running the real servers.
  */
-export async function startDemo({ login = false, quiet = false, keep = false, boot } = {}) {
+export async function startDemo({
+  login = false,
+  quiet = false,
+  keep = false,
+  handoff = false,
+  boot,
+  demoNow = process.env.DEMO_NOW,
+} = {}) {
   // Refused before anything is created: nothing to tear down yet.
   const timeoutMs = healthTimeoutMs();
+  parseDemoNow(demoNow);
   await assertPortsFree([DEMO_API_PORT, DEMO_WEB_PORT]);
 
   const demoDir = await mkdtemp(path.join(tmpdir(), "pocket-demo-"));
@@ -372,6 +420,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     await killStrays(home);
     process.off("SIGINT", onSignal);
     process.off("SIGTERM", onSignal);
+    if (handoff) rmSync(HANDOFF_FILE, { force: true });
     if (keep) return console.log(`[demo] kept ${demoDir}`);
     // Next's server worker can still write its config store under HOME just after
     // it is signalled, so delete until the directory stays gone.
@@ -403,6 +452,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       const finish = () => {
         if (targets.some((pgid) => signalGroup(pgid, 0)) && Date.now() < deadline)
           return setTimeout(finish, 50);
+        if (handoff) rmSync(HANDOFF_FILE, { force: true });
         if (keep) process.exit(130);
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
@@ -445,6 +495,10 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     }
   };
 
+  const webUrl = `http://localhost:${DEMO_WEB_PORT}`;
+  // A leftover from a run that was SIGKILLed: its cookie belongs to a dead instance.
+  if (handoff) rmSync(HANDOFF_FILE, { force: true });
+
   // Everything from here on runs under the same teardown as a normal stop, so a
   // failure at any step (env guard, build, seed, boot, readiness) leaves no
   // scratch dir or process group behind.
@@ -453,7 +507,17 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
     for (const dir of ["home", "tmp", "run"])
       await mkdir(path.join(demoDir, dir), { recursive: true });
 
-    const seedEnv = demoEnv(demoDir, { DATABASE_URL: databaseUrl, FX_PROVIDER: "none", ...local });
+    // The preload is applied through NODE_OPTIONS so it reaches tsx's and Next's
+    // child processes too.
+    const clock = demoNow
+      ? { DEMO_NOW: demoNow, NODE_OPTIONS: `--import ${pathToFileURL(FREEZE_TIME).href}` }
+      : {};
+    const seedEnv = demoEnv(demoDir, {
+      DATABASE_URL: databaseUrl,
+      FX_PROVIDER: "none",
+      ...clock,
+      ...local,
+    });
     const apiEnv = demoEnv(demoDir, {
       NODE_ENV: "development",
       DATABASE_URL: databaseUrl,
@@ -472,6 +536,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       // outside production, create a bucket on) an object store.
       STORAGE_PROVIDER: "folder",
       STORAGE_FOLDER_PATH: path.join(demoDir, "storage"),
+      ...clock,
       ...(local.AUTH_LOCAL_SECRET && { AUTH_LOCAL_SECRET: local.AUTH_LOCAL_SECRET }),
     });
     const webEnv = demoEnv(demoDir, {
@@ -483,6 +548,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       AUTHENTIK_CLIENT_SECRET: "demo", // pragma: allowlist secret
       API_URL: `http://localhost:${DEMO_API_PORT}`,
       PORT: DEMO_WEB_PORT,
+      ...clock,
       ...(local.AUTH_LOCAL_SECRET && { AUTH_LOCAL_SECRET: local.AUTH_LOCAL_SECRET }),
     });
 
@@ -503,6 +569,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
       run: runStep,
       stop,
     });
+    if (handoff) await writeHandoff({ webUrl, patFile, authSecret });
   } catch (err) {
     // A stop (Ctrl-C/SIGTERM) mid-step fails the step it killed; that is no startup failure.
     if (!stopping) console.error(`[demo] startup failed, tearing down: ${err?.message ?? err}`);
@@ -511,7 +578,7 @@ export async function startDemo({ login = false, quiet = false, keep = false, bo
   }
 
   return {
-    webUrl: `http://localhost:${DEMO_WEB_PORT}`,
+    webUrl,
     patFile,
     authSecret,
     demoDir,
@@ -525,7 +592,7 @@ if (invokedDirectly) {
   const keep = process.argv.includes("--keep");
   let demo;
   try {
-    demo = await startDemo({ login: true, keep });
+    demo = await startDemo({ login: true, keep, handoff: true });
     // The throwaway login goes to a private file in the scratch dir (deleted on
     // exit) rather than to the terminal, so it never lands in scrollback or logs.
     const loginFile = path.join(demo.demoDir, "login.txt");
@@ -535,7 +602,8 @@ if (invokedDirectly) {
     console.log(`
 [demo] Pocket demo is up: ${demo.webUrl}
 [demo] Throwaway local login (generated for this run): ${loginFile}
-[demo] Ctrl-C stops it and deletes all demo data.`);
+[demo] Ctrl-C stops it and deletes all demo data.
+DEMO_READY url=${demo.webUrl}`);
   } catch (err) {
     // startDemo has already torn down on a startup failure; this covers a
     // failure after it returned. stop() is idempotent either way.
