@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { reconcileCash, netManualAdjustments } from "../../src/services/pytr/reconcile.js";
 import type { TrExportSummary } from "../../src/services/pytr/runner.js";
+import { detectAnomalies } from "@portfolio/core";
 import type { CoreTransaction, ReconciliationGap } from "@portfolio/core";
 
 const summary = (amount: string): TrExportSummary => ({
@@ -152,5 +153,45 @@ describe("netManualAdjustments", () => {
       expect.objectContaining({ currency: "EUR", derived: "100", diff: "0.00" }),
       expect.objectContaining({ currency: "USD", derived: "40", diff: "10.00" }),
     ]);
+  });
+
+  it("keeps the stored driftSincePrev: a correction cancels out of a sync-to-sync delta", () => {
+    const withDrift: ReconciliationGap = {
+      cash: [
+        {
+          currency: "EUR",
+          reported: "271.35",
+          derived: "304.31",
+          diff: "-32.96",
+          driftSincePrev: "0.00",
+        },
+      ],
+    };
+    const result = netManualAdjustments(withDrift, [adjustmentTx({ price: "-26.70" })]);
+    expect(result.cash[0]).toMatchObject({ diff: "-6.26", driftSincePrev: "0.00" });
+    const codes = detectAnomalies([], [], { cashCounted: true, reconciliationGap: result }).map(
+      (a) => a.code,
+    );
+    expect(codes).toEqual(["reconciliation_gap"]);
+  });
+
+  it("still emits reconciliation_drift for a genuinely nonzero stored drift", () => {
+    const withDrift: ReconciliationGap = {
+      cash: [
+        {
+          currency: "EUR",
+          reported: "271.35",
+          derived: "304.31",
+          diff: "-32.96",
+          driftSincePrev: "-5.00",
+        },
+      ],
+    };
+    const result = netManualAdjustments(withDrift, [adjustmentTx({ price: "-26.70" })]);
+    expect(result.cash[0]).toMatchObject({ driftSincePrev: "-5.00" });
+    const codes = detectAnomalies([], [], { cashCounted: true, reconciliationGap: result }).map(
+      (a) => a.code,
+    );
+    expect(codes).toEqual(["reconciliation_gap", "reconciliation_drift"]);
   });
 });
