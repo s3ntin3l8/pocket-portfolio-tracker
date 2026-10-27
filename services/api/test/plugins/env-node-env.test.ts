@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { describe, it, expect, afterEach, afterAll } from "vitest";
 import { users, apiTokens } from "@portfolio/db";
@@ -43,45 +44,24 @@ describe("NODE_ENV default is fail-closed", () => {
   }
 
   it("defaults to production and a PAT is not admin when NODE_ENV is unset", async () => {
-    // The README setup (`cp .env.example .env`) puts NODE_ENV=development in that
-    // file, and @fastify/env reads cwd/.env. Plant one for this boot so the
-    // assertion fails in CI if `dotenv:` goes back to `NODE_ENV !== "test"` —
-    // that check is true the moment this test deletes NODE_ENV (#1154).
-    // One file descriptor for the read and the write: a separate existsSync
-    // check is a TOCTOU (CodeQL js/file-system-race).
-    const envPath = path.resolve(".env");
-    let created = false;
-    let fd: number;
+    // @fastify/env reads cwd/.env. A developer's own file (the README
+    // `cp .env.example .env`) must not be the fixture: truncating it and
+    // restoring later loses the file if the process is killed mid-test.
+    // A fresh directory is the cwd for this boot only, so the planted
+    // NODE_ENV=development is always what a reverted `dotenv:` gate would
+    // load, and CI still fails that regression (#1154).
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ppt-env-"));
+    const previousCwd = process.cwd();
     try {
-      fd = fs.openSync(
-        envPath,
-        fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_EXCL,
-        0o600,
-      );
-      created = true;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-      fd = fs.openSync(envPath, fs.constants.O_RDWR);
-    }
-    try {
-      const previous = fs.readFileSync(fd, "utf8");
-      const planted =
-        previous.length === 0
-          ? "NODE_ENV=development\n"
-          : /^\s*NODE_ENV\s*=/m.test(previous)
-            ? previous
-            : `${previous.replace(/\n?$/, "\n")}NODE_ENV=development\n`;
-      fs.ftruncateSync(fd, 0);
-      fs.writeSync(fd, planted, 0, "utf8");
-      try {
-        expect(await patIsAdmin(undefined, "env-unset")).toBe(false);
-      } finally {
-        fs.ftruncateSync(fd, 0);
-        if (previous.length > 0) fs.writeSync(fd, previous, 0, "utf8");
-      }
+      process.chdir(dir);
+      fs.writeFileSync(path.join(dir, ".env"), "NODE_ENV=development\n", {
+        flag: "wx",
+        mode: 0o600,
+      });
+      expect(await patIsAdmin(undefined, "env-unset")).toBe(false);
     } finally {
-      fs.closeSync(fd);
-      if (created) fs.rmSync(envPath, { force: true });
+      process.chdir(previousCwd);
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 

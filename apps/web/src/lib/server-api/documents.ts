@@ -23,7 +23,9 @@ export async function resolveInboxScope(): Promise<{
     const portfolios = await listPortfoliosCached();
     return inboxPortfolios(portfolios, await resolveEffectiveScope(portfolios));
   } catch {
-    return { portfolios: [], portfolioIds: null };
+    // A scope we couldn't read must not fall open to every portfolio. An empty
+    // id list is the closed scope: nothing to list, nothing to upload into.
+    return { portfolios: [], portfolioIds: [] };
   }
 }
 

@@ -786,6 +786,13 @@ describe("aggregate + misc loaders", () => {
     h.cookies = {};
   });
 
+  it("resolveInboxScope fails closed when the portfolio list throws", async () => {
+    h.client.listPortfolios = async () => {
+      throw new Error("down");
+    };
+    expect(await api.resolveInboxScope()).toEqual({ portfolios: [], portfolioIds: [] });
+  });
+
   it("loadInstrumentResult only reports not_found for a real 404, never a transient error", async () => {
     h.client.getInstrumentHistory = async () => [];
     h.client.listCorporateActions = async () => [];
