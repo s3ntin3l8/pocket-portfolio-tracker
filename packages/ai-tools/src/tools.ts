@@ -66,7 +66,8 @@ function groupAbstentions(items: { rule: string; scope: string; reason: string }
 
 const BASIS_NOTE =
   "Name the basis of any gain you quote (vs cost of holdings / vs net contributed) and disclose " +
-  "valuedAtCost holdings and fxMissingCurrencies exclusions.";
+  "valuedAtCost holdings, partly at-cost rows (valuedAtCostPartial) and fxMissingCurrencies " +
+  "exclusions.";
 
 /** Run `fn` over `items` with at most `limit` in flight; results keep input order. */
 async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>) {
