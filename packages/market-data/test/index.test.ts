@@ -3473,6 +3473,11 @@ describe("findGaps", () => {
     // within the window → no leading gap; no candles at all → nothing to anchor on
     expect(findGaps(["2026-08-05"], "2026-08-05", 10, "2026-08-01")).toEqual([]);
     expect(findGaps([], "2026-08-20", 10, "2026-08-01")).toEqual([]);
+    // Leading window comes FIRST: fillGaps asks the fallback only from gaps[0].from.
+    expect(findGaps(["2026-08-20", "2026-09-30"], "2026-09-30", 10, "2026-08-01")).toEqual([
+      { from: "2026-08-01", to: "2026-08-19" },
+      { from: "2026-08-21", to: "2026-09-29" },
+    ]);
   });
 
   it("returns nothing for no dates", () => {
