@@ -131,6 +131,7 @@ function compactHeadline(s: PortfolioSummary | NetWorth) {
     fxMissingCurrencies: s.fxMissingCurrencies ?? [],
     holdingCount: s.holdings.length,
     valuedAtCostCount: s.holdings.filter((h) => h.valuedAtCost).length,
+    valuedAtCostPartialCount: s.holdings.filter((h) => h.valuedAtCostPartial).length,
     gain: s.gain ?? null,
     allocation: s.allocation ?? null,
     drift: s.drift ?? null,
