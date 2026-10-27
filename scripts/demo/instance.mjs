@@ -40,8 +40,12 @@ const API_TSCONFIG = path.join(REPO_ROOT, "services/api/tsconfig.json");
 const WEB_DIR = path.join(REPO_ROOT, "apps/web");
 const FREEZE_TIME = path.join(REPO_ROOT, "scripts/demo/freeze-time.mjs");
 export const HANDOFF_FILE = path.join(REPO_ROOT, ".demo/instance.json");
-/** The seeded user's Auth.js subject (DEMO_AUTH_SUB in seed-demo.ts). */
-const DEMO_AUTH_SUB = "demo|pocket";
+/**
+ * The seeded user's Auth.js subject, as seed-demo.ts derives it: `local|<email>`
+ * when a login password is seeded (`login: true`, i.e. `make demo`), else `demo|pocket`.
+ * SEED_DEMO_EMAIL is never passed to the seed, so the email is its default.
+ */
+const authSubFor = (login) => (login ? "local|demo@pocket.invalid" : "demo|pocket");
 
 export const DEMO_API_PORT = process.env.DEMO_API_PORT ?? "3910";
 export const DEMO_WEB_PORT = process.env.DEMO_WEB_PORT ?? "3915";
@@ -351,11 +355,11 @@ async function bootDemo({
  * demo's own PAT and AUTH_SECRET, the same forged cookie the old capture script
  * used. Private (0600), and gone when the demo stops.
  */
-async function writeHandoff({ webUrl, patFile, authSecret }) {
+async function writeHandoff({ webUrl, patFile, authSecret, authSub }) {
   const { mintSessionCookie } = await import("../../apps/web/scripts/mint-session.mjs");
   const cookie = await mintSessionCookie({
     patSecret: (await readFile(patFile, "utf8")).trim(),
-    authSub: DEMO_AUTH_SUB,
+    authSub,
     secret: authSecret,
   });
   await mkdir(path.dirname(HANDOFF_FILE), { recursive: true });
@@ -497,7 +501,7 @@ export async function startDemo({
 
   const webUrl = `http://localhost:${DEMO_WEB_PORT}`;
   // A leftover from a run that was SIGKILLed: its cookie belongs to a dead instance.
-  if (handoff) rmSync(HANDOFF_FILE, { force: true });
+  rmSync(HANDOFF_FILE, { force: true });
 
   // Everything from here on runs under the same teardown as a normal stop, so a
   // failure at any step (env guard, build, seed, boot, readiness) leaves no
@@ -569,7 +573,7 @@ export async function startDemo({
       run: runStep,
       stop,
     });
-    if (handoff) await writeHandoff({ webUrl, patFile, authSecret });
+    if (handoff) await writeHandoff({ webUrl, patFile, authSecret, authSub: authSubFor(login) });
   } catch (err) {
     // A stop (Ctrl-C/SIGTERM) mid-step fails the step it killed; that is no startup failure.
     if (!stopping) console.error(`[demo] startup failed, tearing down: ${err?.message ?? err}`);

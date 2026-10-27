@@ -138,8 +138,9 @@ Other entry points:
 seed, the API and the web app to that instant (`scripts/demo/freeze-time.mjs`; it then ticks
 as normal), so relative dates, ranges and "today" read the same on any day. Without it the demo
 follows the real date. Once ready, `make demo` prints `DEMO_READY url=<web url>` and, while it
-runs, keeps `.demo/instance.json` (web URL plus a session cookie for the seeded user; private,
-removed on stop) for tools that drive the demo from outside.
+runs, keeps `.demo/instance.json` (private, removed on stop) for tools that drive the demo from
+outside: `{ "webUrl": "http://localhost:3915", "cookie": { "name": "authjs.session-token", "value": "…" } }`,
+a session for the seeded user.
 
 On a slow or heavily loaded host, raise `DEMO_HEALTH_TIMEOUT_MS` (default `90000`), the time
 each readiness probe (API `/health`, then the web app) may take, e.g.

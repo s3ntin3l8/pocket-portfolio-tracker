@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -600,6 +601,16 @@ describe("healthTimeoutMs", () => {
 describe("startDemo clock and session hand-off", () => {
   afterEach(() => rmSync(HANDOFF_FILE, { force: true }));
 
+  // Reads rather than stats, so the later writes are not a check-then-use of the same path.
+  const handoffPresent = () => {
+    try {
+      readFileSync(HANDOFF_FILE);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   it("refuses a bad DEMO_NOW before creating anything", async () => {
     for (const demoNow of ["yesterday", "2026-10-15", "2026-10-15T10:00:00"]) {
       await expect(startDemo({ quiet: true, demoNow, boot: async () => {} })).rejects.toThrow(
@@ -627,23 +638,38 @@ describe("startDemo clock and session hand-off", () => {
     }
   });
 
-  it("writes .demo/instance.json (0600) while the demo runs and removes it on stop", async () => {
-    const boot = async (ctx) => writeFileSync(ctx.patFile, "pt_test-secret\n");
-    const demo = await startDemo({ quiet: true, handoff: true, boot });
-    expect(statSync(HANDOFF_FILE).mode & 0o777).toBe(0o600);
-    const info = JSON.parse(readFileSync(HANDOFF_FILE, "utf8"));
-    expect(info.webUrl).toBe(demo.webUrl);
-    expect(info.cookie.name).toBe("authjs.session-token");
-    expect(info.cookie.value.length).toBeGreaterThan(50);
-    await demo.stop();
-    expect(existsSync(HANDOFF_FILE)).toBe(false);
-  }, 20_000);
+  it.each([
+    [false, "demo|pocket"],
+    [true, "local|demo@pocket.invalid"],
+  ])(
+    "writes .demo/instance.json (0600) while it runs, removes it on stop (login: %s)",
+    async (login, sub) => {
+      const boot = async (ctx) => writeFileSync(ctx.patFile, "pt_test-secret\n");
+      const demo = await startDemo({ quiet: true, login, handoff: true, boot });
+      expect(statSync(HANDOFF_FILE).mode & 0o777).toBe(0o600);
+      const info = JSON.parse(readFileSync(HANDOFF_FILE, "utf8"));
+      expect(info.webUrl).toBe(demo.webUrl);
+      expect(info.cookie.name).toBe("authjs.session-token");
+      // The cookie is for the user the seed creates, and carries the demo's PAT.
+      const { decode } = await import("next-auth/jwt");
+      const token = await decode({
+        token: info.cookie.value,
+        secret: demo.authSecret,
+        salt: info.cookie.name,
+      });
+      expect(token).toMatchObject({ sub, accessToken: "pt_test-secret" });
+      await demo.stop();
+      expect(handoffPresent()).toBe(false);
+    },
+    20_000,
+  );
 
   it("writes nothing without handoff, and nothing when startup fails", async () => {
     const demo = await startDemo({ quiet: true, boot: async () => {} });
-    expect(existsSync(HANDOFF_FILE)).toBe(false);
+    expect(handoffPresent()).toBe(false);
     await demo.stop();
-    writeFileSync(HANDOFF_FILE, "stale", { flag: "w" });
+    mkdirSync(path.dirname(HANDOFF_FILE), { recursive: true });
+    writeFileSync(HANDOFF_FILE, "stale");
     await expect(
       startDemo({
         quiet: true,
@@ -651,6 +677,6 @@ describe("startDemo clock and session hand-off", () => {
         boot: async () => Promise.reject(new Error("boom")),
       }),
     ).rejects.toThrow("boom");
-    expect(existsSync(HANDOFF_FILE)).toBe(false);
+    expect(handoffPresent()).toBe(false);
   });
 });

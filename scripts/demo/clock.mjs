@@ -3,12 +3,27 @@
  * preload that applies them to a process.
  */
 
-/** DEMO_NOW as epoch ms, or null when unset. Throws on anything but an ISO instant. */
+/** DEMO_NOW as epoch ms, or null when unset. Throws on anything but a real ISO instant. */
 export function parseDemoNow(value) {
   if (value === undefined || value === "") return null;
-  const ms = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/.test(value)
-    ? Date.parse(value)
-    : NaN;
+  const m =
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.exec(
+      value,
+    );
+  // Date.parse rolls 2026-02-30 over to March and 24:00 to the next day; refuse both
+  // rather than shift the whole demo by a day on a typo.
+  const [year, month, day, hour, minute, second = 0] = (m ?? [])
+    .slice(1)
+    .map((part) => (part === undefined ? undefined : Number(part)));
+  const calendar = m && new Date(Date.UTC(year, month - 1, day));
+  const real =
+    calendar &&
+    calendar.getUTCMonth() === month - 1 &&
+    calendar.getUTCDate() === day &&
+    hour < 24 &&
+    minute < 60 &&
+    second < 60;
+  const ms = real ? Date.parse(value) : NaN;
   if (Number.isNaN(ms))
     throw new Error(
       `DEMO_NOW must be an ISO instant with a zone, e.g. 2026-10-15T10:00:00Z, got "${value}"`,
