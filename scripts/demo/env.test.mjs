@@ -97,7 +97,7 @@ describe("assertDemoEnv refuses a poisoned environment", () => {
       ...base,
       AUTH_SECRET: "generated", // pragma: allowlist secret
       DATABASE_URL: `pglite://${path.join(demoDir, "db")}`,
-      SCREENSHOTS_PAT_FILE: path.join(demoDir, "pat.txt"),
+      DEMO_PAT_FILE: path.join(demoDir, "pat.txt"),
     };
     expect(assertDemoEnv(env, demoDir, { collect: true })).toEqual([]);
   });

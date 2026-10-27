@@ -71,29 +71,29 @@
   },
   "screenshots": [
     {
-      "src": "/screenshots/holdings-dark-narrow.png",
-      "sizes": "828x1792",
+      "src": "/screenshots/holdings-dark-mobile.png",
+      "sizes": "780x1688",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "Net worth, allocation and positions across every brokerage"
     },
     {
-      "src": "/screenshots/insights-dark-narrow.png",
-      "sizes": "828x1792",
+      "src": "/screenshots/insights-dark-mobile.png",
+      "sizes": "780x1688",
       "type": "image/png",
       "form_factor": "narrow",
       "label": "XIRR, rebalancing drift and concentration at a glance"
     },
     {
-      "src": "/screenshots/holdings-dark-wide.png",
-      "sizes": "2560x1440",
+      "src": "/screenshots/holdings-dark-desktop.png",
+      "sizes": "2880x1800",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Net worth, allocation and positions across every brokerage"
     },
     {
-      "src": "/screenshots/tax-dark-wide.png",
-      "sizes": "2560x1440",
+      "src": "/screenshots/tax-dark-desktop.png",
+      "sizes": "2880x1800",
       "type": "image/png",
       "form_factor": "wide",
       "label": "Capital gains, allowance usage and harvest suggestions"

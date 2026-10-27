@@ -25,8 +25,7 @@ import { valuePortfolio } from "../services/valuation.js";
 import { boundaryFlowsAt, fxAtFlowDates } from "../routes/transactions/shared/flows.js";
 
 /**
- * Rich demo dataset for the screenshot pipeline (see `scripts/screenshots.mjs` at the
- * repo root, and the plan doc `.claude/plans/can-we-make-some-distributed-seal.md`).
+ * Rich demo dataset for the screenshot pipeline (see `visual/` at the repo root, and the plan doc `.claude/plans/can-we-make-some-distributed-seal.md`).
  * Distinct from `seed.ts` (a single near-empty admin user for a fresh dev DB) — this
  * seeds a full portfolio/transaction/price graph spanning every asset class so every
  * hero screen (dashboard, holdings, insights, reports, tax) renders real, non-empty

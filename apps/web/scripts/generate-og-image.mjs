@@ -65,9 +65,9 @@ const mask = Buffer.from(
   `<svg xmlns="http://www.w3.org/2000/svg" width="${SHOT.w}" height="${SHOT.h}">` +
     `<rect width="${SHOT.w}" height="${SHOT.h}" rx="${SHOT.r}" fill="#fff"/></svg>`,
 );
-const shotPath = join(publicDir, "screenshots", "holdings-dark-wide.png");
+const shotPath = join(publicDir, "screenshots", "holdings-dark-desktop.png");
 await access(shotPath).catch(() => {
-  throw new Error(`Missing ${shotPath} — generate it first (scripts/screenshots.mjs).`);
+  throw new Error(`Missing ${shotPath} — generate it first (make screenshots).`);
 });
 const shot = await sharp(shotPath)
   .resize(SHOT.w, SHOT.h, { fit: "cover", position: "left top" })

@@ -1,0 +1,149 @@
+{
+  "$schema": "https://raw.githubusercontent.com/s3ntin3l8/visual-kit/main/schema/scenes.schema.json",
+  "demo": {
+    "start": "[ -d node_modules ] || npm ci --no-audit --no-fund && make demo",
+    "url": "http://localhost:3915",
+    "readyOutput": "DEMO_READY",
+    "startTimeoutSec": 600,
+    "env": {
+      "DEMO_NOW": "2026-10-15T10:00:00Z",
+      "DEMO_HEALTH_TIMEOUT_MS": "240000"
+    }
+  },
+  "cacheKeyFiles": ["package-lock.json", ".github/visual-setup.sh"],
+  "clock": "2026-10-15T10:00:00Z",
+  "scenes": [
+    {
+      "name": "holdings",
+      "path": "/en/holdings",
+      "tags": ["presentation", "check", "audit"]
+    },
+    {
+      "name": "activity",
+      "path": "/en/transactions",
+      "tags": ["presentation", "check", "audit"]
+    },
+    {
+      "name": "insights",
+      "path": "/en/insights",
+      "tags": ["presentation", "check", "audit"]
+    },
+    {
+      "name": "reports",
+      "path": "/en/reports",
+      "tags": ["presentation", "check", "audit"]
+    },
+    {
+      "name": "tax",
+      "path": "/en/tax",
+      "tags": ["presentation", "check", "audit"]
+    },
+    {
+      "name": "holdings-range",
+      "path": "/en/holdings",
+      "tags": ["presentation"],
+      "stills": false,
+      "loop": {
+        "tailSec": 1.5
+      },
+      "steps": [
+        {
+          "wait": 1200
+        },
+        {
+          "click": "[role=radiogroup][aria-label=\"Time range\"] >> nth=0 >> role=radio[name=\"1M\"]"
+        },
+        {
+          "wait": 1600
+        },
+        {
+          "click": "[role=radiogroup][aria-label=\"Time range\"] >> nth=0 >> role=radio[name=\"All\"]"
+        },
+        {
+          "wait": 1600
+        },
+        {
+          "click": "[role=radiogroup][aria-label=\"Time range\"] >> nth=0 >> role=radio[name=\"1Y\"]"
+        },
+        {
+          "wait": 1600
+        }
+      ]
+    },
+    {
+      "name": "home",
+      "path": "/en",
+      "tags": ["audit"]
+    },
+    {
+      "name": "income",
+      "path": "/en/income",
+      "tags": ["audit"]
+    },
+    {
+      "name": "trades",
+      "path": "/en/trades",
+      "tags": ["audit"]
+    },
+    {
+      "name": "savings",
+      "path": "/en/savings",
+      "tags": ["audit"]
+    },
+    {
+      "name": "reports-documents",
+      "path": "/en/reports/documents",
+      "tags": ["audit"]
+    },
+    {
+      "name": "settings",
+      "path": "/en/settings",
+      "tags": ["audit"]
+    },
+    {
+      "name": "settings-portfolios",
+      "path": "/en/settings/portfolios",
+      "tags": ["audit"]
+    },
+    {
+      "name": "settings-account",
+      "path": "/en/settings/account",
+      "tags": ["audit"]
+    },
+    {
+      "name": "settings-investing",
+      "path": "/en/settings/investing",
+      "tags": ["audit"]
+    },
+    {
+      "name": "settings-connections",
+      "path": "/en/settings/connections",
+      "tags": ["audit"]
+    },
+    {
+      "name": "admin",
+      "path": "/en/admin",
+      "tags": ["audit"]
+    },
+    {
+      "name": "admin-jobs",
+      "path": "/en/admin/jobs",
+      "tags": ["audit"]
+    },
+    {
+      "name": "onboarding",
+      "path": "/en/onboarding",
+      "tags": ["audit"]
+    },
+    {
+      "name": "holdings-id",
+      "path": "/id/holdings",
+      "tags": ["audit"]
+    },
+    {
+      "name": "insights-id",
+      "path": "/id/insights",
+      "tags": ["audit"]
+    }
+  ]
+}

@@ -70,5 +70,11 @@ apps/web/.ds-sync-css/
 .design-sync/node_modules
 landing-shots/
 
+# visual-kit: the launcher extracted from the pinned image, check output, audit evidence, and staging leftovers of a killed run
+visual/.kit/
+visual/.out/
+docs/audit/assets/
+*.staging
+
 # Session hand-off of a running `make demo` (scripts/demo/instance.mjs); removed on stop
 .demo/

@@ -3,8 +3,8 @@ import { encode } from "next-auth/jwt";
 /**
  * Mints a forged Auth.js v5 session cookie carrying a seeded personal-access-token
  * (PAT) secret as its `accessToken`, so the app treats the browser as logged in
- * without a real Authentik round trip. Used only by the screenshot pipeline
- * (`scripts/screenshots.mjs`) against a throwaway demo backend — never for anything
+ * without a real Authentik round trip. Used only by the demo instance
+ * (`scripts/demo/instance.mjs`, which hands the cookie to visual-kit) against a throwaway demo backend — never for anything
  * touching a real user's data.
  *
  * How this works: both RSC reads (`lib/server-api.ts`) and the same-origin API proxy

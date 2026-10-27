@@ -20,8 +20,8 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
-    // Its audit functions are handed to page.evaluate() and run in the browser.
-    files: ["scripts/ui-walkthrough.mjs"],
+    // visual-kit app hooks: node on the host side, and page.evaluate() callbacks that run in the browser.
+    files: ["visual/**/*.mjs"],
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
