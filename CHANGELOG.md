@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.8...v0.2.9) (2026-10-27)
+
+
+### Features
+
+* **demo:** fixed clock and launcher hand-off for the demo instance ([#1210](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1210)) ([3ba7349](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3ba73496f71bc0f109821607c67e2ff2acbb5bd1))
+
 ## [0.2.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.7...v0.2.8) (2026-10-27)
 
 
