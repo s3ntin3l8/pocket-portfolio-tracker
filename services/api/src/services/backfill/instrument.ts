@@ -36,6 +36,8 @@ export interface InstrumentChunkResult {
   days: number;
   truncated: boolean;
   unpriced: boolean;
+  /** The feed is cooling down as dead (`isDeadFeedCoolingDown`): the providers were not asked. */
+  skippedDeadFeed?: boolean;
 }
 
 /**
@@ -189,7 +191,7 @@ export async function fetchInstrumentPrices(
   // Regular instrument — a dead feed is skipped under any trigger (see core.ts); the stored
   // prices are read back by computeBackfillSnapshots, so nothing about valuation changes.
   if (!retryDeadFeeds && isDeadFeedCoolingDown(instr, new Date().toISOString().slice(0, 10))) {
-    return { instrumentId, days: 0, truncated: false, unpriced: true };
+    return { instrumentId, days: 0, truncated: false, unpriced: true, skippedDeadFeed: true };
   }
 
   // Regular instrument — fetch from market data provider

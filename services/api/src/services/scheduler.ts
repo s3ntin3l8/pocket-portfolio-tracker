@@ -623,7 +623,14 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
             .where(eq(backfillJobs.id, backfillJobId));
 
           app.log.info(
-            { backfillJobId, instrumentId, chunkStart, chunkEnd, days: result.days },
+            {
+              backfillJobId,
+              instrumentId,
+              chunkStart,
+              chunkEnd,
+              days: result.days,
+              ...(result.skippedDeadFeed ? { skippedDeadFeed: true } : {}),
+            },
             "backfill-instrument complete",
           );
         } catch (err) {

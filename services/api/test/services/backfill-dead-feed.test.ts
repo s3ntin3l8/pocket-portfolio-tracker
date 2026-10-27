@@ -23,7 +23,11 @@ import {
   type MarketDataProvider,
 } from "@portfolio/market-data";
 import { ensureDb, closeDb } from "../../src/db/client.js";
-import { backfillPortfolioHistory, fetchInstrumentPrices } from "../../src/services/backfill.js";
+import {
+  backfillPortfolioHistory,
+  backfillStalePortfolios,
+  fetchInstrumentPrices,
+} from "../../src/services/backfill.js";
 import { planFanOut } from "../../src/services/backfill/fan-out.js";
 
 const DAY = 86_400_000;
@@ -154,6 +158,7 @@ describe("backfill — a dead feed is not asked again", () => {
       );
       expect(calls, `sold=${sold}`).toEqual([]);
       expect(res.days).toBe(0);
+      expect(res.skippedDeadFeed).toBe(true);
     }
   });
 
@@ -204,5 +209,34 @@ describe("backfill — a dead feed is not asked again", () => {
       pf.id,
     );
     expect(calls).toEqual([symbol]);
+  });
+
+  it("the stale sweep leaves a dead-feed-only stale portfolio alone unless retryDeadFeeds", async () => {
+    const { db, pf, instr } = await seed({ missCount: DEAD_FEED_MISS_THRESHOLD });
+    // Looks fully backfilled from inception, but the newest price is long stale.
+    await db.insert(portfolioSnapshots).values({
+      portfolioId: pf.id,
+      date: ago(40),
+      netWorth: "20",
+      marketValue: "20",
+      effectiveFlow: "0",
+      currency: "EUR",
+    });
+    await db
+      .insert(prices)
+      .values({ instrumentId: instr.id, date: ago(30), close: "10", currency: "EUR" });
+    const run = async (retryDeadFeeds?: boolean) => {
+      const calls: { portfolioId: string; retry?: boolean }[] = [];
+      await backfillStalePortfolios(db, new MarketDataService([]), 10_000, {
+        retryDeadFeeds,
+        enqueue: async (portfolioId, _from, _tail, retry) => {
+          calls.push({ portfolioId, retry });
+          return true;
+        },
+      });
+      return calls.filter((c) => c.portfolioId === pf.id);
+    };
+    expect(await run()).toEqual([]);
+    expect(await run(true)).toEqual([{ portfolioId: pf.id, retry: true }]);
   });
 });

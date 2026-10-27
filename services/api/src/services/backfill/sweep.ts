@@ -227,6 +227,9 @@ export async function backfillStalePortfolios(
     return !!h && h.assetClass === "bond" && (isManualPriceBond(h) || !h.faceValue);
   }
   function isCoolingDownDeadFeed(instrumentId: string): boolean {
+    // `retryDeadFeeds` (an operator who knows the feed is back) must reach the selection
+    // too, or a portfolio stale only because of its dead feed is never enqueued at all.
+    if (opts.retryDeadFeeds) return false;
     const health = feedHealthByInstr.get(instrumentId);
     return !!health && isDeadFeedCoolingDown(health, today);
   }
