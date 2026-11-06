@@ -6,4 +6,5 @@
 **/drizzle/
 **/package-lock.json
 .claude/
+.agents/
 CHANGELOG.md

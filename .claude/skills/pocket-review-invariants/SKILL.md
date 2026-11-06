@@ -14,7 +14,7 @@ description: >-
 
 # Pocket domain red flags
 
-These come from this repo's CLAUDE.md, but restated as things to *grep for or notice
+These come from this repo's AGENTS.md, but restated as things to *grep for or notice
 in a diff* rather than prose to re-read — the invariant is already documented there;
 this is the checklist for spotting violations in code. This skill is a companion to
 the generic `autonomous-pr-review` skill (installed via the `ai-agent-skills` plugin

@@ -24,5 +24,5 @@ the affected packages/core module and the portfolio's cashCounted boundary
 - [ ] <!-- Requirement 1 -->
 - [ ] <!-- Requirement 2 -->
 - [ ] Update `docs/*.md` (tax, trade_republic, dkb, interactive_brokers, data_providers) if broker/tax/provider behavior changes
-- [ ] Update `CLAUDE.md` if a convention or invariant changes
+- [ ] Update `AGENTS.md` if a convention or invariant changes
 - [ ] Test coverage additions/modifications (gate is 70%)

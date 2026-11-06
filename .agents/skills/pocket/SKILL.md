@@ -8,7 +8,6 @@ description: >-
   write or change code in packages/core, services/api or apps/web, before you plan a feature
   that touches money, performance, tax or imports, and when you review a diff in this repo.
 ---
-
 <!-- mullion:scaffold:pocket -->
 
 # Pocket invariants
@@ -164,10 +163,10 @@ refusing a price-0 `transfer_in` with 400 `transfer_cost_basis_required` (#818).
   - `?range=` and `?year=` are shallow `replaceState` writes; never add history entries for
     range or period.
   - Only ids go in params, never personal data.
-- Admin gates go through `requireAdmin()`. Only a _successful_ non-admin answer gives
+- Admin gates go through `requireAdmin()`. Only a *successful* non-admin answer gives
   `notFound()`; a failed lookup renders `<AdminGateFailure>`.
 - Task-tier overlays use `DialogContent`'s `size` scale, and their only breakpoint is `md`.
-  Never branch the overlay _component tree_ on `useMediaQuery`/`isDesktop`: crossing the
+  Never branch the overlay *component tree* on `useMediaQuery`/`isDesktop`: crossing the
   breakpoint remounts it and drops user input. Use CSS (`max-md:`/`md:`) on one tree.
 - A UI change isn't done until you've looked at it with `make visual-check ROUTES=…`. A new
   route or state needs a scene in `visual/scenes.json`.

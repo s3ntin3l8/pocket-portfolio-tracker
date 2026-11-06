@@ -10,7 +10,7 @@ make install-hooks          # pre-commit + pre-push git hooks (see below)
 ```
 
 See the Quick Start in `README.md` for running the app locally, and
-[`CLAUDE.md`](CLAUDE.md) for the full architecture/layout tour.
+[`AGENTS.md`](AGENTS.md) for the full architecture/layout tour.
 
 ## Before opening a PR
 
@@ -150,6 +150,11 @@ merged coverage across all 4 shards is what's actually checked against
 build/lint/typecheck cache is also persisted across runs (`turbo-cache: true`), and so is
 Next's own `.next/cache` (`next-cache: true`; turbo's `outputs` exclude it, so the two don't
 overlap).
+Sharding + caching cut the job from ~5m30s to ~2m (live-validated via a smoke-test PR
+before adopting).
+Caller jobs invoking reusable workflows with write scopes **must declare a
+`permissions:` block** or the run fails at startup. `codeql`, `dependency-review`,
+`release-please`, `ghcr-cleanup` are also wired.
 
 `codeql` and `dependency-review` are gated on `github.event.repository.private == false`
 — they need GitHub Advanced Security, which is free on public repos but not private ones.

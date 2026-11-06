@@ -71,7 +71,7 @@ const nextConfig = {
     const csp = [
       "default-src 'self'",
       // 'unsafe-inline' on script-src is the known gap here: next-themes' FOUC-prevention
-      // script (see CLAUDE.md) is a genuine inline <script>, not a hydration data blob.
+      // script (see AGENTS.md) is a genuine inline <script>, not a hydration data blob.
       // Tighten this to a nonce once the report-only period confirms nothing else needs it.
       "script-src 'self' 'unsafe-inline'",
       // Tailwind/shadcn + Radix UI both rely on inline style attributes at runtime.
