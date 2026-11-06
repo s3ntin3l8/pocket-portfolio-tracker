@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from "vitest";
 import { generateKeyPair, SignJWT, exportJWK, type JWK } from "jose";
 import { eq, sql } from "drizzle-orm";
 import {
@@ -46,6 +46,10 @@ async function adminToken(sub: string) {
 const auth = (t: string) => ({ authorization: `Bearer ${t}` });
 
 describe("auth + portfolios + transactions", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeAll(async () => {
     const kp = await generateKeyPair("ES256");
     privateKey = kp.privateKey;
@@ -2759,6 +2763,9 @@ describe("auth + portfolios + transactions", () => {
   });
 
   it("includes quarterly dividends in forecastRestOfYear when dividend_events has future announced rows", async () => {
+    // Pin "today": the announced rows below sit 1 and 2 months ahead, and from November on the
+    // second one lands in next year, which changes which rows count as rest-of-year.
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-06-15T00:00:00Z") });
     const { dividendEvents, fxRates } = await import("@portfolio/db");
     const t = await token("msft-forecast-user");
     const portfolioId = (
@@ -2828,7 +2835,6 @@ describe("auth + portfolios + transactions", () => {
     }
 
     // Simulate refreshDividends with TwelveData/EODHD (returns future announced dividends)
-    // Use dates relative to today so the test doesn't break when run on/after a hardcoded date.
     const today = new Date();
     const nextMonth = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 12));
     const twoMonths = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 2, 12));
