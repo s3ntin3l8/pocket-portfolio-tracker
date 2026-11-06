@@ -406,3 +406,10 @@ gate, Node setup, and review-capable tool grants (including
 `mcp__github_inline_comment__create_inline_comment` for inline suggested edits, plus
 `gh pr review` for a formal Approve/Request-Changes verdict) live there once, shared with
 `runway-ai-usage-tracker` and `claude-remote-session` (`.github#34`).
+
+<!-- mullion:pointer:start -->
+
+@AGENTS.md
+
+<!-- Claude Code does not read AGENTS.md on its own; this import delivers it. -->
+<!-- mullion:pointer:end -->

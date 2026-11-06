@@ -122,3 +122,49 @@ checks: `test-node / lint-and-test`, `test-python`,
 `dependency-review / dependency-review`, and CodeQL's
 `analyze / Analyze (javascript-typescript)`. A clean local run of the
 commands above should mean a clean CI run.
+
+<!-- mullion:pointer:start -->
+
+See `AGENTS.md`'s Workflow Conventions section for our process rules.
+<!-- mullion:pointer:end -->
+
+<!-- mullion:moved:start -->
+
+## CI internals
+
+`.github/workflows/` are thin callers of the reusable workflows in
+[`s3ntin3l8/.github`](https://github.com/s3ntin3l8/.github): `ci-cd.yml` runs
+**ci-node** at the root (so root scripts fan out via Turbo: lint, typecheck, build),
+plus two self-contained jobs — **test-python** (pytest over `services/api/python`, the
+vendored pytr extraction tests — not covered by ci-node) and **e2e** (the Playwright
+suite in `apps/web/e2e/`, which needs its own job because the shared reusable workflow
+exposes no e2e input) — then two parallel
+**docker-publish** jobs (root `Dockerfile` → `@portfolio/api`, and `apps/web/Dockerfile`
+→ `@portfolio/web`) once all three test jobs pass. `release-please.yml` mirrors the same
+two-image publish on releases. Tests run
+**sharded 4-way** (`test-shards: "4"`) via `test:coverage:sharded` — the same Vitest
+coverage run as `test:coverage`, but with `coverage.thresholds` disabled per-shard
+(a single shard's inherently-partial coverage would otherwise trip the 70% gate); the
+merged coverage across all 4 shards is what's actually checked against
+`coverage-fail-under`, in a `test-merge` job that runs after the shard matrix. Turbo's
+build/lint/typecheck cache is also persisted across runs (`turbo-cache: true`), and so is
+Next's own `.next/cache` (`next-cache: true`; turbo's `outputs` exclude it, so the two don't
+overlap).
+
+`codeql` and `dependency-review` are gated on `github.event.repository.private == false`
+— they need GitHub Advanced Security, which is free on public repos but not private ones.
+The repo **is public** (confirmed 2026-07-16), so both are live on every PR, not
+conditionally skipped.
+
+Two more workflows are mention-triggered, not push/PR-triggered: **`claude-code.yml`** runs
+Claude Code itself against `@claude`-mentioned issues/PR comments/reviews; **`hermes.yml`**
+runs an on-demand PR review bot on `@s3ntin3l8-hermes` comment mentions (guarded against
+re-triggering itself via `github.actor`, since a submitted review's body also matches the
+mention substring — see the in-file comment on the Claude→Hermes cascade, `.github#527`).
+`claude-code.yml` is a thin caller of the reusable `claude-code.yml` in `s3ntin3l8/.github`
+(same `workflow_call` pattern as `hermes.yml`/`hermes-review.yml`) — the trusted-commenter
+gate, Node setup, and review-capable tool grants (including
+`mcp__github_inline_comment__create_inline_comment` for inline suggested edits, plus
+`gh pr review` for a formal Approve/Request-Changes verdict) live there once, shared with
+`runway-ai-usage-tracker` and `claude-remote-session` (`.github#34`).
+<!-- mullion:moved:end -->

@@ -78,3 +78,7 @@ docs/audit/assets/
 
 # Session hand-off of a running `make demo` (scripts/demo/instance.mjs); removed on stop
 .demo/
+
+# mullion:worktrees:start
+.wt/
+# mullion:worktrees:end
