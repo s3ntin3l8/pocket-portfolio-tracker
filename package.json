@@ -17,8 +17,9 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint && npm run lint:scripts",
+    "lint": "turbo run lint && npm run lint:scripts && npm run check:skill-mirror",
     "lint:scripts": "eslint scripts visual",
+    "check:skill-mirror": "diff -r .claude/skills/pocket .agents/skills/pocket",
     "typecheck": "turbo run typecheck",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
