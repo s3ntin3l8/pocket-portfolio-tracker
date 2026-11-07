@@ -153,8 +153,8 @@ screenshots-audit: visual/.kit/run.sh ## Audit evidence for AUDIT=YYYY-MM-<scope
 	@test -n "$(AUDIT)" || { echo "AUDIT=YYYY-MM-<scope>-<topic> is required"; exit 1; }
 	$(VISUAL_RUN) audit --slug "$(AUDIT)" $(if $(FORCE),--force)
 
-# Only a plain number is forwarded: an ambient REPEAT=yes in the environment is ignored, as the launcher does.
-REPEAT_N := $(and $(REPEAT),$(if $(word 2,$(REPEAT)),,x),$(if $(strip $(subst 0,,$(subst 1,,$(subst 2,,$(subst 3,,$(subst 4,,$(subst 5,,$(subst 6,,$(subst 7,,$(subst 8,,$(subst 9,,$(REPEAT)))))))))))),,$(REPEAT)))
+# Only a whole number from 1 to 99 is forwarded (what the launcher accepts): an ambient REPEAT=yes, 0 or 100 in the environment is ignored, as the launcher does.
+REPEAT_N := $(and $(REPEAT),$(if $(word 2,$(strip $(REPEAT))),,$(filter $(shell seq 1 99),$(strip $(REPEAT)))))
 
 visual-check: visual/.kit/run.sh ## Before/after of the routes a UI change touches (ROUTES=/en/holdings,tax) against BASE (default: merge base); REPEAT=N also recaptures the head N-1 times and fails if it is not deterministic
 	$(VISUAL_RUN) check $(if $(ROUTES),--routes "$(ROUTES)") $(if $(BASE),--base "$(BASE)") $(if $(FORCE),--force) $(if $(REPEAT_N),--repeat "$(REPEAT_N)")
