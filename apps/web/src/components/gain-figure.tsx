@@ -62,7 +62,9 @@ export function GainFigure({
           <p className={cn("tabular text-lg font-bold", colour, amountClassName)}>{amount}</p>
         )}
         {pct != null && (
-          <p className={cn("tabular text-body-sm font-bold", colour, pctClassName)}>{pct}</p>
+          <p className={cn("tabular text-body-sm leading-5 font-bold", colour, pctClassName)}>
+            {pct}
+          </p>
         )}
       </div>
       <BasisLabel>{label}</BasisLabel>
