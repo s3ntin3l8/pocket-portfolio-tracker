@@ -11,6 +11,7 @@
     }
   },
   "cacheKeyFiles": ["package-lock.json", ".github/visual-setup.sh"],
+  "baseHarness": ["scripts/demo"],
   "clock": "2026-10-15T10:00:00Z",
   "scenes": [
     {
