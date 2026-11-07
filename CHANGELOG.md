@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.8...v0.2.9) (2026-11-07)
+
+
+### Features
+
+* **demo:** fixed clock and launcher hand-off for the demo instance ([#1210](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1210)) ([3ba7349](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3ba73496f71bc0f109821607c67e2ff2acbb5bd1))
+
+
+### Bug Fixes
+
+* **web:** lay the holdings value card out on whole pixels ([#1220](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1220)) ([bebe70f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bebe70f795ce2822bd21899fce82b68197d15a23))
+
 ## [0.2.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.7...v0.2.8) (2026-10-27)
 
 
