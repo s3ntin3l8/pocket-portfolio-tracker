@@ -1,0 +1,31 @@
+name: Update screenshots
+
+# `/update-baselines` on a pull request regenerates the committed README and PWA screenshots (`make screenshots`) in CI
+# and pushes them to the PR branch as one commit (write access, same-repository branch only), so a UI PR does not need
+# Docker locally. The shared workflow in s3ntin3l8/.github (visual-baselines.yml) does the work and refuses anything
+# else with a reply; `workflow_dispatch` takes a PR number. Pocket has no committed visual baselines, so the command
+# means "refresh the screenshots".
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  screenshots:
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.issue.pull_request && startsWith(github.event.comment.body, '/update-baselines')) }}
+    uses: s3ntin3l8/.github/.github/workflows/visual-baselines.yml@main
+    with:
+      pr-number: ${{ inputs.pr }}
+      node-version: "26"
+      target: screenshots
+      paths: "docs/screenshots apps/web/public/screenshots"

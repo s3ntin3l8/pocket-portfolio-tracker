@@ -143,6 +143,9 @@ visual/.kit/run.sh: visual/Dockerfile
 
 screenshots: visual/.kit/run.sh ## README screenshots into docs/screenshots (committed) and the PWA manifest copies. FORCE=1 replaces a folder visual-kit did not write
 	$(VISUAL_RUN) readme $(if $(FORCE),--force)
+	@# The README shows stills only; the loop is for the landing page (screenshots-landing). Loops re-encode
+	@# differently on every run, so keeping them here would make the weekly refresh PR itself noise.
+	rm -f docs/screenshots/*.webm docs/screenshots/*.mp4 docs/screenshots/*.jpg
 	mkdir -p apps/web/public/screenshots
 	for s in $(MANIFEST_SHOTS); do cp docs/screenshots/$$s.png apps/web/public/screenshots/$$s.png; done
 

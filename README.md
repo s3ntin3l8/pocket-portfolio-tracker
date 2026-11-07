@@ -132,6 +132,14 @@ captures each hero screen in light/dark and mobile/desktop, then tears everythin
 scenes, the viewports and the fixed clock (`DEMO_NOW`) are in `visual/scenes.json`; the spec is
 visual-kit's `CONTRACT.md`. Docker is required.
 
+You rarely need to run it: a weekly workflow (`.github/workflows/visual-refresh.yml`, or run it from
+the Actions tab) regenerates the images and, only when one differs by more than 20 px (re-renders
+are never byte-identical), opens or updates a single `chore(web): refresh screenshots` PR from
+`bot/refresh-screenshots`. On a UI PR, comment `/update-baselines` and CI pushes one commit with
+the images that really changed to the PR branch (`.github/workflows/visual-baselines.yml`; write
+access, same-repository branch only). The README shows stills only: the holdings loop is not
+committed, `make screenshots-landing` renders it.
+
 Other entry points:
 
 | Command                          | What it does                                                                                                                                 |

@@ -27,8 +27,12 @@ If `npm run format:check` fails, `npm run format` applies the fix in place.
 
 If you changed what a screen looks like, run `make visual-check ROUTES=<routes>` (needs Docker; it
 compares the merge base with your tree and writes `visual/.out/check/report/`), put the result in
-the PR's **Visual check** section, and regenerate the README images with `make screenshots`
-(see "Reproducing the screenshots" in the README).
+the PR's **Visual check** section. The README images need no local run: comment `/update-baselines` on the PR
+and CI pushes the regenerated ones (or `make screenshots`; see "Reproducing the screenshots" in the README).
+The weekly `visual-refresh` workflow also opens a `chore(web): refresh screenshots` PR when they drift.
+Both push with `GITHUB_TOKEN`, so the PR's checks would wait at `action_required`; the workflows approve them
+themselves, only for the commit they just pushed. If checks never start on such a PR, approve them by hand in
+the Actions tab.
 
 If you changed the Drizzle schema (`packages/db/src/schema/*.ts`), also run
 `npm run db:generate --workspace @portfolio/db` and commit the generated
