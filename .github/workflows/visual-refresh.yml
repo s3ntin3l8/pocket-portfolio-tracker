@@ -1,0 +1,24 @@
+name: Visual refresh
+
+# Weekly: regenerate the README and PWA screenshots (`make screenshots`) and, only when an image changed by more
+# than the pixel tolerance, open or update one rolling pull request from `bot/refresh-screenshots`. The mechanics,
+# the tolerance and the self-approval of the PR's held checks live in the shared workflow in s3ntin3l8/.github
+# (visual-refresh.yml); `workflow_dispatch` runs it on demand.
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  refresh:
+    if: ${{ !github.event.repository.fork }}
+    uses: s3ntin3l8/.github/.github/workflows/visual-refresh.yml@main
+    with:
+      node-version: "26"
+      paths: "docs/screenshots apps/web/public/screenshots"
+      title: "chore(web): refresh screenshots"
