@@ -43,7 +43,7 @@ export function PortfolioValueCard({
         {/* Total value */}
         <div>
           <p className="text-xs font-medium text-muted-foreground">{totalLabel}</p>
-          <p className="tabular mt-0.5 text-heading leading-7 font-bold">{totalValueFormatted}</p>
+          <p className="tabular mt-0.5 text-heading font-bold">{totalValueFormatted}</p>
         </div>
         {/* All-time P&L */}
         <div className="border-t border-line pt-3">
@@ -53,7 +53,6 @@ export function PortfolioValueCard({
             pct={allTimePct}
             tone={allTimeTone}
             basis="cost"
-            pctClassName="leading-5"
             className="mt-0.5"
           />
           {allTimeExplainer && <div className="mt-1.5">{allTimeExplainer}</div>}
@@ -64,7 +63,7 @@ export function PortfolioValueCard({
           <div className="mt-0.5 flex items-baseline gap-2">
             <p className={cn("tabular text-lg font-bold", toneClass(todayTone))}>{todayAmount}</p>
             {todayPct != null && (
-              <p className={cn("tabular text-body-sm leading-5 font-bold", toneClass(todayTone))}>
+              <p className={cn("tabular text-body-sm font-bold", toneClass(todayTone))}>
                 {todayPct}
               </p>
             )}

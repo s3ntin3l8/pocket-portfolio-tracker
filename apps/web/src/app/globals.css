@@ -214,20 +214,22 @@
 
   /* Type scale (font-size / line-height). Tailwind's text-xs (12) / text-sm (14) /
      text-base (16) / text-lg (18) stay as-is; these fill the gaps. Floor is 11px — never
-     use text-[Npx]. Headings: page h1 = font-bold (PageHeader), section h2 =
+     use text-[Npx]. Line heights are whole pixels (a fractional
+     box puts text on a half pixel, where raster rounding differs between renders; #1221).
+     Headings: page h1 = font-bold (PageHeader), section h2 =
      text-base font-semibold, card title = font-semibold (CardTitle). */
   --text-micro: 0.6875rem; /* 11px: badges, axis ticks, eyebrow labels */
-  --text-micro--line-height: 1.35;
+  --text-micro--line-height: 0.9375rem; /* 15px */
   --text-body-sm: 0.8125rem; /* 13px: dense rows, secondary body */
-  --text-body-sm--line-height: 1.45;
+  --text-body-sm--line-height: 1.1875rem; /* 19px */
   --text-body: 0.9375rem; /* 15px: primary body / section titles */
-  --text-body--line-height: 1.5;
+  --text-body--line-height: 1.375rem; /* 22px */
   --text-heading: 1.375rem; /* 22px: page titles */
-  --text-heading--line-height: 1.25;
+  --text-heading--line-height: 1.75rem; /* 28px */
   --text-display: 1.75rem; /* 28px */
-  --text-display--line-height: 1.15;
+  --text-display--line-height: 2rem; /* 32px */
   --text-hero: 2.25rem; /* 36px: hero figures */
-  --text-hero--line-height: 1.1;
+  --text-hero--line-height: 2.5rem; /* 40px */
 
   /* Route-transition content blend + skeleton shimmer sweep. Registered here so Tailwind
      generates `animate-fade-in` / `animate-shimmer` utilities (Tailwind v4 CSS config —
