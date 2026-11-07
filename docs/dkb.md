@@ -13,7 +13,7 @@ of single-document securities PDFs. Everything DKB books is EUR.
    manually. Detected drafts go through the normal import review screen for confirmation.
 4. Confirmed drafts become transactions, subject to the general import dedup rules
    (file-level, within-source, and cross-source economic fingerprinting — see
-   [`CLAUDE.md`](../CLAUDE.md#conventions)).
+   [`AGENTS.md`](../AGENTS.md#conventions)).
 
 ---
 

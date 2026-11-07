@@ -62,7 +62,7 @@ A npm-workspaces + Turborepo monorepo (Node ≥26, ESM, TypeScript).
 authenticated user; the web app logs in via Auth.js v5. **Infra** is Supabase Cloud
 (Postgres + Storage) to start, with self-hosting on Proxmox as the exit path.
 
-See [`CLAUDE.md`](CLAUDE.md) for the full architecture and the phased plan in
+See [`AGENTS.md`](AGENTS.md) for the full architecture and the phased plan in
 `.claude/plans/`.
 
 ## Quick start

@@ -1,4 +1,4 @@
-# Align Codecov with the repo's coverage policy (see CLAUDE.md + vitest.config.ts).
+# Align Codecov with the repo's coverage policy (see AGENTS.md + vitest.config.ts).
 # Overall coverage is already enforced two ways — the root Vitest `thresholds` and
 # CI's `coverage-fail-under: 70`. Here we keep Codecov from flagging framework glue
 # that we deliberately don't unit-test (entrypoints, app-router shells, auth wiring),

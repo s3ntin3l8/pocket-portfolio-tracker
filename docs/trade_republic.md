@@ -76,7 +76,7 @@ called in sequence from `sync.ts`:
    source event now reports `CANCELED`/`CANCELLED` (e.g. TR restates an annual dividend).
 2. **Resolved-events ledger** (`tr_resolved_events` table, `packages/db/src/schema.ts`) —
    the durable, TR-specific dedup layer (distinct from the general cross-source dedup in
-   `CLAUDE.md`): every event already confirmed or discarded is recorded here, keyed by
+   `AGENTS.md`): every event already confirmed or discarded is recorded here, keyed by
    `(portfolioId, source="pytr", eventId)`, so a later sync never re-stages it even if the
    confirmed transaction was manually deleted. Seeded once from any pre-existing confirmed
    `pytr` transactions so the ledger is durable from the first sync after deploy.
@@ -101,7 +101,7 @@ A sync is **boundary-aware** (issue #326): a cash-inside portfolio (`cashCounted
 e.g. a Tagesgeld/Festgeld sub-account) imports every event including deposits,
 withdrawals, and card spending; a cash-outside (invest-only) portfolio excludes genuine
 cash movements so they don't manufacture phantom flows against a value boundary that
-excludes cash (see `CLAUDE.md`'s "one boundary per portfolio"). Unknown/unmapped event
+excludes cash (see `AGENTS.md`'s "one boundary per portfolio"). Unknown/unmapped event
 types are never excluded by this filter — they always surface as attention gaps. Flipping
 a portfolio's boundary re-stages any previously-excluded events on the next sync.
 

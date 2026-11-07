@@ -79,7 +79,7 @@ jobs:
       # The API resolves @portfolio/core, @portfolio/db and the other workspace
       # packages from their dist/ folder, so they must be built before the suite
       # boots — `npm ci` alone leaves no dist/ at all. Same filter as the API
-      # Dockerfile. It also removes the tsx/dist emit race documented in CLAUDE.md.
+      # Dockerfile. It also removes the tsx/dist emit race documented in AGENTS.md.
       - name: Build workspace packages
         run: npx turbo run build --filter=@portfolio/api...
       - name: Resolve the Playwright version
