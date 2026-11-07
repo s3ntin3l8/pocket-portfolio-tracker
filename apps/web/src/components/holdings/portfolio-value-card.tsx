@@ -53,6 +53,7 @@ export function PortfolioValueCard({
             pct={allTimePct}
             tone={allTimeTone}
             basis="cost"
+            pctClassName="leading-5"
             className="mt-0.5"
           />
           {allTimeExplainer && <div className="mt-1.5">{allTimeExplainer}</div>}
