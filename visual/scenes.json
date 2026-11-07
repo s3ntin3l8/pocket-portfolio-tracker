@@ -79,7 +79,7 @@
     {
       "name": "income",
       "path": "/en/income",
-      "tags": ["audit"]
+      "tags": ["check", "audit"]
     },
     {
       "name": "trades",
@@ -89,7 +89,7 @@
     {
       "name": "savings",
       "path": "/en/savings",
-      "tags": ["audit"]
+      "tags": ["check", "audit"]
     },
     {
       "name": "reports-documents",
