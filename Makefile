@@ -153,8 +153,8 @@ screenshots-audit: visual/.kit/run.sh ## Audit evidence for AUDIT=YYYY-MM-<scope
 	@test -n "$(AUDIT)" || { echo "AUDIT=YYYY-MM-<scope>-<topic> is required"; exit 1; }
 	$(VISUAL_RUN) audit --slug "$(AUDIT)" $(if $(FORCE),--force)
 
-visual-check: visual/.kit/run.sh ## Before/after of the routes a UI change touches (ROUTES=/en/holdings,tax) against BASE (default: merge base)
-	$(VISUAL_RUN) check $(if $(ROUTES),--routes "$(ROUTES)") $(if $(BASE),--base "$(BASE)") $(if $(FORCE),--force)
+visual-check: visual/.kit/run.sh ## Before/after of the routes a UI change touches (ROUTES=/en/holdings,tax) against BASE (default: merge base); REPEAT=N also recaptures the head N-1 times and fails if it is not deterministic
+	$(VISUAL_RUN) check $(if $(ROUTES),--routes "$(ROUTES)") $(if $(BASE),--base "$(BASE)") $(if $(FORCE),--force) $(if $(REPEAT),--repeat "$(REPEAT)")
 
 integrity: ## Run the analysis-integrity invariants against a running API with POCKET_TOKEN (see docs/integrity.md)
 	node scripts/integrity-report.mjs
