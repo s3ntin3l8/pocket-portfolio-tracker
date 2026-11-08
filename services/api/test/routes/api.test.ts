@@ -2762,6 +2762,109 @@ describe("auth + portfolios + transactions", () => {
     expect(Number(y.yieldOnCost)).toBeCloseTo(100 / 95000, 8);
   });
 
+  it.each([
+    { label: "ex and pay both in January", exDate: "2027-01-14", payDate: null, restOfYear: 0 },
+    {
+      label: "ex in December, pay in January",
+      exDate: "2026-12-28",
+      payDate: "2027-01-14",
+      restOfYear: 15,
+    },
+  ])(
+    "keeps the remaining cadence payments when one dividend is announced ($label)",
+    async ({ exDate, payDate, restOfYear }) => {
+      // November: Jan 2027 is next year, so the next-year blend branch is live.
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-15T00:00:00Z") });
+      const { dividendEvents, fxRates } = await import("@portfolio/db");
+      const t = await token(`quarterly-nextyear-${exDate}`);
+      const portfolioId = (
+        await app.inject({
+          method: "POST",
+          url: "/portfolios",
+          headers: auth(t),
+          payload: { name: "Quarterly NY", baseCurrency: "USD" },
+        })
+      ).json().id;
+      const [ins] = await app.db
+        .insert(instruments)
+        .values({
+          symbol: `QNY${exDate}`,
+          market: "NASDAQ",
+          assetClass: "equity",
+          currency: "USD",
+          name: "Quarterly Next Year",
+        })
+        .returning();
+      await app.db
+        .insert(fxRates)
+        .values({ base: "USD", quote: "USD", rate: "1", date: "2026-11-15" })
+        .onConflictDoNothing();
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "buy",
+          instrumentId: ins.id,
+          quantity: "10",
+          price: "100",
+          currency: "USD",
+          executedAt: "2025-01-02T00:00:00.000Z",
+        },
+      });
+      // Jan/Apr/Jul/Oct 2026 history, 1.00/share flat: the engine anchors on Oct 12 and emits
+      // Jan 12 / Apr 12 / Jul 12 / Oct 12 2027 (4 x 10.00 USD).
+      for (const date of ["2026-01-12", "2026-04-12", "2026-07-12", "2026-10-12"]) {
+        await app.inject({
+          method: "POST",
+          url: `/portfolios/${portfolioId}/transactions`,
+          headers: auth(t),
+          payload: {
+            type: "dividend",
+            instrumentId: ins.id,
+            quantity: "0",
+            price: "10",
+            currency: "USD",
+            executedAt: `${date}T00:00:00.000Z`,
+          },
+        });
+      }
+      // One announced next-year row (ex-date in January 2027): covers the Jan 12 slot only.
+      await app.db.insert(dividendEvents).values({
+        instrumentId: ins.id,
+        exDate,
+        payDate,
+        amountPerShare: "1.50",
+        currency: "USD",
+        status: "announced",
+        source: "test",
+        fetchedAt: new Date(),
+      });
+
+      const body = (
+        await app.inject({
+          method: "GET",
+          url: `/portfolios/${portfolioId}/income`,
+          headers: auth(t),
+        })
+      ).json();
+
+      // Projected 2027 payments: the announced row covers the Jan 12 slot whichever year its
+      // ex-date is in, so exactly the other three remain.
+      const projected = body.upcoming.filter(
+        (u: { kind: string; instrumentId: string; date: string; status: string }) =>
+          u.kind === "dividend" &&
+          u.instrumentId === ins.id &&
+          u.date.startsWith("2027") &&
+          u.status !== "announced",
+      );
+      expect(projected).toHaveLength(3);
+      // The announced 1.50 x 10 counts once: in next year when its ex-date is, else in rest-of-year.
+      expect(Number(body.forecastNextYear)).toBeCloseTo(30 + (restOfYear ? 0 : 15), 1);
+      expect(Number(body.forecastRestOfYear)).toBeCloseTo(restOfYear, 1);
+    },
+  );
+
   it("includes quarterly dividends in forecastRestOfYear when dividend_events has future announced rows", async () => {
     // Pin "today": the announced rows below sit 1 and 2 months ahead, and from November on the
     // second one lands in next year, which changes which rows count as rest-of-year.
@@ -2906,8 +3009,8 @@ describe("auth + portfolios + transactions", () => {
       })
     ).json();
 
-    // MSFT should appear in forecastRestOfYear via futureAnnounced
-    // (0.80 USD × 10 shares × 2 quarters = 16 USD × 16000 IDR)
+    // MSFT should appear in forecastRestOfYear via futureAnnounced (the announced rows
+    // plus whichever cadence payments they don't cover — the blend is per payment).
     const forecastRestOfYear = Number(body.forecastRestOfYear);
     expect(forecastRestOfYear).toBeGreaterThan(0);
 

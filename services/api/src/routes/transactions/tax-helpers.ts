@@ -39,6 +39,8 @@ import {
   idCashBalancesAtPayments,
   idDepositBalanceIdr,
   ID_SALES_TAX_RATE,
+  blendAnnouncedDividends,
+  dividendIntervalMonths,
 } from "@portfolio/core";
 import {
   getFxRates,
@@ -224,24 +226,30 @@ export async function restOfYearForecastGross(
 
   const futureByInstrument = new Map<
     string,
-    { exDate: string; amount: string; currency: string }[]
+    { exDate: string; payDate: string; amount: string; currency: string }[]
   >();
   for (const row of announcedRows) {
     const qty = heldQtyMap.get(row.instrumentId);
     if (!qty) continue;
     const totalAmount = new Decimal(row.amountPerShare).mul(qty).toString();
     const list = futureByInstrument.get(row.instrumentId) ?? [];
-    list.push({ exDate: row.exDate, amount: totalAmount, currency: row.currency });
+    list.push({
+      exDate: row.exDate,
+      payDate: row.payDate ?? row.exDate,
+      amount: totalAmount,
+      currency: row.currency,
+    });
     futureByInstrument.set(row.instrumentId, list);
   }
 
-  const instrumentsWithAnnounced = new Set(
-    [...futureByInstrument.entries()]
-      .filter(([_, rows]) => rows.some((r) => r.exDate > todayStr && r.exDate <= yearEndStr))
-      .map(([id]) => id),
-  );
-  const blendedProjected = projectedDivs.filter(
-    (d) => d.instrumentId && !instrumentsWithAnnounced.has(d.instrumentId!),
+  const blendedProjected = blendAnnouncedDividends(
+    projectedDivs,
+    [...futureByInstrument.entries()].flatMap(([instrumentId, rows]) =>
+      rows
+        .filter((r) => r.exDate > todayStr && r.exDate <= yearEndStr)
+        .map((r) => ({ instrumentId, date: r.payDate })),
+    ),
+    dividendIntervalMonths(pastDivEvents, now),
   );
   const announcedRestOfYear = [...futureByInstrument.values()]
     .flat()
@@ -293,7 +301,7 @@ export async function restOfYearForecastGross(
 
   for (const d of blendedProjected) {
     const net = new Decimal(convert(d.amount, d.currency, display, fx));
-    const instrumentId = d.instrumentId!;
+    const instrumentId = d.instrumentId;
     const netSum = grossUpNet.get(instrumentId) ?? new Decimal(0);
     const taxSum = grossUpTax.get(instrumentId) ?? new Decimal(0);
     // gross = net × (net + tax) / net — multiply before dividing so a ratio like 1/3 isn't

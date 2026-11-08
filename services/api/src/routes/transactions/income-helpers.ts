@@ -10,6 +10,8 @@ import {
   projectCoupons,
   projectDividends,
   projectNextYearDividends,
+  blendAnnouncedDividends,
+  dividendIntervalMonths,
   toDateKey,
   toMonthKey,
   incomeFlow,
@@ -247,6 +249,8 @@ export async function buildIncomeStats(
     string,
     {
       exDate: string;
+      /** Matching date against projections: the pay date when known, else the ex-date. */
+      payDate: string;
       amount: string;
       currency: string;
       status: "announced" | "paid";
@@ -261,6 +265,7 @@ export async function buildIncomeStats(
     const list = futureAnnouncedByInstrument.get(row.instrumentId) ?? [];
     list.push({
       exDate: row.exDate,
+      payDate: row.payDate ?? row.exDate,
       amount: totalAmount,
       currency: row.currency,
       status: row.status,
@@ -271,14 +276,27 @@ export async function buildIncomeStats(
   }
 
   const yearEndStr = toDateKey(new Date(Date.UTC(now.getUTCFullYear(), 11, 31)));
-  const instrumentsWithAnnouncedRestOfYear = new Set(
-    [...futureAnnouncedByInstrument.entries()]
-      .filter(([_, rows]) => rows.some((r) => r.exDate > todayStr && r.exDate <= yearEndStr))
-      .map(([id]) => id),
+  // Cadence per instrument (bucketed the way the projection engines do) sets how close an
+  // announced payment must be to a projected one to replace it.
+  const intervalFor = dividendIntervalMonths(pastDivs, now);
+  const announcedIn = (from: string, to: string) =>
+    [...futureAnnouncedByInstrument.entries()].flatMap(([instrumentId, rows]) =>
+      rows
+        .filter((r) => r.exDate > from && r.exDate <= to)
+        .map((r) => ({ instrumentId, date: r.payDate })),
+    );
+  // Announced rows are windowed by ex-date (amounts below) but matched to projections by pay
+  // date, and the two can fall in different years (Dec ex / Jan pay). Blend them against both
+  // years' projections at once, so the slot a row covers is removed from whichever year it is
+  // in, then split the survivors back by date. A row near the year boundary can therefore
+  // consume a slot in the other year than its ex-date window (its amount is counted once, in
+  // its own window): the announcement replaces the payment it stands for, wherever that was.
+  const survivingProjected = blendAnnouncedDividends(
+    [...projectedDividends, ...projectedNextYear],
+    announcedIn(todayStr, nextYearEndStr),
+    intervalFor,
   );
-  const blendedProjected = projectedDividends.filter(
-    (d) => d.instrumentId && !instrumentsWithAnnouncedRestOfYear.has(d.instrumentId),
-  );
+  const blendedProjected = survivingProjected.filter((d) => d.date <= yearEndStr);
   const futureAnnouncedRestOfYear = [...futureAnnouncedByInstrument.values()]
     .flat()
     .filter((d) => d.exDate > todayStr && d.exDate <= yearEndStr);
@@ -287,14 +305,7 @@ export async function buildIncomeStats(
     ...futureAnnouncedRestOfYear.map((d) => ({ amount: d.amount, currency: d.currency })),
   ];
 
-  const instrumentsWithAnnouncedNextYear = new Set(
-    [...futureAnnouncedByInstrument.entries()]
-      .filter(([_, rows]) => rows.some((r) => r.exDate > yearEndStr && r.exDate <= nextYearEndStr))
-      .map(([id]) => id),
-  );
-  const blendedNextYear = projectedNextYear.filter(
-    (d) => d.instrumentId && !instrumentsWithAnnouncedNextYear.has(d.instrumentId),
-  );
+  const blendedNextYear = survivingProjected.filter((d) => d.date > yearEndStr);
   const futureAnnouncedNextYear = [...futureAnnouncedByInstrument.values()]
     .flat()
     .filter((d) => d.exDate > yearEndStr && d.exDate <= nextYearEndStr);
