@@ -37,3 +37,11 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  # The visual-kit image the screenshots and visual checks render in (visual/Dockerfile).
+  # Pinned to an exact release on purpose: the renderer is part of the baselines, so a
+  # bump is a reviewed PR.
+  - package-ecosystem: "docker"
+    directory: "/visual"
+    schedule:
+      interval: "weekly"
