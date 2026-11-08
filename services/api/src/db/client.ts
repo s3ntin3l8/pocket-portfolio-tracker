@@ -72,7 +72,9 @@ export async function initDb(databaseUrl?: string): Promise<DB> {
     // (db.<ref>.supabase.co, bounded by Postgres max_connections, ~60 on the free tier)
     // over a pooler (Supavisor session-mode pool_size is a much smaller shared budget) —
     // see the EMAXCONNSESSION investigation notes.
-    sql = postgres(url!, { max: 10, ssl: isLocal ? undefined : "require" });
+    // infer: true keeps postgres.js v3's parameter typing (v4 defaults to letting the server
+    // decide, which turns an uncast raw `${boolean}` in an sql`` template into a string).
+    sql = postgres(url!, { max: 10, ssl: isLocal ? undefined : "require", infer: true });
     dbInstance = drizzlePostgres(sql, { schema });
   }
 
