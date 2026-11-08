@@ -1,8 +1,10 @@
 name: Hermes (review)
 
 # Two ways to get a review from the s3ntin3l8-hermes bot:
-#   1. auto-review    -> exactly once per PR: on `opened` if it starts non-draft,
-#      or on `ready_for_review` if it starts as a draft.
+#   1. auto-review    -> once per PR unless the prior review was dismissed:
+#      on `opened` if it starts non-draft, or on `ready_for_review` if it
+#      starts as a draft (the guard counts only non-dismissed reviews, so
+#      dismissing re-arms the next draft<->ready flip).
 #   2. on-demand-review -> comment "@s3ntin3l8-hermes Review" (or "Triage" on
 #      an issue) any time you want another look -- including every follow-up
 #      after the initial auto-review.
@@ -20,6 +22,17 @@ name: Hermes (review)
 # review on the PR -- that guard was actually broken until
 # s3ntin3l8/.github#54 (a `gh api --jq --arg` invocation that silently
 # failed and always reported "no prior review found"), fixed there.
+#
+# `auto-review` reviews dependabot PRs too: a dependency bump can change a
+# runtime tool version without saying so (runway-ai-usage-tracker#627: a
+# cosign-installer bump silently changed the default cosign from v2 to v3),
+# which is exactly what a reviewer catches. A dependabot-authored run only
+# sees DEPENDABOT secrets, so HERMES_APP_ID / HERMES_APP_PRIVATE_KEY /
+# HERMES_API_KEY must also be set under Settings -> Secrets and variables ->
+# Dependabot; without them the reusable workflow skips green with a notice
+# (s3ntin3l8/.github#96). The Dependabot secret store is repo-wide, so every
+# workflow a dependabot PR triggers can read them; that blast radius is
+# accepted. release-please PRs (`github-actions[bot]`) stay excluded.
 #
 # SECURITY: this repo is public and the reusable workflow runs on a self-hosted
 # runner. For a `pull_request` event, GitHub runs the workflow FILE from the PR's
@@ -51,15 +64,14 @@ jobs:
     # not github.actor -- on `ready_for_review`, github.actor is whoever
     # clicked "Ready for review", which is not necessarily who opened the
     # PR. Author-based exclusion keeps working on both trigger types. This
-    # bot-author list and the mullion/task-* exclusion below are also now
-    # enforced centrally inside the reusable workflow itself (as of
-    # s3ntin3l8/.github#54) -- this copy is defense-in-depth, same as the
-    # fork guard already is, not the only line of defense.
+    # bot-author list and the mullion/task-* exclusion below are also
+    # enforced centrally inside the reusable workflow itself -- this copy is
+    # defense-in-depth, same as the fork guard, and must not be stricter
+    # than the central list.
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 's3ntin3l8-hermes[bot]' &&
-      github.event.pull_request.user.login != 'dependabot[bot]' &&
       github.event.pull_request.user.login != 'github-actions[bot]' &&
       github.event.pull_request.draft == false &&
       !startsWith(github.event.pull_request.head.ref, 'mullion/task-')
