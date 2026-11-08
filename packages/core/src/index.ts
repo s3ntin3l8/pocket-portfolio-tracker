@@ -75,7 +75,12 @@ export {
   type BondRatePeriod,
   type ProjectedCoupon,
 } from "./coupons.js";
-export { projectDividends, projectNextYearDividends, type ProjectedDividend } from "./dividends.js";
+export {
+  projectDividends,
+  projectNextYearDividends,
+  blendAnnouncedDividends,
+  type ProjectedDividend,
+} from "./dividends.js";
 export {
   trailingIncomeByInstrument,
   trailingYield,

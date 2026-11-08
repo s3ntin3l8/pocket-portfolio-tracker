@@ -39,6 +39,8 @@ import {
   idCashBalancesAtPayments,
   idDepositBalanceIdr,
   ID_SALES_TAX_RATE,
+  blendAnnouncedDividends,
+  inferIntervalMonths,
 } from "@portfolio/core";
 import {
   getFxRates,
@@ -224,24 +226,39 @@ export async function restOfYearForecastGross(
 
   const futureByInstrument = new Map<
     string,
-    { exDate: string; amount: string; currency: string }[]
+    { exDate: string; payDate: string; amount: string; currency: string }[]
   >();
   for (const row of announcedRows) {
     const qty = heldQtyMap.get(row.instrumentId);
     if (!qty) continue;
     const totalAmount = new Decimal(row.amountPerShare).mul(qty).toString();
     const list = futureByInstrument.get(row.instrumentId) ?? [];
-    list.push({ exDate: row.exDate, amount: totalAmount, currency: row.currency });
+    list.push({
+      exDate: row.exDate,
+      payDate: row.payDate ?? row.exDate,
+      amount: totalAmount,
+      currency: row.currency,
+    });
     futureByInstrument.set(row.instrumentId, list);
   }
 
-  const instrumentsWithAnnounced = new Set(
-    [...futureByInstrument.entries()]
-      .filter(([_, rows]) => rows.some((r) => r.exDate > todayStr && r.exDate <= yearEndStr))
-      .map(([id]) => id),
-  );
-  const blendedProjected = projectedDivs.filter(
-    (d) => d.instrumentId && !instrumentsWithAnnounced.has(d.instrumentId!),
+  const cutoff24mo = new Date(now);
+  cutoff24mo.setUTCFullYear(cutoff24mo.getUTCFullYear() - 2);
+  const datesByInstrument = new Map<string, Date[]>();
+  for (const e of pastDivEvents) {
+    if (e.type !== "dividend" || !e.instrumentId || e.executedAt < cutoff24mo) continue;
+    const list = datesByInstrument.get(e.instrumentId) ?? [];
+    list.push(e.executedAt);
+    datesByInstrument.set(e.instrumentId, list);
+  }
+  const blendedProjected = blendAnnouncedDividends(
+    projectedDivs.filter((d): d is typeof d & { instrumentId: string } => !!d.instrumentId),
+    [...futureByInstrument.entries()].flatMap(([instrumentId, rows]) =>
+      rows
+        .filter((r) => r.exDate > todayStr && r.exDate <= yearEndStr)
+        .map((r) => ({ instrumentId, date: r.payDate })),
+    ),
+    (id) => inferIntervalMonths(datesByInstrument.get(id) ?? []),
   );
   const announcedRestOfYear = [...futureByInstrument.values()]
     .flat()

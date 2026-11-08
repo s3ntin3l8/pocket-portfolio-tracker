@@ -199,7 +199,7 @@ export function projectDividends(
  * `growthApplied` / `assumesContributions` fields for UI display.
  *
  * Announced/paid data from `dividend_events` is blended at the API layer (same
- * pattern as `projectDividends`), not here.
+ * pattern as `projectDividends`) via `blendAnnouncedDividends`, not here.
  *
  * Only instruments still held (`heldQty` with qty > 0) are projected. Instruments
  * with no payment in the trailing 24 months are skipped.
@@ -353,4 +353,43 @@ export function projectNextYearDividends(
   }
 
   return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Drop the projected payments that an announced dividend already covers, keeping the rest
+ * of the cadence. Each announced row consumes at most one projected payment of the same
+ * instrument — the nearest unconsumed one within `floor(interval / 2)` calendar months —
+ * so an announced slot is never counted twice, while uncovered cadence payments stay
+ * (a quarterly payer with one announced row keeps its other three). An announced row with
+ * nothing in range (a special dividend) consumes nothing.
+ *
+ * `announced[].date` is the announced payment date (`payDate ?? exDate`), `YYYY-MM-DD`.
+ * Returns the surviving projected objects unchanged.
+ */
+export function blendAnnouncedDividends<P extends { instrumentId: string; date: string }>(
+  projected: P[],
+  announced: { instrumentId: string; date: string }[],
+  intervalMonths: (instrumentId: string) => number,
+): P[] {
+  const consumed = new Set<P>();
+  const asDate = (s: string) => new Date(`${s}T00:00:00.000Z`);
+  const sortedAnnounced = [...announced].sort((a, b) => a.date.localeCompare(b.date));
+  for (const a of sortedAnnounced) {
+    const tolerance = Math.floor(intervalMonths(a.instrumentId) / 2);
+    const aDate = asDate(a.date);
+    let best: P | undefined;
+    let bestGap = Infinity;
+    for (const p of projected) {
+      if (p.instrumentId !== a.instrumentId || consumed.has(p)) continue;
+      const pDate = asDate(p.date);
+      if (Math.abs(monthsBetween(aDate, pDate)) > tolerance) continue;
+      const gap = Math.abs(pDate.getTime() - aDate.getTime());
+      if (gap < bestGap) {
+        best = p;
+        bestGap = gap;
+      }
+    }
+    if (best) consumed.add(best);
+  }
+  return projected.filter((p) => !consumed.has(p));
 }
