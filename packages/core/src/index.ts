@@ -79,6 +79,7 @@ export {
   projectDividends,
   projectNextYearDividends,
   blendAnnouncedDividends,
+  dividendIntervalMonths,
   type ProjectedDividend,
 } from "./dividends.js";
 export {

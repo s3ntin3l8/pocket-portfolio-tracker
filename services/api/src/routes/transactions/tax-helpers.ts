@@ -40,7 +40,7 @@ import {
   idDepositBalanceIdr,
   ID_SALES_TAX_RATE,
   blendAnnouncedDividends,
-  inferIntervalMonths,
+  dividendIntervalMonths,
 } from "@portfolio/core";
 import {
   getFxRates,
@@ -242,23 +242,14 @@ export async function restOfYearForecastGross(
     futureByInstrument.set(row.instrumentId, list);
   }
 
-  const cutoff24mo = new Date(now);
-  cutoff24mo.setUTCFullYear(cutoff24mo.getUTCFullYear() - 2);
-  const datesByInstrument = new Map<string, Date[]>();
-  for (const e of pastDivEvents) {
-    if (e.type !== "dividend" || !e.instrumentId || e.executedAt < cutoff24mo) continue;
-    const list = datesByInstrument.get(e.instrumentId) ?? [];
-    list.push(e.executedAt);
-    datesByInstrument.set(e.instrumentId, list);
-  }
   const blendedProjected = blendAnnouncedDividends(
-    projectedDivs.filter((d): d is typeof d & { instrumentId: string } => !!d.instrumentId),
+    projectedDivs,
     [...futureByInstrument.entries()].flatMap(([instrumentId, rows]) =>
       rows
         .filter((r) => r.exDate > todayStr && r.exDate <= yearEndStr)
         .map((r) => ({ instrumentId, date: r.payDate })),
     ),
-    (id) => inferIntervalMonths(datesByInstrument.get(id) ?? []),
+    dividendIntervalMonths(pastDivEvents, now),
   );
   const announcedRestOfYear = [...futureByInstrument.values()]
     .flat()
@@ -310,7 +301,7 @@ export async function restOfYearForecastGross(
 
   for (const d of blendedProjected) {
     const net = new Decimal(convert(d.amount, d.currency, display, fx));
-    const instrumentId = d.instrumentId!;
+    const instrumentId = d.instrumentId;
     const netSum = grossUpNet.get(instrumentId) ?? new Decimal(0);
     const taxSum = grossUpTax.get(instrumentId) ?? new Decimal(0);
     // gross = net × (net + tax) / net — multiply before dividing so a ratio like 1/3 isn't

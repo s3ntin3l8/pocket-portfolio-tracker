@@ -85,6 +85,38 @@ describe("restOfYearForecastGross — Decimal sums (audit B12)", () => {
     expect(out).toBe("10.30");
   });
 
+  it("replaces only the projected payment an announced row covers", async () => {
+    const dId = await instrument("FCAST-D");
+    const pay = (id: string, iso: string): CoreTransaction => ({
+      id,
+      instrumentId: dId,
+      type: "dividend",
+      quantity: "0",
+      price: "10",
+      fees: "0",
+      tax: "0",
+      currency: "EUR",
+      executedAt: new Date(`${iso}T00:00:00.000Z`),
+    });
+    // Quarterly history projects Sep 15 and Dec 15 2026 at 10 each. The announced 2.00/share
+    // x 10 shares (ex-date Sep 20) covers the September slot, so December stays: 20 + 10.
+    await app.db.insert(dividendEvents).values({
+      instrumentId: dId,
+      exDate: "2026-09-20",
+      amountPerShare: "2",
+      currency: "EUR",
+    });
+    const out = await restOfYearForecastGross(
+      app,
+      [pay("div-d1", "2025-09-15"), pay("div-d2", "2025-12-15")],
+      summaryOf([{ instrumentId: dId, quantity: "10" }]),
+      "EUR",
+      2026,
+      NOW,
+    );
+    expect(out).toBe("30.00");
+  });
+
   it("rounds the exact half-cent the float sum got wrong", async () => {
     const c = await instrument("FCAST-C");
     await app.db

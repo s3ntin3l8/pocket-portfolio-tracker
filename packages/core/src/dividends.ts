@@ -356,12 +356,37 @@ export function projectNextYearDividends(
 }
 
 /**
+ * Per-instrument payment interval (months) the way `projectNextYearDividends` infers it:
+ * monthly-bucketed dividends of the trailing 24 months fed to `inferIntervalMonths`
+ * (12 when an instrument has too little history). Use it to size the matching window of
+ * `blendAnnouncedDividends`, so matching and projecting always agree on the cadence.
+ */
+export function dividendIntervalMonths(
+  pastDividends: IncomeEntry[],
+  now: Date = new Date(),
+): (instrumentId: string) => number {
+  const cutoff24mo = addUTCMonths(now, -24);
+  const datesByInstrument = new Map<string, Date[]>();
+  for (const e of bucketMonthly(pastDividends)) {
+    if (e.type !== "dividend" || !e.instrumentId || e.executedAt < cutoff24mo) continue;
+    const list = datesByInstrument.get(e.instrumentId) ?? [];
+    list.push(e.executedAt);
+    datesByInstrument.set(e.instrumentId, list);
+  }
+  return (instrumentId) => inferIntervalMonths(datesByInstrument.get(instrumentId) ?? []);
+}
+
+const DAY_MS = 86_400_000;
+
+/**
  * Drop the projected payments that an announced dividend already covers, keeping the rest
  * of the cadence. Each announced row consumes at most one projected payment of the same
- * instrument — the nearest unconsumed one within `floor(interval / 2)` calendar months —
+ * instrument — the nearest unconsumed one within half the payment interval
+ * (`floor(interval * 30 / 2)` days: monthly 15, quarterly 45, semiannual 90, annual 180) —
  * so an announced slot is never counted twice, while uncovered cadence payments stay
  * (a quarterly payer with one announced row keeps its other three). An announced row with
- * nothing in range (a special dividend) consumes nothing.
+ * nothing in range (a special dividend) consumes nothing. Matching is by date only, not
+ * amount.
  *
  * `announced[].date` is the announced payment date (`payDate ?? exDate`), `YYYY-MM-DD`.
  * Returns the surviving projected objects unchanged.
@@ -372,19 +397,17 @@ export function blendAnnouncedDividends<P extends { instrumentId: string; date: 
   intervalMonths: (instrumentId: string) => number,
 ): P[] {
   const consumed = new Set<P>();
-  const asDate = (s: string) => new Date(`${s}T00:00:00.000Z`);
+  const dayOf = (s: string) => new Date(`${s}T00:00:00.000Z`).getTime() / DAY_MS;
   const sortedAnnounced = [...announced].sort((a, b) => a.date.localeCompare(b.date));
   for (const a of sortedAnnounced) {
-    const tolerance = Math.floor(intervalMonths(a.instrumentId) / 2);
-    const aDate = asDate(a.date);
+    const toleranceDays = Math.floor((intervalMonths(a.instrumentId) * 30) / 2);
+    const aDay = dayOf(a.date);
     let best: P | undefined;
     let bestGap = Infinity;
     for (const p of projected) {
       if (p.instrumentId !== a.instrumentId || consumed.has(p)) continue;
-      const pDate = asDate(p.date);
-      if (Math.abs(monthsBetween(aDate, pDate)) > tolerance) continue;
-      const gap = Math.abs(pDate.getTime() - aDate.getTime());
-      if (gap < bestGap) {
+      const gap = Math.abs(dayOf(p.date) - aDay);
+      if (gap <= toleranceDays && gap < bestGap) {
         best = p;
         bestGap = gap;
       }

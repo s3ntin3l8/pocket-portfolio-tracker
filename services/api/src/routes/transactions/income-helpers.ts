@@ -11,7 +11,7 @@ import {
   projectDividends,
   projectNextYearDividends,
   blendAnnouncedDividends,
-  inferIntervalMonths,
+  dividendIntervalMonths,
   toDateKey,
   toMonthKey,
   incomeFlow,
@@ -276,18 +276,9 @@ export async function buildIncomeStats(
   }
 
   const yearEndStr = toDateKey(new Date(Date.UTC(now.getUTCFullYear(), 11, 31)));
-  // Cadence per instrument (same input as the next-year engine) sets how close an announced
-  // payment must be to a projected one to replace it.
-  const cutoff24mo = new Date(now);
-  cutoff24mo.setUTCFullYear(cutoff24mo.getUTCFullYear() - 2);
-  const datesByInstrument = new Map<string, Date[]>();
-  for (const e of pastDivs) {
-    if (!e.instrumentId || e.executedAt < cutoff24mo) continue;
-    const list = datesByInstrument.get(e.instrumentId) ?? [];
-    list.push(e.executedAt);
-    datesByInstrument.set(e.instrumentId, list);
-  }
-  const intervalFor = (id: string) => inferIntervalMonths(datesByInstrument.get(id) ?? []);
+  // Cadence per instrument (bucketed the way the projection engines do) sets how close an
+  // announced payment must be to a projected one to replace it.
+  const intervalFor = dividendIntervalMonths(pastDivs, now);
   const announcedIn = (from: string, to: string) =>
     [...futureAnnouncedByInstrument.entries()].flatMap(([instrumentId, rows]) =>
       rows
@@ -297,7 +288,9 @@ export async function buildIncomeStats(
   // Announced rows are windowed by ex-date (amounts below) but matched to projections by pay
   // date, and the two can fall in different years (Dec ex / Jan pay). Blend them against both
   // years' projections at once, so the slot a row covers is removed from whichever year it is
-  // in, then split the survivors back by date.
+  // in, then split the survivors back by date. A row near the year boundary can therefore
+  // consume a slot in the other year than its ex-date window (its amount is counted once, in
+  // its own window): the announcement replaces the payment it stands for, wherever that was.
   const survivingProjected = blendAnnouncedDividends(
     [...projectedDividends, ...projectedNextYear],
     announcedIn(todayStr, nextYearEndStr),
