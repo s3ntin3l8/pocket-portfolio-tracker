@@ -73,7 +73,7 @@ export function ErrorState({
       )}
 
       <h1 className="text-balance text-heading font-semibold">{title}</h1>
-      <p className="max-w-sm text-pretty text-sm leading-relaxed text-muted-foreground">{body}</p>
+      <p className="max-w-sm text-pretty text-sm leading-6 text-muted-foreground">{body}</p>
 
       {code && (
         <span className="rounded-lg bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground">

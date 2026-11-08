@@ -139,7 +139,7 @@ export function TaxHolderSectionId({
       <IdByYearTable rows={idTax.byYear} currency={currency} locale={locale} />
 
       {(idTax.cryptoDisposals?.length ?? 0) > 0 && (
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-5">
           {t("id.crypto.line", {
             tax: money(idTax.totalCryptoTax ?? "0"),
             proceeds: money(idTax.totalCryptoProceeds ?? "0"),
@@ -148,7 +148,7 @@ export function TaxHolderSectionId({
       )}
 
       {(idTax.goldDisposals?.length ?? 0) > 0 && (
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className="text-xs text-muted-foreground leading-5">
           {t("id.gold.line", {
             tax: money(idTax.totalGoldTax ?? "0"),
             proceeds: money(idTax.totalGoldProceeds ?? "0"),
@@ -156,7 +156,7 @@ export function TaxHolderSectionId({
         </p>
       )}
 
-      <p className="text-xs text-muted-foreground leading-relaxed">{t("id.footnote")}</p>
+      <p className="text-xs text-muted-foreground leading-5">{t("id.footnote")}</p>
     </>
   );
 }

@@ -96,7 +96,7 @@ export function AdminImportSettingsForm({
                     ? t(`importStrategyOption_${s}`)
                     : t("importStrategy")}
                 </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
                   {t.has(`importStrategyHint_${s}`)
                     ? t(`importStrategyHint_${s}`)
                     : t("importStrategyHint")}

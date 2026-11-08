@@ -101,7 +101,7 @@ export function IncomeCalendarMonthCell({
 }) {
   return (
     <div className={cn("min-w-[58px] flex-1 text-center", monthIdx > 0 && "border-r border-line")}>
-      <p className="text-micro font-bold leading-tight text-text-2">
+      <p className="text-micro font-bold leading-3.5 text-text-2">
         {month.label}
         {month.isFirstOfYear && (
           <span className="text-text-mute"> &apos;{String(month.year).slice(2)}</span>

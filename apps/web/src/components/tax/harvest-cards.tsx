@@ -66,7 +66,7 @@ export function HarvestSummaryNote({
   return (
     <div className="flex items-start gap-2.5 border-t border-card-2 bg-success/10 px-[22px] py-3.5">
       <CircleCheck className="mt-px size-[17px] shrink-0 text-success" />
-      <p className="text-xs font-medium leading-relaxed text-text-mute">{summaryText}</p>
+      <p className="text-xs font-medium leading-5 text-text-mute">{summaryText}</p>
     </div>
   );
 }

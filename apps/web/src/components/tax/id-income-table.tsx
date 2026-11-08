@@ -218,7 +218,7 @@ export function IdIncomeTable({
                 </TableRow>
               </TableFooter>
             </Table>
-            <ul className="mt-3 space-y-1 px-6 text-xs leading-relaxed text-muted-foreground">
+            <ul className="mt-3 space-y-1 px-6 text-xs leading-5 text-muted-foreground">
               {notes.map((c) => (
                 <li key={c}>{t.has(`id.notes.${c}`) ? t(`id.notes.${c}`) : t("id.notesOther")}</li>
               ))}
@@ -315,7 +315,7 @@ export function IdForeignIncomeTable({
             </TableRow>
           </TableFooter>
         </Table>
-        <p className="mt-3 px-6 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-3 px-6 text-xs leading-5 text-muted-foreground">
           {t("id.foreignTable.note")}
         </p>
       </CardContent>
