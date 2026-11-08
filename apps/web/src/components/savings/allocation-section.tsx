@@ -114,7 +114,7 @@ export function AllocationSection({
         >
           <path d="M12 2v20M2 12h20" />
         </svg>
-        <p className="text-xs font-medium leading-[1.45]">
+        <p className="text-xs font-medium leading-4">
           <b style={{ color: "var(--warn-strong)" }}>{strong}</b>
           <span style={{ color: "var(--warn-soft)" }}>{rest}</span>
         </p>

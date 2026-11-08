@@ -249,7 +249,7 @@ export function DetailsCard({
             {account?.brokerage && (
               <BrokerageIcon brokerage={account.brokerage} className="size-9 rounded-sm" />
             )}
-            <span className="min-w-0 leading-tight">
+            <span className="min-w-0 leading-4">
               <span className="block truncate">{accountName}</span>
               {account?.brokerage && (
                 <span className="block truncate text-micro font-medium text-text-2">

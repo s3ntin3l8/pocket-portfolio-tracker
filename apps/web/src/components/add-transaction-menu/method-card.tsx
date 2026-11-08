@@ -38,7 +38,7 @@ export const MethodCard = forwardRef<
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-body font-bold">{title}</span>
-        <span className="mt-[3px] block text-xs font-medium leading-[1.4] text-text-2">
+        <span className="mt-[3px] block text-xs font-medium leading-4 text-text-2">
           {description}
         </span>
       </span>

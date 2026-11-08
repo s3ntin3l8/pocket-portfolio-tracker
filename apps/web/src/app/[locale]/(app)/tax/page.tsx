@@ -340,7 +340,7 @@ function TaxHolderOverviewDe({
             )}
           </Card>
 
-          <p className="text-xs text-muted-foreground leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-5">
             {t("footnote", { rate: ratePct, allowance: money(u.allowanceAnnual) })}
           </p>
           {children}

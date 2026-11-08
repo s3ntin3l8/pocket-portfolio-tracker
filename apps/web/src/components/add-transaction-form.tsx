@@ -197,7 +197,7 @@ export function AddTransactionForm({
               checked={form.idReinvested}
               onCheckedChange={(v) => form.setIdReinvested(v === true)}
             />
-            <label htmlFor={`${formId}-reinvested`} className="text-sm leading-snug">
+            <label htmlFor={`${formId}-reinvested`} className="text-sm leading-5">
               {form.t("idReinvested")}
             </label>
           </div>

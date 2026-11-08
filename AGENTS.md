@@ -286,6 +286,7 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   "Sparer\u00adpausch\u00adbetrag" with U+00AD so a narrow phone tile breaks it between syllables.
   The character is invisible in diffs and editors, so keep it when rewriting the message
   (`tax-cards.test.tsx` guards it).
+- **Line boxes are whole pixels.** A fractional line box puts text on a half pixel, where raster rounding differs between renders (#1220, #1221, #1224). The `--text-*` tokens in `globals.css` are rem values that are whole px at the 16 px root, and a component's own `leading-*` must be too (`text-xs leading-5`, not `leading-relaxed`; a ratio only where size × ratio is whole, e.g. `text-hero leading-tight`). `apps/web/test/type-scale.test.ts` checks both the tokens and every class string under `apps/web/src`.
 - **The URL is the view state (web).** Scope is `?scope=all|p:<id>|h:<id>`: the proxy
   (`apps/web/src/proxy.ts`) copies a valid value into the `x-pocket-scope` request header and
   `getRawScope` (`lib/server-api/_shared.ts`) prefers it over the `pf` cookie (default for

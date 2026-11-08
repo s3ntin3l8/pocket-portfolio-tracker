@@ -80,7 +80,7 @@ export async function AdminStats({ stats }: { stats: AdminStatsData }) {
       {!objectStorage.configured ? (
         <div className="flex items-start gap-2.5 rounded-lg border border-border bg-background p-3.5">
           <Info className="mt-px size-[17px] shrink-0 text-text-2" strokeWidth={1.9} />
-          <p className="text-xs leading-relaxed text-text-2">
+          <p className="text-xs leading-5 text-text-2">
             <span className="font-bold text-foreground">{t("statsObjectStorageNotUsedTitle")}</span>{" "}
             — {t("statsObjectStorageNotUsedBody")}
           </p>
