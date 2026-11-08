@@ -1,1 +1,1 @@
-FROM ghcr.io/s3ntin3l8/visual-kit:0.4.0
+FROM ghcr.io/s3ntin3l8/visual-kit:0.4.1
