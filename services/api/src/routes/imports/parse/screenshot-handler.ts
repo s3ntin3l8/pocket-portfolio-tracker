@@ -26,8 +26,9 @@ export async function handleScreenshotUpload(
   reply: FastifyReply,
 ) {
   const id = request.userId;
-  if (!app.screenshotParser.isConfigured()) {
-    request.log.warn({ provider: app.screenshotParser.name }, "screenshot parser not configured");
+  const parser = await app.resolveScreenshotParser();
+  if (!parser.isConfigured()) {
+    request.log.warn({ provider: parser.name }, "screenshot parser not configured");
     return reply.code(503).send({ error: "screenshot_parser_not_configured" });
   }
 
@@ -132,7 +133,7 @@ export async function handleScreenshotUpload(
 
   let parsed;
   const importStrategy = await getImportStrategy(app.db);
-  let parserTag = app.screenshotParser.name;
+  let parserTag = parser.name;
   if (importStrategy === "parser_first" && mimeType === "application/pdf") {
     try {
       const text = pdfText ?? (await extractPdfText(buf));
@@ -159,7 +160,7 @@ export async function handleScreenshotUpload(
     }
   }
   try {
-    parsed ??= await app.screenshotParser.parse({ data: buf, mimeType }, request.log);
+    parsed ??= await parser.parse({ data: buf, mimeType }, request.log);
   } catch (err) {
     const message = (err as Error)?.message ?? "";
     const m = /vision_error_(\d+)$/.exec(message);
@@ -167,7 +168,7 @@ export async function handleScreenshotUpload(
     return reply.code(502).send({
       error: "screenshot_parse_failed",
       reason: "provider_error",
-      provider: app.screenshotParser.name,
+      provider: parser.name,
       providerStatus: m ? Number(m[1]) : null,
     });
   }

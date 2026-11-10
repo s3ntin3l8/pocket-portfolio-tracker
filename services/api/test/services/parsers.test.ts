@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parseCsv } from "../../src/services/parsers/csv.js";
 import { parseIbkr } from "../../src/services/parsers/ibkr.js";
 import { parseCoinbase } from "../../src/services/parsers/coinbase.js";
@@ -7,7 +7,6 @@ import { ClaudeVisionParser } from "../../src/services/parsers/claude.js";
 import { GeminiVisionParser } from "../../src/services/parsers/gemini.js";
 import { OpenRouterVisionParser } from "../../src/services/parsers/openrouter.js";
 import { OllamaVisionParser } from "../../src/services/parsers/ollama.js";
-import { buildScreenshotParser } from "../../src/services/screenshot-parser.js";
 import { TRANSACTIONS_TOOL_SCHEMA, validateDrafts } from "../../src/services/parsers/shared.js";
 
 const IMAGE = { data: Buffer.from("img"), mimeType: "image/png" } as const;
@@ -110,50 +109,6 @@ describe("OllamaVisionParser", () => {
     await expect(p.parse({ data: Buffer.from("img"), mimeType: "image/png" })).rejects.toThrow(
       "ollama_vision_error_404",
     );
-  });
-});
-
-describe("buildScreenshotParser (selection)", () => {
-  const KEYS = [
-    "ANTHROPIC_API_KEY",
-    "GEMINI_API_KEY",
-    "OPENROUTER_API_KEY",
-    "SCREENSHOT_PARSER",
-    "OLLAMA_BASE_URL",
-  ] as const;
-  const saved: Record<string, string | undefined> = {};
-  for (const k of KEYS) saved[k] = process.env[k];
-
-  afterEach(() => {
-    for (const k of KEYS) {
-      if (saved[k] === undefined) delete process.env[k];
-      else process.env[k] = saved[k];
-    }
-  });
-
-  function clear() {
-    for (const k of KEYS) delete process.env[k];
-  }
-
-  it("auto-selects the first configured parser (claude → gemini → openrouter)", () => {
-    clear();
-    process.env.GEMINI_API_KEY = "g";
-    process.env.OPENROUTER_API_KEY = "o";
-    expect(buildScreenshotParser().name).toBe("gemini");
-  });
-
-  it("honours a pinned SCREENSHOT_PARSER even over the order", () => {
-    clear();
-    process.env.ANTHROPIC_API_KEY = "a";
-    process.env.SCREENSHOT_PARSER = "openrouter";
-    expect(buildScreenshotParser().name).toBe("openrouter");
-  });
-
-  it("falls back to an inert claude parser when nothing is configured", () => {
-    clear();
-    const p = buildScreenshotParser();
-    expect(p.name).toBe("claude");
-    expect(p.isConfigured()).toBe(false);
   });
 });
 

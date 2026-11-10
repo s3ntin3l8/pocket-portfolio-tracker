@@ -127,6 +127,11 @@
       "tags": ["audit"]
     },
     {
+      "name": "admin-ai",
+      "path": "/en/admin/ai",
+      "tags": ["check", "audit"]
+    },
+    {
       "name": "admin-jobs",
       "path": "/en/admin/jobs",
       "tags": ["audit"]

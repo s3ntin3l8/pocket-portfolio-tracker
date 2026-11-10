@@ -12,7 +12,9 @@ import type {
   ApiTokenCreate,
   ProviderSettingUpdate,
   ProviderCredentialInput,
-  ChatProvidersUpdate,
+  AiTask,
+  AiTaskUpdate,
+  AiProviderUpdate,
   ProposeTransactionsBody,
   ProposeTransactionsResult,
   ImportStrategy,
@@ -113,62 +115,59 @@ export interface AdminAuditEntry {
   at: string; // ISO timestamp
 }
 
-/** A vision LLM provider's effective config (GET/PATCH /admin/vision-providers). No secrets. */
-export interface AdminVisionProvider {
+/** One AI provider's connection (GET /admin/ai). Never carries a secret. */
+export interface AdminAiConnection {
   id: string; // "claude" | "gemini" | "openrouter" | "ollama"
   label: string;
-  /** Whether this provider can be used (env key/url present or DB credential set). */
+  /** Ollama is configured by URL, the others by API key. */
+  credential: "key" | "url";
+  /** Usable: a DB credential or an env key/URL is present. */
   configured: boolean;
-  enabled: boolean;
-  /** Fallback order; lower is tried first. */
-  priority: number;
-  /** Whether an encrypted API key (or URL) is stored in the DB. */
+  /** Whether an encrypted API key is stored in the DB. */
   hasKey: boolean;
-  /** Masked display of the DB key, e.g. "••••abc1", or null when no DB key is set. */
+  /** Masked display of the DB key, e.g. "••••abc1", or null. */
   keyHint: string | null;
-  /** Whether a URL override is stored in the DB (for Ollama/LM Studio endpoint). */
+  /** Whether a URL override is stored in the DB. */
   hasUrl: boolean;
-  /**
-   * Origin of the key/URL: "db" if an encrypted credential is stored in DB,
-   * "env" if only an env var is set (no DB key), null if keyless.
-   * Never exposes the key value — presence only.
-   */
+  /** "db" = stored credential, "env" = only an env var, null = nothing set. */
   keySource: "db" | "env" | null;
+  /** Ollama: whether the URL points at the operator's own network (data stays local). */
+  local: boolean | null;
+  /** OpenRouter: allow endpoints that may retain prompts. null = default (deny). */
+  allowDataCollection: boolean | null;
 }
 
-/** Wrapper returned by GET/PATCH /admin/vision-providers and credential routes. */
-/** A chat assistant provider's effective settings (GET/PATCH /admin/chat-providers). */
-export interface AdminChatProvider {
-  id: string; // "claude" | "gemini" | "openrouter" | "ollama"
-  label: string;
-  /** Credential present and a model resolved: chat can use it. */
-  configured: boolean;
-  enabled: boolean;
-  /** "chat" = set for chat here; "vision" = inherited from the vision provider settings. */
-  enabledSource: "chat" | "vision";
-  priority: number;
-  prioritySource: "chat" | "vision";
-  /** The model chat will use, or null when none is resolved (the provider needs one). */
+/** The provider + model one AI task uses. */
+export interface AdminAiTask {
+  task: "vision" | "chat";
+  provider: string | null; // null = off
   model: string | null;
-  /** Where the model comes from: this setting, the env var, or the adapter's default. */
-  modelSource: "db" | "env" | "default" | null;
-  /** The env var that supplies the model when none is set here. */
-  modelEnvVar: string;
+  /** Claude only. */
+  effort: string | null;
+  /** The task can run now: provider set, configured, model present. */
+  usable: boolean;
 }
 
-export interface AdminChatProvidersResponse {
-  providers: AdminChatProvider[];
-  /** The pinned provider id (chat uses that provider or nothing), or null. */
-  pinned: string | null;
-  pinnedSource: "db" | "env" | null;
-  /** The provider that answers chat right now, or null when chat is unavailable. */
-  activeProvider: string | null;
-}
-
-export interface AdminVisionProvidersResponse {
-  providers: AdminVisionProvider[];
-  /** Whether server-side encryption is configured; gates the key-management UI. */
+/** GET/PATCH /admin/ai and the credential routes. */
+export interface AdminAiResponse {
+  connections: AdminAiConnection[];
+  tasks: AdminAiTask[];
+  /** Whether server-side encryption is configured; gates saving a key/URL. */
   encryptionEnabled: boolean;
+}
+
+/** One entry of GET /admin/ai/providers/:id/models. A null capability = the API doesn't say. */
+export interface AdminAiModel {
+  id: string;
+  label: string;
+  vision: boolean | null;
+  tools: boolean | null;
+}
+
+export interface AdminAiModelsResponse {
+  models: AdminAiModel[];
+  /** The provider's error (bad key, unreachable); the models list is then empty. */
+  error?: string;
 }
 
 /** Row in the DB statistics table breakdown. */
@@ -2855,30 +2854,29 @@ export function createApiClient(config: ApiClientConfig) {
       ),
     getAdminAuditLog: () => request<AdminAuditEntry[]>("GET", "/admin/audit"),
 
-    // Admin: vision LLM provider config (enable/disable + fallback priority + credentials).
-    getAdminVisionProviders: () =>
-      request<AdminVisionProvidersResponse>("GET", "/admin/vision-providers"),
-    updateAdminVisionProviders: (input: ProviderSettingUpdate[]) =>
-      request<AdminVisionProvidersResponse>("PATCH", "/admin/vision-providers", input),
-    setAdminVisionProviderCredential: (id: string, body: ProviderCredentialInput) =>
-      request<AdminVisionProvidersResponse>(
+    // Admin: AI providers. Connections (key/URL per provider) are shared; vision and chat
+    // each pick one provider + model.
+    getAdminAi: () => request<AdminAiResponse>("GET", "/admin/ai"),
+    updateAdminAiTask: (task: AiTask, input: AiTaskUpdate) =>
+      request<AdminAiResponse>("PATCH", `/admin/ai/tasks/${task}`, input),
+    updateAdminAiProvider: (id: string, input: AiProviderUpdate) =>
+      request<AdminAiResponse>("PATCH", `/admin/ai/providers/${encodeURIComponent(id)}`, input),
+    setAdminAiCredential: (id: string, body: ProviderCredentialInput) =>
+      request<AdminAiResponse>(
         "PUT",
-        `/admin/vision-providers/${encodeURIComponent(id)}/credential`,
+        `/admin/ai/providers/${encodeURIComponent(id)}/credential`,
         body,
       ),
-    clearAdminVisionProviderCredential: (id: string) =>
-      request<AdminVisionProvidersResponse>(
+    clearAdminAiCredential: (id: string) =>
+      request<AdminAiResponse>(
         "DELETE",
-        `/admin/vision-providers/${encodeURIComponent(id)}/credential`,
+        `/admin/ai/providers/${encodeURIComponent(id)}/credential`,
       ),
-
-    // Admin: chat assistant provider/model/pin. Credentials are the vision providers'.
-    getAdminChatProviders: () =>
-      request<AdminChatProvidersResponse>("GET", "/admin/chat-providers"),
-    updateAdminChatProviders: (input: ChatProvidersUpdate) =>
-      request<AdminChatProvidersResponse>("PATCH", "/admin/chat-providers", input),
-    resetAdminChatProviders: () =>
-      request<AdminChatProvidersResponse>("DELETE", "/admin/chat-providers"),
+    listAdminAiModels: (id: string, task: AiTask) =>
+      request<AdminAiModelsResponse>(
+        "GET",
+        `/admin/ai/providers/${encodeURIComponent(id)}/models?task=${task}`,
+      ),
 
     // Admin: import strategy (deterministic parser vs vision-LLM) for screenshots/PDFs.
     getAdminImportSettings: () =>

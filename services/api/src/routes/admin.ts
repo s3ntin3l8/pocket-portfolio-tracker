@@ -11,8 +11,7 @@ import {
 } from "../services/scrapers/store.js";
 import { FolderProvider, S3Provider } from "../storage/index.js";
 import { registerProvidersRoutes } from "./admin/providers.js";
-import { registerVisionProvidersRoutes } from "./admin/vision-providers.js";
-import { registerChatProvidersRoutes } from "./admin/chat-providers.js";
+import { registerAiRoutes } from "./admin/ai.js";
 import { registerStorageRoutes } from "./admin/storage.js";
 import { registerJobsRoutes } from "./admin/jobs.js";
 import { registerUsersRoutes } from "./admin/users.js";
@@ -27,8 +26,7 @@ import { registerUsersRoutes } from "./admin/users.js";
  */
 export async function adminRoute(app: FastifyInstance) {
   registerProvidersRoutes(app);
-  registerVisionProvidersRoutes(app);
-  registerChatProvidersRoutes(app);
+  registerAiRoutes(app);
   registerStorageRoutes(app);
   registerJobsRoutes(app);
   registerUsersRoutes(app);

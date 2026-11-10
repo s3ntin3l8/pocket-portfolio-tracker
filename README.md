@@ -189,8 +189,10 @@ All config is read from `app.config` (typed in `services/api/src/plugins/env.ts`
   `make seed-demo`'s deterministic PAT.
 - **Storage** — `STORAGE_PROVIDER` (`folder`, the dev default — no bucket required — or
   `s3` for Supabase Storage/MinIO/S3-compatible) and the matching `STORAGE_*` fields.
-- **Screenshot parsing** — `SCREENSHOT_PARSER` + per-provider keys (Claude / Gemini /
-  OpenRouter / Ollama).
+- **AI providers** (screenshot parsing + the assistant) — per-provider keys (Claude / Gemini /
+  OpenRouter / Ollama URL). The provider and model for each task are chosen in **Admin → AI
+  providers**; `SCREENSHOT_PARSER`, `CHAT_PROVIDER` and the `*_MODEL` variables only seed that
+  setting on first start (see [docs/assistant.md](docs/assistant.md#providers)).
 - **Market data** — provider keys (`TWELVEDATA_API_KEY`, `GOLDAPI_KEY`, `EODHD_API_KEY`,
   …) and source URLs; see [docs/data_providers.md](docs/data_providers.md).
 - **Broker sync** — `DB_ENCRYPTION_KEY` (required — encrypts Trade Republic

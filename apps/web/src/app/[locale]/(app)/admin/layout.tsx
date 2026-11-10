@@ -1,15 +1,6 @@
 import { BackLink } from "@/components/back-button";
 import { getTranslations, setRequestLocale } from "next-intl/server";
-import {
-  LineChart,
-  Eye,
-  MessageSquare,
-  ArrowDownUp,
-  HardDrive,
-  Database,
-  Clock,
-  Users,
-} from "lucide-react";
+import { LineChart, Sparkles, ArrowDownUp, HardDrive, Database, Clock, Users } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
 import { requireAdmin } from "@/lib/server-api";
@@ -49,20 +40,12 @@ export default async function AdminLayout({
       ...tint("primary"),
     },
     {
-      key: "vision",
-      href: "/admin/vision",
-      icon: <Eye />,
-      title: t("visionProviders"),
-      subtitle: t("visionProvidersHint"),
+      key: "ai",
+      href: "/admin/ai",
+      icon: <Sparkles />,
+      title: t("aiProviders"),
+      subtitle: t("aiProvidersHint"),
       ...tint("violet"),
-    },
-    {
-      key: "assistant",
-      href: "/admin/assistant",
-      icon: <MessageSquare />,
-      title: t("chatProviders"),
-      subtitle: t("chatProvidersHint"),
-      ...tint("primary"),
     },
     {
       key: "imports",

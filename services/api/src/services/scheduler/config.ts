@@ -153,8 +153,8 @@ export const INSTRUMENT_META_SINGLETON_SECONDS = 6 * 60 * 60; // 6 hours
  *
  * #105 note: `triggerJob()` only affects the replica that receives the request.
  *  In a multi-replica setup the pg-boss job is still enqueued in Postgres so any
- *  idle worker replica can pick it up, but `invalidateMarketData()` /
- *  `invalidateScreenshotParser()` (in-process cache only) are NOT propagated.
+ *  idle worker replica can pick it up, but `invalidateMarketData()`
+ *  (in-process cache only) is NOT propagated.
  *  A LISTEN/NOTIFY fan-out is the proper fix; deferred until >1 replica is in use.
  */
 export const JOB_DESCRIPTORS = [
