@@ -258,6 +258,39 @@ describe("admin AI providers", () => {
       expect(off.isConfigured()).toBe(false); // explicitly off ≠ "fall back to env"
     });
 
+    it("names the selected provider, not claude, when a vision task has no model", async () => {
+      await getDb()
+        .insert(aiTaskSettings)
+        .values({ task: "vision", provider: "gemini", model: null });
+      const parser = await resolveScreenshotParser();
+      expect(parser.name).toBe("gemini");
+      expect(parser.isConfigured()).toBe(false);
+    });
+
+    it("OpenRouter data collection: a stored option decides (null = deny), the env var only applies before one exists", async () => {
+      vi.stubEnv("OPENROUTER_API_KEY", "o"); // pragma: allowlist secret
+      vi.stubEnv("OPENROUTER_ALLOW_DATA_COLLECTION", "true");
+      await call("PATCH", "/admin/ai/tasks/chat", { provider: "openrouter", model: "some/model" });
+      const bodies: Record<string, unknown>[] = [];
+      vi.stubGlobal("fetch", async (_u: string, init: RequestInit) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content: "x" }, finish_reason: "stop" }] }),
+        );
+      });
+      const ask = async () =>
+        (await getChatProvider())!.complete({ system: "s", messages: [], tools: [], maxTokens: 1 });
+
+      await ask(); // no stored option yet: the env opt-out applies
+      await call("PATCH", "/admin/ai/providers/openrouter", { allowDataCollection: null });
+      await ask(); // stored null = the default, deny, whatever the env says
+      expect(bodies[0]!.provider).toBeUndefined();
+      expect(bodies[1]!.provider).toEqual({ data_collection: "deny" });
+      expect(
+        (await view()).connections.find((c) => c.id === "openrouter")!.allowDataCollection,
+      ).toBe(false); // the page shows what actually applies
+    });
+
     it("applies a chat change, keeps effort for Claude chat only, and off means unavailable", async () => {
       vi.stubEnv("ANTHROPIC_API_KEY", "a"); // pragma: allowlist secret
       vi.stubEnv("OPENROUTER_API_KEY", "o"); // pragma: allowlist secret
@@ -429,7 +462,7 @@ describe("admin AI providers", () => {
       expect((await view()).tasks.every((t) => t.provider === null)).toBe(true);
     });
 
-    it("keeps a provider the admin had switched off, off (no row written, none derived)", async () => {
+    it("keeps a provider the admin had switched off, off, with an explicit off row that outlives the legacy tables", async () => {
       vi.stubEnv("ANTHROPIC_API_KEY", "a"); // pragma: allowlist secret
       const db = getDb();
       await db
@@ -437,9 +470,17 @@ describe("admin AI providers", () => {
         .values({ provider: "claude", enabled: false, priority: 1 });
       await db.insert(chatProviderSettings).values({ provider: "claude", enabled: false });
       await seedAiTaskSettings(db);
-      expect(await rows()).toHaveLength(0);
+      const byTask = Object.fromEntries((await rows()).map((r) => [r.task, r]));
+      expect(byTask.vision).toMatchObject({ provider: null });
+      expect(byTask.chat).toMatchObject({ provider: null });
       expect(await getChatProvider()).toBeNull();
       expect((await resolveScreenshotParser()).isConfigured()).toBe(false);
+
+      // The legacy tables are gone (a later release drops them) and the seed runs again:
+      await db.delete(visionProviderSettings);
+      await db.delete(chatProviderSettings);
+      await seedAiTaskSettings(db);
+      expect(await getChatProvider()).toBeNull(); // still off: the stored "off" held
     });
 
     it("keeps an admin pin to a local provider when Claude also has a key", async () => {

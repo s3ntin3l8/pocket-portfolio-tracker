@@ -34,32 +34,16 @@ const maskKey = (plain: string) => (plain.length >= 4 ? `••••${plain.sli
  * and the provider + model each task runs. Never carries a secret, only a masked hint.
  */
 async function aiView(app: FastifyInstance) {
-  const [cfg, credRows] = await Promise.all([
-    loadAiConfig(),
-    app.db
-      .select({
-        provider: providerCredentials.provider,
-        apiKeyEnc: providerCredentials.apiKeyEnc,
-        urlOverride: providerCredentials.urlOverride,
-      })
-      .from(providerCredentials)
-      .then((rs) => rs.filter((r) => r.provider.startsWith(AI_CREDENTIAL_PREFIX))),
-  ]);
-  const stored = new Map(credRows.map((r) => [r.provider.slice(AI_CREDENTIAL_PREFIX.length), r]));
+  const cfg = await loadAiConfig();
+  const stored = new Map(cfg.credentialRows.map((r) => [r.provider, r]));
 
   const connections = AI_PROVIDER_REGISTRY.map((d) => {
     const cred = stored.get(d.id);
     const hasKey = Boolean(cred?.apiKeyEnc);
     const hasUrl = Boolean(cred?.urlOverride);
-    let keyHint: string | null = null;
-    if (hasKey && cred?.apiKeyEnc) {
-      try {
-        keyHint = maskKey(app.encryption.decryptString(cred.apiKeyEnc));
-      } catch {
-        keyHint = "••••";
-      }
-    }
     const secret = cfg.credentials.get(d.id);
+    // The key was already decrypted for `cfg`; a stored key that failed to decrypt has no hint.
+    const keyHint = hasKey ? (secret?.apiKey ? maskKey(secret.apiKey) : "••••") : null;
     return {
       id: d.id,
       label: d.label,

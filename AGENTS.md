@@ -71,7 +71,7 @@ This repo's domain invariants live in `.claude/skills/pocket/SKILL.md`: the cash
   route file), `corporate-actions`, `mergers`, `loans` (skip an installment / early payoff of a cicilan, `docs/loans.md`), `imports` (+`imports/parse`,
   `imports/confirm`), `documents`, `instruments`, `quotes`, `search`, `storage`,
   `targets` (+ the new-cash `/rebalancing` what-if), `tr`, `ibkr`, `preferences`, `mcp` (read-only MCP endpoint, see `docs/mcp.md`),
-  `assistant` (in-app chat over SSE, see `docs/assistant.md`), `admin` (incl. `admin/ai`: the shared provider connections and the one provider + model per AI task — vision and chat — read per request from `ai_task_settings`; env vars only seed it once, `docs/assistant.md`). Schema + migrations come from
+  `assistant` (in-app chat over SSE, see `docs/assistant.md`), `admin` (incl. `admin/ai`: the shared provider connections and the one provider + model per AI task — vision and chat — read per request from `ai_task_settings`; env vars only seed a task that has no stored setting, at startup; a task with none is off, `docs/assistant.md`). Schema + migrations come from
   `@portfolio/db`; the API applies them at startup.
 - **`apps/web`** — **Next.js (App Router) PWA**, Tailwind + shadcn/ui, **next-intl**
   (EN/ID). Talks to the API over HTTP (base URL is config-driven → Vercel-migratable).

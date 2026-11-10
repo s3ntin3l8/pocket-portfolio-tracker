@@ -51,7 +51,16 @@ export async function seedAiTaskSettings(db: DB): Promise<{ seeded: string[] }> 
   for (const task of AI_TASKS) {
     if (have.has(task)) continue;
     const s = deriveTask(task, credentials, legacy);
-    if (!s.provider) continue;
+    if (!s.provider) {
+      // The old admin settings (a provider switched off, a pin to something unusable) are what
+      // kept env from selecting one. Store that as an explicit "off", so it holds once those
+      // tables are dropped and the seed no longer sees them.
+      if (deriveTask(task, credentials).provider) {
+        await db.insert(aiTaskSettings).values({ task, provider: null }).onConflictDoNothing();
+        seeded.push(task);
+      }
+      continue;
+    }
     await db
       .insert(aiTaskSettings)
       .values({ task, provider: s.provider, model: s.model, effort: s.effort })

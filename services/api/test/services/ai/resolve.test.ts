@@ -25,10 +25,13 @@ afterEach(() => {
 });
 
 describe("resolveScreenshotParser (env-only under test)", () => {
-  it("falls back to an inert claude parser when nothing is configured", async () => {
+  it("is an inert parser named off when nothing is configured (not a stand-in for claude)", async () => {
     const p = await resolveScreenshotParser();
-    expect(p.name).toBe("claude");
+    expect(p.name).toBe("off");
     expect(p.isConfigured()).toBe(false);
+    await expect(p.parse({ data: Buffer.alloc(1), mimeType: "image/png" })).rejects.toThrow(
+      "screenshot_parser_not_configured",
+    );
   });
 
   it("selects the first configured provider", async () => {
