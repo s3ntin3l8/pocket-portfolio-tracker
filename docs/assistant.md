@@ -68,25 +68,39 @@ A read-scoped token may chat: the route is declared `config: { scope: "read" }` 
 
 ## Providers
 
-The chat provider is picked per request:
+The assistant uses exactly **one provider and one model**, chosen in **Admin → AI providers**. There is no priority
+list and no fallback: if the chosen provider is switched off, no longer connected, or has no model, chat is
+unavailable (`503`) rather than silently going to another provider, so a "keep it local" setup (Ollama) cannot start
+sending data to a cloud provider. The setting is read per request, so a change applies immediately.
 
-1. a **pin**: the admin's pin (Admin → Assistant providers), else the `CHAT_PROVIDER` env var. The pinned provider is used **or nothing** — if it is not usable, chat is unavailable (`503`); it never falls through to another provider, so a "keep it local" pin cannot silently start sending data to a cloud provider. A pin ignores the per-provider enabled switch;
-2. otherwise the first provider that is **enabled** and ranked highest by priority **and** configured for chat.
+The same page holds the **connections** (an API key per provider, or a URL for Ollama), which the assistant shares
+with document reading (screenshot/PDF import). Each task picks its own provider and model from them: the vision
+models are no good for tool calling, so the two are never tied together. Models are chosen from the provider's own
+model list (filtered to those that can use tools where the API says so), or typed as a model id when the list can't
+be loaded. A credential is an encrypted DB value, else the provider's env var; saving a key in the UI needs
+`DB_ENCRYPTION_KEY`.
 
-Enabled and priority follow the vision parsers' settings until the admin saves chat-specific ones (Admin → Assistant
-providers); "Reset to defaults" drops every chat override again. The **model** is the admin's setting, else the
-provider's env var, else the adapter default — a model chosen in the admin also satisfies the "model required" gate
-for Gemini, OpenRouter and Ollama. The same page shows which provider answers chat right now.
+| Provider     | Connection           | Notes                                                                                                                                                                                                                                                                    |
+| ------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `claude`     | `ANTHROPIC_API_KEY`  | optional **reasoning effort** (low … max) on the page; on the first-party API the request opts into server-side refusal fallback                                                                                                                                         |
+| `openrouter` | `OPENROUTER_API_KEY` | OpenAI-compatible `/chat/completions` with tools. Requests carry `provider.data_collection: "deny"` (only endpoints that do not retain or train on prompts); the **Allow providers that may retain prompts** switch relaxes this, e.g. for a model with no such endpoint |
+| `ollama`     | `OLLAMA_BASE_URL`    | tool-calling quality depends on the model. `local` is derived from the URL (loopback, private ranges, `.local`/`.internal`, single-label/Docker names), so a remote URL is reported as not local                                                                         |
+| `gemini`     | `GEMINI_API_KEY`     | Gemini `generateContent` with function calling, streamed. The model's parts (including thought signatures) are replayed verbatim between tool rounds                                                                                                                     |
 
-Credentials are the same vendor credentials the vision parsers use (encrypted DB credential, else env; set them on
-the vision providers page). Only the models are chat-specific:
+### Upgrading from the priority lists
 
-| Provider     | Needs                                   | Notes                                                                                                                                                                                                                                                                                                                |
-| ------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `claude`     | `ANTHROPIC_API_KEY`                     | default model `claude-opus-5-5` (`ANTHROPIC_CHAT_MODEL`, `ANTHROPIC_CHAT_EFFORT`); on the first-party API the request opts into server-side refusal fallback                                                                                                                                                         |
-| `openrouter` | key + `OPENROUTER_CHAT_MODEL`           | OpenAI-compatible `/chat/completions` with tools. Requests carry `provider.data_collection: "deny"` (only endpoints that do not retain or train on prompts); set `OPENROUTER_ALLOW_DATA_COLLECTION=true` to relax, e.g. for a model with no such endpoint                                                            |
-| `ollama`     | `OLLAMA_BASE_URL` + `OLLAMA_CHAT_MODEL` | tool-calling quality depends on the model. `local` is derived from the URL (loopback, private ranges, `.local`/`.internal`, single-label/Docker names), so a remote URL is reported as not local                                                                                                                     |
-| `gemini`     | key + `GEMINI_CHAT_MODEL`               | Gemini `generateContent` with function calling, streamed. Opt-in via the model variable: Gemini outranks OpenRouter and Ollama in the default priority, so a Gemini vision key alone never starts sending chat to Google. The model's parts (including thought signatures) are replayed verbatim between tool rounds |
+At startup, for each task that has no stored setting yet, the API stores today's effective choice
+(`ai_task_settings`), so nothing changes on upgrade: the old vision order, the chat overrides and pin, and
+`SCREENSHOT_PARSER` / `CHAT_PROVIDER` / `*_VISION_MODEL` / `*_CHAT_MODEL` / `ANTHROPIC_CHAT_EFFORT` /
+`OPENROUTER_ALLOW_DATA_COLLECTION` are folded in. A task that has nothing selectable at that start (no key yet) stays
+without a setting and is seeded again on a later start, e.g. after a key is added to `.env`.
+A provider with only a vision key is **not** moved to chat (a chat model was always required for Gemini, OpenRouter
+and Ollama), and a provider the admin had switched off, or a chat pin to a local one, stays that way: when the old
+state resolved to "off" an explicit "off" is stored (it holds once the old tables are dropped), and a task with no
+stored setting is **off**, never filled in from env at runtime (so a failed seed can't switch a provider on either). Once a task has a stored setting **those env vars no
+longer select anything for it**; edit the setting in the UI. Keys and URLs in
+the environment still work as the fallback for a connection with no stored credential. Stored credentials move from
+the `vision:` to the `ai:` namespace in migration `0100`.
 
 Provider adapters use plain `fetch` (no SDK), like the vision parsers.
 

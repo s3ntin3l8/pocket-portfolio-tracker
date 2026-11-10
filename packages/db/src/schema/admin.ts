@@ -66,6 +66,26 @@ export const chatSettings = pgTable("chat_settings", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();
 
+/**
+ * The one provider + model each AI task uses (`task` = "vision" | "chat"). A null `provider`
+ * means the task is off. Replaces the vision/chat priority lists: only this row picks a
+ * provider at runtime; env vars only seed it on first boot (`seedAiTaskSettings`).
+ */
+export const aiTaskSettings = pgTable("ai_task_settings", {
+  task: text("task").primaryKey(),
+  provider: text("provider"),
+  model: text("model"),
+  effort: text("effort"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
+/** Per-provider options that are not credentials (null = use the built-in default). */
+export const aiProviderSettings = pgTable("ai_provider_settings", {
+  provider: text("provider").primaryKey(),
+  allowDataCollection: boolean("allow_data_collection"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}).enableRLS();
+
 export const adminAuditLog = pgTable("admin_audit_log", {
   id: uuid("id").primaryKey().defaultRandom(),
   actorSub: text("actor_sub").notNull(),

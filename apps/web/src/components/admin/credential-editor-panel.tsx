@@ -121,7 +121,7 @@ export function CredentialEditorPanel({
         )}
         {/* Only true for API keys — a URL override (e.g. Ollama's) is saved as plain text
             even though writing it still requires encryption to be enabled server-side
-            (services/api/src/routes/admin/vision-providers.ts gates the whole route on
+            (services/api/src/routes/admin/ai.ts gates the credential route on
             `encryption.isEnabled`, not just the key case), so don't claim it's encrypted. */}
         {!isUrl && (
           <p className="mt-2.5 flex items-center gap-1.5 text-micro text-text-2">

@@ -5,11 +5,11 @@
 import type { AddressInfo } from "node:net";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
-import { visionProviderSettings } from "@portfolio/db";
+import { aiTaskSettings } from "@portfolio/db";
 
 import { buildApp } from "../../src/app.js";
 import { closeDb, getDb } from "../../src/db/client.js";
-import { getChatProvider } from "../../src/services/chat/registry.js";
+import { getChatProvider } from "../../src/services/ai/resolve.js";
 import { MAX_HISTORY_MESSAGES, MAX_MESSAGE_CHARS } from "../../src/routes/assistant.js";
 import { MAX_TOOL_ROUNDS } from "../../src/services/chat/loop.js";
 import {
@@ -408,35 +408,31 @@ describe("client disconnect", () => {
   });
 });
 
-describe("provider selection from the DB settings", () => {
-  it("honours admin enable/disable and priority across providers", async () => {
+describe("provider selection from the stored settings", () => {
+  it("follows the admin's stored chat setting, and off means unavailable", async () => {
     vi.stubEnv("NODE_ENV", "development"); // use the DB path, not the env-only test path
     vi.stubEnv("ANTHROPIC_API_KEY", "k");
     vi.stubEnv("OPENROUTER_API_KEY", "k");
     vi.stubEnv("OPENROUTER_CHAT_MODEL", "some/model");
     try {
-      expect((await getChatProvider())?.name).toBe("claude"); // default order
+      // No stored row: env keys alone select nothing.
+      expect(await getChatProvider()).toBeNull();
 
       const db = getDb();
-      await db
-        .insert(visionProviderSettings)
-        .values({ provider: "claude", enabled: false, priority: 1 });
-      expect((await getChatProvider())?.name).toBe("openrouter"); // claude disabled by the admin
+      const store = (provider: string | null, model: string | null) =>
+        db
+          .insert(aiTaskSettings)
+          .values({ task: "chat", provider, model })
+          .onConflictDoUpdate({ target: aiTaskSettings.task, set: { provider, model } });
 
-      await db
-        .insert(visionProviderSettings)
-        .values({ provider: "claude", enabled: true, priority: 9 })
-        .onConflictDoUpdate({
-          target: visionProviderSettings.provider,
-          set: { enabled: true, priority: 9 },
-        });
-      await db
-        .insert(visionProviderSettings)
-        .values({ provider: "openrouter", enabled: true, priority: 1 });
-      expect((await getChatProvider())?.name).toBe("openrouter"); // re-ranked above claude
+      await store("openrouter", "admin/model");
+      expect((await getChatProvider())?.name).toBe("openrouter"); // the admin's choice wins
+
+      await store(null, null);
+      expect(await getChatProvider()).toBeNull(); // explicitly off, not "fall back to env"
     } finally {
       vi.unstubAllEnvs();
-      await getDb().delete(visionProviderSettings);
+      await getDb().delete(aiTaskSettings);
     }
   });
 });

@@ -38,14 +38,14 @@ import { searchRoute } from "./routes/search.js";
 import { mcpRoute } from "./routes/mcp.js";
 import { oauthMetadataRoute } from "./routes/oauth-metadata.js";
 import { assistantRoute } from "./routes/assistant.js";
-import { getChatProvider } from "./services/chat/registry.js";
+import { getChatProvider, resolveScreenshotParser } from "./services/ai/resolve.js";
+import { seedAiTaskSettings } from "./services/ai/seed.js";
 import type { ChatProvider } from "./services/chat/types.js";
 import { storageRoute } from "./routes/storage.js";
 import { targetsRoute } from "./routes/targets.js";
 import { preferencesRoute } from "./routes/preferences.js";
 import { authRoute } from "./routes/auth.js";
 import type { ScreenshotParser } from "./services/parsers/types.js";
-import { getScreenshotParser } from "./services/screenshot-parser.js";
 import { getPytrRunner } from "./services/pytr/runner.js";
 import type { PytrRunner } from "./services/pytr/runner.js";
 import { createFlexClient } from "./services/ibkr/flex-client.js";
@@ -327,20 +327,25 @@ export async function buildApp(opts: BuildAppOptions = {}) {
     );
   }
 
-  const screenshotParser = opts.screenshotParser ?? (await getScreenshotParser());
-  app.decorate("screenshotParser", screenshotParser);
+  // Both resolve per request, so an admin change applies without a restart.
+  const injectedParser = opts.screenshotParser;
+  app.decorate(
+    "resolveScreenshotParser",
+    injectedParser ? async () => injectedParser : resolveScreenshotParser,
+  );
   app.decorate(
     "resolveChatProvider",
     opts.chatProvider !== undefined ? async () => opts.chatProvider ?? null : getChatProvider,
   );
-  // Log the selected vision provider once at startup (only for the real singleton, not
-  // test-injected mocks — those are controlled by the test and shouldn't pollute logs).
-  if (!opts.screenshotParser) {
-    const pinned = !!process.env.SCREENSHOT_PARSER?.trim();
-    app.log.info(
-      { provider: screenshotParser.name, configured: screenshotParser.isConfigured(), pinned },
-      "vision provider selected",
-    );
+  // Freeze today's effective provider + model into the stored AI settings, so an upgrade changes
+  // nothing and later env edits stop silently moving the selection. Tests select from env only.
+  if (process.env.NODE_ENV !== "test") {
+    try {
+      const { seeded } = await seedAiTaskSettings(app.db);
+      if (seeded.length > 0) app.log.info({ tasks: seeded }, "seeded AI task settings");
+    } catch (err) {
+      app.log.warn({ err }, "could not seed AI task settings");
+    }
   }
 
   app.decorate("pytr", opts.pytr ?? getPytrRunner(app.config, app.log));
@@ -391,7 +396,8 @@ export async function buildApp(opts: BuildAppOptions = {}) {
 
 declare module "fastify" {
   interface FastifyInstance {
-    screenshotParser: ScreenshotParser;
+    /** Resolves the vision parser per request; an inert one (503) when the task is off. */
+    resolveScreenshotParser: () => Promise<ScreenshotParser>;
     /** Resolves the assistant's chat provider per request; `null` when none is configured. */
     resolveChatProvider: () => Promise<ChatProvider | null>;
     pytr: PytrRunner;
