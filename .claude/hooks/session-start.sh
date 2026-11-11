@@ -17,4 +17,7 @@ cd "${CLAUDE_PROJECT_DIR:-.}"
 export NPM_CONFIG_FETCH_RETRIES=5
 export NPM_CONFIG_FETCH_RETRY_MINTIMEOUT=20000
 export NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT=120000
-npm ci
+npm ci --prefer-offline || {
+  echo "session-start: npm ci failed; run npm install to repair package-lock.json" >&2
+  exit 1
+}
