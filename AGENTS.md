@@ -102,15 +102,15 @@ This repo's domain invariants live in `.claude/skills/pocket/SKILL.md`: the cash
 
 Run from the repo root (Turborepo fans out across workspaces):
 
-| Command             | Does                                               |
-| ------------------- | -------------------------------------------------- |
-| `npm install`       | Install all workspace deps (single root lockfile). |
-| `npm run dev`       | Run all `dev` tasks (API watch + Next dev).        |
-| `npm run build`     | Build every workspace.                             |
-| `npm run lint`      | ESLint across workspaces.                          |
-| `npm run typecheck` | `tsc --noEmit` across workspaces.                  |
-| `npm test`          | Vitest across workspaces.                          |
-| `npm run format`    | Prettier write.                                    |
+| Command             | Does                                                        |
+| ------------------- | ----------------------------------------------------------- |
+| `npm ci`            | Install deps as locked (`npm install` only to change them). |
+| `npm run dev`       | Run all `dev` tasks (API watch + Next dev).                 |
+| `npm run build`     | Build every workspace.                                      |
+| `npm run lint`      | ESLint across workspaces.                                   |
+| `npm run typecheck` | `tsc --noEmit` across workspaces.                           |
+| `npm test`          | Vitest across workspaces.                                   |
+| `npm run format`    | Prettier write.                                             |
 
 Target one workspace with `--workspace @portfolio/<name>` (e.g.
 `npm run dev --workspace @portfolio/api`). DB: `npm run db:generate --workspace
