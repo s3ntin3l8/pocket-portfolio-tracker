@@ -391,7 +391,7 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     title: "Income",
     description:
       "Dividend, coupon and interest income statistics, including the forecast for the rest of the year. " +
-      "Pass eventsYear (all portfolios; not allowed together with portfolioId) for the individual dividend and " +
+      "Pass eventsYear (all portfolios, or those of holderId; not allowed together with portfolioId) for the individual dividend and " +
       "coupon payments of that calendar year (interest is only in the statistics). Income is return, never contribution.",
     inputSchema: z
       .object({
@@ -410,7 +410,8 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       // The events list is an all-portfolios view; combining it with a portfolio would silently
       // return that portfolio's statistics instead of the payments that were asked for.
       .refine((v) => !(v.eventsYear && v.portfolioId), {
-        message: "eventsYear lists payments for all portfolios; omit portfolioId",
+        message:
+          "eventsYear lists payments across portfolios (optionally one holder); omit portfolioId",
         path: ["eventsYear"],
       }),
     handler: ({ portfolioId: id, holderId: h, eventsYear }) =>
