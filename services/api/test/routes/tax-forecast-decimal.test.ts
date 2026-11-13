@@ -117,6 +117,39 @@ describe("restOfYearForecastGross — Decimal sums (audit B12)", () => {
     expect(out).toBe("30.00");
   });
 
+  it("still matches by date only (known limitation, #1243): a special replaces its slot", async () => {
+    const eId = await instrument("FCAST-E");
+    const pay = (id: string, iso: string): CoreTransaction => ({
+      id,
+      instrumentId: eId,
+      type: "dividend",
+      quantity: "0",
+      price: "10",
+      fees: "0",
+      tax: "0",
+      currency: "EUR",
+      executedAt: new Date(`${iso}T00:00:00.000Z`),
+    });
+    // Unlike the income forecast, this path passes no per-share amounts to the blend, so an
+    // announced 5.00/share special (5x the regular amount) covers the September slot:
+    // 10 (December) + 50 = 60. When #1243 lands this becomes 70.
+    await app.db.insert(dividendEvents).values({
+      instrumentId: eId,
+      exDate: "2026-09-20",
+      amountPerShare: "5",
+      currency: "EUR",
+    });
+    const out = await restOfYearForecastGross(
+      app,
+      [pay("div-e1", "2025-09-15"), pay("div-e2", "2025-12-15")],
+      summaryOf([{ instrumentId: eId, quantity: "10" }]),
+      "EUR",
+      2026,
+      NOW,
+    );
+    expect(out).toBe("60.00");
+  });
+
   it("rounds the exact half-cent the float sum got wrong", async () => {
     const c = await instrument("FCAST-C");
     await app.db

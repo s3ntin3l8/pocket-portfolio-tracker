@@ -2,6 +2,7 @@ import { Decimal } from "decimal.js";
 import { toDateKey, toMonthKey } from "./date-utils.js";
 import { inferIntervalMonths, computeGrowthFactor, addUTCMonths, monthsBetween } from "./growth.js";
 import type { IncomeEntry } from "./income.js";
+import { SPECIAL_DIVIDEND_RATIO } from "./sanity-gates.js";
 
 /** A dividend payment projected from last year's actual payout, in instrument currency. */
 export interface ProjectedDividend {
@@ -378,6 +379,39 @@ export function dividendIntervalMonths(
 
 const DAY_MS = 86_400_000;
 
+/** One past dividend payment's per-share amount, the run-rate sample for `blendAnnouncedDividends`. */
+export interface DividendRunRateSample {
+  instrumentId: string;
+  currency: string;
+  perShare: string;
+}
+
+/**
+ * Per-share amounts of each instrument's dividends over the trailing 24 months (monthly
+ * bucketed like the forecast engines, so a multi-leg month counts once), for
+ * `blendAnnouncedDividends`' run-rate. `qtyAt` is the same split-adjusted share count the
+ * projections use; a payment with no known quantity is skipped.
+ */
+export function dividendRunRateSamples(
+  pastDividends: IncomeEntry[],
+  qtyAt: (instrumentId: string, at: Date) => string,
+  now: Date = new Date(),
+): DividendRunRateSample[] {
+  const cutoff = addUTCMonths(now, -24);
+  const out: DividendRunRateSample[] = [];
+  for (const e of bucketMonthly(pastDividends)) {
+    if (e.type !== "dividend" || !e.instrumentId || e.executedAt < cutoff) continue;
+    const qty = new Decimal(qtyAt(e.instrumentId, e.executedAt));
+    if (qty.lte(0)) continue;
+    out.push({
+      instrumentId: e.instrumentId,
+      currency: e.currency,
+      perShare: new Decimal(e.price).div(qty).toString(),
+    });
+  }
+  return out;
+}
+
 /**
  * Drop the projected payments that an announced dividend already covers, keeping the rest
  * of the cadence. Each announced row consumes at most one projected payment of the same
@@ -385,21 +419,75 @@ const DAY_MS = 86_400_000;
  * (`floor(interval * 30 / 2)` days: monthly 15, quarterly 45, semiannual 90, annual 180) —
  * so an announced slot is never counted twice, while uncovered cadence payments stay
  * (a quarterly payer with one announced row keeps its other three). An announced row with
- * nothing in range (a special dividend) consumes nothing. Matching is by date only, not
- * amount.
+ * nothing in range (a special dividend) consumes nothing.
+ *
+ * Amount band: an announced row with a per-share amount only consumes a slot if it is within
+ * `[1/R, R]` (`SPECIAL_DIVIDEND_RATIO`, 3x) of the instrument's regular run-rate: the median
+ * per-share of its actual past payments (`history`, see `dividendRunRateSamples`), else the
+ * median projected per-share of the same currency. History first, because the projections are
+ * derived from it (next-year slots are a trailing mean), so one special inside that window
+ * would make every projected slot special-sized and the next regular announcement look special. A special near a regular slot consumes nothing and is
+ * added on top of the cadence by the caller. Without comparable amounts (missing per-share,
+ * different currencies, a non-positive amount) matching is by date only. Trade-offs: a
+ * regular payment that moves by more than 3x is treated as a special, a special within 3x of
+ * the run-rate still replaces its slot, and an instrument whose only recent payment was a
+ * special has no regular run-rate to compare against.
  *
  * `announced[].date` is the announced payment date (`payDate ?? exDate`), `YYYY-MM-DD`.
  * Returns the surviving projected objects unchanged.
  */
-export function blendAnnouncedDividends<P extends { instrumentId: string; date: string }>(
+export function blendAnnouncedDividends<
+  P extends { instrumentId: string; date: string; perShare?: string; currency?: string },
+>(
   projected: P[],
-  announced: { instrumentId: string; date: string }[],
+  announced: { instrumentId: string; date: string; perShare?: string; currency?: string }[],
   intervalMonths: (instrumentId: string) => number,
+  history?: DividendRunRateSample[],
 ): P[] {
   const consumed = new Set<P>();
   const dayOf = (s: string) => new Date(`${s}T00:00:00.000Z`).getTime() / DAY_MS;
+  const normCcy = (c: string) => c.trim().toUpperCase();
+  const runRates = new Map<string, Decimal | null>();
+  const medianOf = (xs: Decimal[]): Decimal | null => {
+    const vals = xs.filter((v) => v.gt(0)).sort((x, y) => x.comparedTo(y));
+    if (vals.length === 0) return null;
+    const mid = vals.length >> 1;
+    return vals.length % 2 ? vals[mid] : vals[mid - 1].add(vals[mid]).div(2);
+  };
+  const runRate = (instrumentId: string, currency: string): Decimal | null => {
+    const key = `${instrumentId}|${normCcy(currency)}`;
+    if (!runRates.has(key)) {
+      const sameCcy = (c: string | undefined) =>
+        c !== undefined && normCcy(c) === normCcy(currency);
+      // Actual past payments first: the projections are derived from the same history (next-year
+      // slots are a trailing mean), so a special in that window would make them special-sized.
+      const fromHistory = medianOf(
+        (history ?? [])
+          .filter((h) => h.instrumentId === instrumentId && sameCcy(h.currency))
+          .map((h) => new Decimal(h.perShare)),
+      );
+      runRates.set(
+        key,
+        fromHistory ??
+          medianOf(
+            projected
+              .filter((p) => p.instrumentId === instrumentId && sameCcy(p.currency) && p.perShare)
+              .map((p) => new Decimal(p.perShare as string)),
+          ),
+      );
+    }
+    return runRates.get(key) ?? null;
+  };
+  const inBand = (a: (typeof announced)[number]): boolean => {
+    if (!a.perShare || !a.currency) return true;
+    const ap = new Decimal(a.perShare);
+    const rate = runRate(a.instrumentId, a.currency);
+    if (!rate || ap.lte(0)) return true;
+    return ap.lte(rate.mul(SPECIAL_DIVIDEND_RATIO)) && ap.mul(SPECIAL_DIVIDEND_RATIO).gte(rate);
+  };
   const sortedAnnounced = [...announced].sort((a, b) => a.date.localeCompare(b.date));
   for (const a of sortedAnnounced) {
+    if (!inBand(a)) continue;
     const toleranceDays = Math.floor((intervalMonths(a.instrumentId) * 30) / 2);
     const aDay = dayOf(a.date);
     let best: P | undefined;

@@ -12,6 +12,7 @@ import {
   projectNextYearDividends,
   blendAnnouncedDividends,
   dividendIntervalMonths,
+  dividendRunRateSamples,
   toDateKey,
   toMonthKey,
   incomeFlow,
@@ -283,7 +284,12 @@ export async function buildIncomeStats(
     [...futureAnnouncedByInstrument.entries()].flatMap(([instrumentId, rows]) =>
       rows
         .filter((r) => r.exDate > from && r.exDate <= to)
-        .map((r) => ({ instrumentId, date: r.payDate })),
+        .map((r) => ({
+          instrumentId,
+          date: r.payDate,
+          perShare: r.perShare,
+          currency: r.currency,
+        })),
     );
   // Announced rows are windowed by ex-date (amounts below) but matched to projections by pay
   // date, and the two can fall in different years (Dec ex / Jan pay). Blend them against both
@@ -295,6 +301,7 @@ export async function buildIncomeStats(
     [...projectedDividends, ...projectedNextYear],
     announcedIn(todayStr, nextYearEndStr),
     intervalFor,
+    dividendRunRateSamples(pastDivs, qtyAt, now),
   );
   const blendedProjected = survivingProjected.filter((d) => d.date <= yearEndStr);
   const futureAnnouncedRestOfYear = [...futureAnnouncedByInstrument.values()]
