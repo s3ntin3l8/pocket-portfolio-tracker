@@ -80,6 +80,8 @@ export {
   projectNextYearDividends,
   blendAnnouncedDividends,
   dividendIntervalMonths,
+  dividendRunRateSamples,
+  type DividendRunRateSample,
   type ProjectedDividend,
 } from "./dividends.js";
 export {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { blendAnnouncedDividends, dividendIntervalMonths, type IncomeEntry } from "../src/index.js";
+import {
+  blendAnnouncedDividends,
+  dividendIntervalMonths,
+  dividendRunRateSamples,
+  type IncomeEntry,
+} from "../src/index.js";
 
 const proj = (instrumentId: string, date: string, perShare?: string, currency?: string) => ({
   instrumentId,
@@ -131,6 +136,28 @@ describe("blendAnnouncedDividends amount band", () => {
     );
   });
 
+  it("uses past payments as the run-rate when every projected slot is special-sized", () => {
+    // What the engines emit a year after a special: the trailing-12-month mean is inflated, so
+    // every next-year slot carries the same special-sized per-share.
+    const uniform = ["2027-01-12", "2027-04-12", "2027-07-12", "2027-10-12"].map((x) =>
+      proj("A", x, "2", "USD"),
+    );
+    const history = ["1", "1", "1", "5"].map((perShare) => ({
+      instrumentId: "A",
+      currency: "USD",
+      perShare,
+    }));
+    // Against the projections alone a regular 0.5 announcement looks special (0.25x of 2).
+    expect(blendAnnouncedDividends(uniform, [ann("2027-01-20", "0.5")], quarterly)).toHaveLength(4);
+    // Against the past payments' median (1.00) it is the regular payment and replaces the slot.
+    const out = blendAnnouncedDividends(uniform, [ann("2027-01-20", "0.5")], quarterly, history);
+    expect(out).toHaveLength(3);
+    // A real special is still out of band against that history.
+    expect(
+      blendAnnouncedDividends(uniform, [ann("2027-01-20", "5")], quarterly, history),
+    ).toHaveLength(4);
+  });
+
   it("compares currencies case- and whitespace-insensitively", () => {
     expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "5", " usd ")], quarterly)).toHaveLength(
       4,
@@ -148,6 +175,36 @@ describe("blendAnnouncedDividends amount band", () => {
     }
     const zero = ["2027-01-12"].map((x) => proj("A", x, "0", "USD"));
     expect(blendAnnouncedDividends(zero, [ann("2027-01-20", "50")], quarterly)).toHaveLength(0);
+  });
+});
+
+describe("dividendRunRateSamples", () => {
+  const e = (iso: string, price: string, instrumentId = "Q"): IncomeEntry =>
+    ({
+      instrumentId,
+      type: "dividend",
+      price,
+      currency: "USD",
+      executedAt: new Date(`${iso}T00:00:00.000Z`),
+    }) as IncomeEntry;
+  const now = new Date("2026-11-15T00:00:00.000Z");
+
+  it("returns per-share amounts for the trailing 24 months, one per month", () => {
+    const out = dividendRunRateSamples(
+      [
+        e("2026-10-12", "5"),
+        e("2026-10-20", "5"), // same month as above: bucketed into one 10.00 payment
+        e("2026-01-12", "10"),
+        e("2024-01-12", "99"), // older than 24 months
+      ],
+      () => "10",
+      now,
+    );
+    expect(out.map((s) => s.perShare).sort()).toEqual(["1", "1"]);
+  });
+
+  it("skips payments with no known quantity", () => {
+    expect(dividendRunRateSamples([e("2026-10-12", "5")], () => "0", now)).toEqual([]);
   });
 });
 

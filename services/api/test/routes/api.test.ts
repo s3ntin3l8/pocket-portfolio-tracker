@@ -2952,6 +2952,91 @@ describe("auth + portfolios + transactions", () => {
     expect(Number(body.forecastNextYear)).toBeCloseTo(40 + 50, 1);
   });
 
+  it("treats a regular announcement as regular a year after a special", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-15T00:00:00Z") });
+    const { dividendEvents, fxRates } = await import("@portfolio/db");
+    const t = await token("quarterly-after-special-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "After Special", baseCurrency: "USD" },
+      })
+    ).json().id;
+    const [ins] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "QAFTERSPECIAL",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "After Special",
+      })
+      .returning();
+    await app.db
+      .insert(fxRates)
+      .values({ base: "USD", quote: "USD", rate: "1", date: "2026-11-15" })
+      .onConflictDoNothing();
+    await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions`,
+      headers: auth(t),
+      payload: {
+        type: "buy",
+        instrumentId: ins.id,
+        quantity: "10",
+        price: "100",
+        currency: "USD",
+        executedAt: "2025-01-02T00:00:00.000Z",
+      },
+    });
+    // 1.00/share in Mar/Jun/Sep 2025 and a 5.00/share special in December 2025: the December
+    // payment is the only one in the projection window, so the engines project it at 5.00.
+    for (const [date, price] of [
+      ["2025-03-12", "10"],
+      ["2025-06-12", "10"],
+      ["2025-09-12", "10"],
+      ["2025-12-12", "50"],
+    ]) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "dividend",
+          instrumentId: ins.id,
+          quantity: "0",
+          price,
+          currency: "USD",
+          executedAt: `${date}T00:00:00.000Z`,
+        },
+      });
+    }
+    await app.db.insert(dividendEvents).values({
+      instrumentId: ins.id,
+      exDate: "2026-12-14",
+      payDate: null,
+      amountPerShare: "1.00",
+      currency: "USD",
+      status: "announced",
+      source: "test",
+      fetchedAt: new Date(),
+    });
+
+    const body = (
+      await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/income`,
+        headers: auth(t),
+      })
+    ).json();
+
+    // The regular 1.00 x 10 replaces the December slot that replayed last year's special:
+    // 10.00, not 10.00 + a phantom 50.00.
+    expect(Number(body.forecastRestOfYear)).toBeCloseTo(10, 1);
+  });
+
   it("includes quarterly dividends in forecastRestOfYear when dividend_events has future announced rows", async () => {
     // Pin "today": the announced rows below sit 1 and 2 months ahead, and from November on the
     // second one lands in next year, which changes which rows count as rest-of-year.

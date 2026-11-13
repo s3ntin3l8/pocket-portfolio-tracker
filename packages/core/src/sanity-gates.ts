@@ -64,7 +64,7 @@ export const XIRR_MAX_RATE = 50;
 /**
  * Amount band for matching an announced dividend to a projected cadence payment
  * (`blendAnnouncedDividends`): an announced per-share amount within
- * `[1/RATIO, RATIO]` of the projected per-share is the regular payment and replaces
+ * `[1/RATIO, RATIO]` of the instrument's regular run-rate (median past per-share) is the regular payment and replaces
  * its slot; anything outside is a special (or a tiny stub) and is added on top.
  * Wide enough for a normal raise or cut, an interim/final split measured against a
  * 12-month average, and net-vs-gross withholding.

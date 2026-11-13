@@ -12,6 +12,7 @@ import {
   projectNextYearDividends,
   blendAnnouncedDividends,
   dividendIntervalMonths,
+  dividendRunRateSamples,
   toDateKey,
   toMonthKey,
   incomeFlow,
@@ -300,6 +301,7 @@ export async function buildIncomeStats(
     [...projectedDividends, ...projectedNextYear],
     announcedIn(todayStr, nextYearEndStr),
     intervalFor,
+    dividendRunRateSamples(pastDivs, qtyAt, now),
   );
   const blendedProjected = survivingProjected.filter((d) => d.date <= yearEndStr);
   const futureAnnouncedRestOfYear = [...futureAnnouncedByInstrument.values()]
