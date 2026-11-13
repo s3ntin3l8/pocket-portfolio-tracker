@@ -178,7 +178,7 @@ describe("listModels", () => {
     expect(calls[1]!.url).toBe("http://lm:1234/v1/models");
   });
 
-  it("OpenAI-compatible: sends the stored or env key as a Bearer token and caches per key", async () => {
+  it("OpenAI-compatible: sends the stored or env key as a Bearer token; a credential change clears the cache", async () => {
     const { f, calls } = fakeFetch({ "/v1/models": () => json({ data: [{ id: "m" }] }) });
     await listModels(
       "openai-compatible",
@@ -190,8 +190,13 @@ describe("listModels", () => {
 
     vi.stubEnv("OPENAI_COMPAT_BASE_URL", "http://lm:1234");
     vi.stubEnv("OPENAI_COMPAT_API_KEY", "env-key"); // pragma: allowlist secret
+    // Same URL: served from the cache (the key is not part of it)...
     await listModels("openai-compatible", "chat", undefined, { fetch: f });
-    expect(calls).toHaveLength(2); // a different key is a different cache entry
+    expect(calls).toHaveLength(1);
+    // ...until the credential changes, which the admin routes signal with clearModelCache.
+    clearModelCache("openai-compatible");
+    await listModels("openai-compatible", "chat", undefined, { fetch: f });
+    expect(calls).toHaveLength(2);
     expect(new Headers(calls[1]!.init?.headers).get("authorization")).toBe("Bearer env-key");
   });
 
@@ -231,7 +236,7 @@ describe("listModels", () => {
     ).toBe("provider_unreachable");
   });
 
-  it("caches per credential for ten minutes and re-fetches after", async () => {
+  it("caches per provider for ten minutes, re-fetches after, and drops the entry when the credential changes", async () => {
     let n = 0;
     const f = (async () => {
       n++;
@@ -242,12 +247,12 @@ describe("listModels", () => {
     await listModels("openrouter", "chat", secret, { fetch: f, now: t0 });
     await listModels("openrouter", "vision", secret, { fetch: f, now: t0 + 60_000 });
     expect(n).toBe(1); // both tasks share one upstream list
-    await listModels("openrouter", "chat", { apiKey: "key-2" }, { fetch: f, now: t0 + 60_000 }); // pragma: allowlist secret
-    expect(n).toBe(2); // another credential never sees the first one's list
-    await listModels("openrouter", "chat", secret, { fetch: f, now: t0 + 11 * 60_000 });
-    expect(n).toBe(3);
+    // The key is not part of the cache (nothing secret is held): a credential change is signalled
+    // by the admin routes with clearModelCache, which drops the entry so the next call re-fetches.
     clearModelCache("openrouter");
-    await listModels("openrouter", "chat", secret, { fetch: f, now: t0 + 11 * 60_000 });
-    expect(n).toBe(4);
+    await listModels("openrouter", "chat", { apiKey: "key-2" }, { fetch: f, now: t0 + 60_000 }); // pragma: allowlist secret
+    expect(n).toBe(2);
+    await listModels("openrouter", "chat", secret, { fetch: f, now: t0 + 12 * 60_000 });
+    expect(n).toBe(3); // past the ten minutes
   });
 });

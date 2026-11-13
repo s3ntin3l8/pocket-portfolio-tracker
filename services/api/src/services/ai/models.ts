@@ -1,4 +1,3 @@
-import { createHmac, randomBytes } from "node:crypto";
 import type { ResolvedSecret } from "../market-data/types.js";
 import { compatKey, env, findProvider, openAiV1, type AiTask } from "./registry.js";
 
@@ -168,9 +167,6 @@ async function listOpenAICompat(
   });
 }
 
-/** Random per process: makes the cache identity of a key unguessable and unreproducible elsewhere. */
-const CACHE_ID_SECRET = randomBytes(32);
-
 const cache = new Map<string, { at: number; models: AiModel[] }>();
 
 /** Drop cached model lists (all, or one provider's) — e.g. after its credential changed. */
@@ -205,12 +201,10 @@ export async function listModels(
         ? compatKey(secret)
         : "";
   const baseUrl = d.baseUrl(secret) ?? "";
-  // Keyed by credential so a changed key/URL never serves the previous account's list.
-  // The key is never held in plaintext by the process-lifetime cache: only a keyed digest (HMAC
-  // under a per-process random secret) identifies it. This is a cache identity, not password
-  // storage, and the secret never leaves the process.
-  const keyId = createHmac("sha256", CACHE_ID_SECRET).update(apiKey).digest("hex").slice(0, 16);
-  const cacheKey = `${provider}|${d.credential === "url" ? `${baseUrl}|${keyId}` : keyId}`;
+  // Keyed by provider and URL only: the key itself is never part of the cache (nothing secret is
+  // held for the life of the process). A changed credential is dropped by `clearModelCache`,
+  // which the admin credential routes call on every PUT/DELETE; an env change needs a restart.
+  const cacheKey = `${provider}|${d.credential === "url" ? baseUrl : ""}`;
 
   let all = cache.get(cacheKey);
   if (!all || now - all.at > CACHE_TTL_MS) {
