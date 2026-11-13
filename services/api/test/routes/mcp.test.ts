@@ -143,6 +143,12 @@ describe("POST /mcp", () => {
         "get_fsa_allocation",
         "resolve_instrument",
         "explain_import_duplicates",
+        "get_trades",
+        "get_instrument",
+        "get_loans",
+        "get_savings_plans",
+        "list_imports",
+        "get_anomalies",
         "check_integrity",
       ]),
     );
