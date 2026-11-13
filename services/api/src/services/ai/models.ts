@@ -1,5 +1,6 @@
+import { createHash } from "node:crypto";
 import type { ResolvedSecret } from "../market-data/types.js";
-import { env, findProvider, openAiV1, type AiTask } from "./registry.js";
+import { compatKey, env, findProvider, openAiV1, type AiTask } from "./registry.js";
 
 /** One selectable model. A null capability means the provider's API doesn't say. */
 export interface AiModel {
@@ -192,19 +193,19 @@ export async function listModels(
 
   const doFetch = opts.fetch ?? globalThis.fetch;
   const now = opts.now ?? Date.now();
-  // A URL provider's `credentialEnvVar` is the URL, not a key: only its optional key counts.
+  // A URL provider's `credentialEnvVar` is the URL, not a key. The one with an optional key
+  // resolves it in the registry (`compatKey`), the single owner of which key may go to which URL.
   const apiKey =
-    secret?.apiKey ??
-    // An env key goes with the env URL only (see `compatKey` in registry.ts).
-    (d.credential === "url"
-      ? secret?.url
-        ? ""
-        : env(d.optionalKeyEnvVar ?? "")
-      : env(d.credentialEnvVar)) ??
-    "";
+    d.credential === "key"
+      ? (secret?.apiKey ?? env(d.credentialEnvVar) ?? "")
+      : d.optionalKeyEnvVar
+        ? compatKey(secret)
+        : "";
   const baseUrl = d.baseUrl(secret) ?? "";
   // Keyed by credential so a changed key/URL never serves the previous account's list.
-  const cacheKey = `${provider}|${d.credential === "url" ? `${baseUrl}|${apiKey}` : apiKey}`;
+  // The key is hashed so the process-lifetime cache never holds it in plaintext.
+  const keyId = createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+  const cacheKey = `${provider}|${d.credential === "url" ? `${baseUrl}|${keyId}` : keyId}`;
 
   let all = cache.get(cacheKey);
   if (!all || now - all.at > CACHE_TTL_MS) {

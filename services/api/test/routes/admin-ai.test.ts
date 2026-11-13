@@ -226,6 +226,13 @@ describe("admin AI providers", () => {
       expect(find(await call("PUT", path, { urlOverride: "http://a:1234" }))).toMatchObject({
         hasKey: true,
       });
+      // The editor sends back the URL as shown (no trailing slash): still the same server.
+      await call("PUT", path, { urlOverride: "http://c:1234/", apiKey: "key-for-c-2222" }); // pragma: allowlist secret
+      expect(find(await call("PUT", path, { urlOverride: "http://c:1234" }))).toMatchObject({
+        hasKey: true,
+        keyHint: "••••2222",
+      });
+      await call("PUT", path, { urlOverride: "http://a:1234", apiKey: "key-for-a-1111" }); // pragma: allowlist secret
       expect(find(await call("PUT", path, { urlOverride: "http://b:1234" }))).toMatchObject({
         hasKey: false,
         url: "http://b:1234",

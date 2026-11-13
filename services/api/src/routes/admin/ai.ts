@@ -19,6 +19,7 @@ import {
   env,
   findProvider,
   isLocalProvider,
+  openAiRoot,
 } from "../../services/ai/registry.js";
 import {
   AI_CREDENTIAL_PREFIX,
@@ -26,6 +27,9 @@ import {
   loadAiConfig,
   resolveTask,
 } from "../../services/ai/resolve.js";
+
+// Compared normalised (trailing slash, `/v1`): the editor sends back the URL the view showed.
+const sameUrl = (a: string | null | undefined, b: string) => openAiRoot(a ?? "") === openAiRoot(b);
 
 const maskKey = (plain: string) => (plain.length >= 4 ? `••••${plain.slice(-4)}` : "••••");
 
@@ -159,7 +163,7 @@ export function registerAiRoutes(app: FastifyInstance) {
           .select({ url: providerCredentials.urlOverride, key: providerCredentials.apiKeyEnc })
           .from(providerCredentials)
           .where(eq(providerCredentials.provider, namespacedId));
-        dropKey = Boolean(row?.key) && row?.url !== body.urlOverride;
+        dropKey = Boolean(row?.key) && !sameUrl(row?.url, body.urlOverride);
       }
 
       await app.db

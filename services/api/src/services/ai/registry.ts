@@ -75,10 +75,10 @@ export const openAiRoot = (u: string) => u.trim().replace(/\/+$/, "").replace(/\
 /** The same URL as the `/v1` base the chat and models endpoints hang off. */
 export const openAiV1 = (u: string) => (u.trim() ? `${openAiRoot(u)}/v1` : "");
 
-const compatUrl = (s: ResolvedSecret | undefined) => urlFrom(s, "OPENAI_COMPAT_BASE_URL");
+export const compatUrl = (s: ResolvedSecret | undefined) => urlFrom(s, "OPENAI_COMPAT_BASE_URL");
 // The env key belongs to the env URL: with a stored URL it is never sent there, so repointing
 // the URL cannot hand a key to another host.
-const compatKey = (s: ResolvedSecret | undefined) =>
+export const compatKey = (s: ResolvedSecret | undefined) =>
   s?.apiKey ?? (s?.url ? "" : (env("OPENAI_COMPAT_API_KEY") ?? ""));
 
 /** In default order: the first configured one is what an env-only deployment gets. */
