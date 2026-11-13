@@ -100,6 +100,13 @@ setting in the UI. Keys and URLs in the environment still work as the fallback f
 credential. Stored credentials moved from the `vision:` to the `ai:` namespace in migration `0100`; the old
 `vision_provider_settings` / `chat_provider_settings` / `chat_settings` tables were dropped in `0101`.
 
+> **Upgrading from v0.2.8 or older: go through v0.2.9 first.** Migrations run before the seed, so an instance that
+> jumps straight from v0.2.8 to a release that contains `0101` never lets the seed read those tables: a provider you
+> had switched off, a chat pin and per-provider chat-model overrides are lost, and the seed then derives each task from
+> env (a provider with a key can come back on). Start v0.2.9 once (the compose default `IMAGE_TAG=edge` is not a
+> release; pin `0.2.9`) so the seed stores your effective choice in `ai_task_settings`, then upgrade further. A fresh
+> install, or one already on v0.2.9, is unaffected.
+
 Provider adapters use plain `fetch` (no SDK), like the vision parsers.
 
 ## Conversation history (opt-in)

@@ -478,7 +478,22 @@ describe("admin AI providers", () => {
     }
   });
 
-  it("migration 0101 drops the legacy provider tables and leaves ai_task_settings alone", async () => {
+  const legacyTables = async () => {
+    const res = await getDb().execute(
+      sql`SELECT table_name FROM information_schema.tables
+          WHERE table_name IN ('vision_provider_settings','chat_provider_settings','chat_settings')`,
+    );
+    // PGlite returns `{ rows }`, postgres-js a bare array.
+    return (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]);
+  };
+
+  it("migration 0101 is applied by the real migrator: the legacy tables are gone from a migrated database", async () => {
+    // `buildApp()` ran every journal entry in `beforeAll`: if 0101 were missing from
+    // `meta/_journal.json` (or its tag mismatched) the migrator would skip it and these would exist.
+    expect(await legacyTables()).toHaveLength(0);
+  });
+
+  it("migration 0101 drops the three legacy tables and leaves ai_task_settings alone", async () => {
     const file = readFileSync(
       new URL("../../../../packages/db/drizzle/0101_furry_polaris.sql", import.meta.url),
       "utf8",
@@ -492,19 +507,13 @@ describe("admin AI providers", () => {
 
     const db = getDb();
     await db.insert(aiTaskSettings).values({ task: "chat", provider: "claude", model: "m" });
-    // Recreate the three tables as an upgrading database has them, then run the migration.
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS vision_provider_settings (provider text)`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS chat_provider_settings (provider text)`);
-    await db.execute(sql`CREATE TABLE IF NOT EXISTS chat_settings (id integer)`);
+    // Recreate the three tables as an upgrading database has them, then run the statements.
+    await db.execute(sql`CREATE TABLE vision_provider_settings (provider text)`);
+    await db.execute(sql`CREATE TABLE chat_provider_settings (provider text)`);
+    await db.execute(sql`CREATE TABLE chat_settings (id integer)`);
+    expect(await legacyTables()).toHaveLength(3);
     for (const st of statements) await db.execute(sql.raw(st));
-    const gone = await db.execute(
-      sql`SELECT table_name FROM information_schema.tables
-          WHERE table_name IN ('vision_provider_settings','chat_provider_settings','chat_settings')`,
-    );
-    // PGlite returns `{ rows }`, postgres-js a bare array.
-    const goneRows =
-      (gone as unknown as { rows?: unknown[] }).rows ?? (gone as unknown as unknown[]);
-    expect(goneRows).toHaveLength(0);
+    expect(await legacyTables()).toHaveLength(0);
     expect(await db.select().from(aiTaskSettings)).toMatchObject([
       { task: "chat", provider: "claude", model: "m" },
     ]);
