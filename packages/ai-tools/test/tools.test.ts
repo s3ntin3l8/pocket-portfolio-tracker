@@ -330,7 +330,7 @@ const client = {
     {
       loanId: "l1",
       provider: "X",
-      contractNo: "C-1",
+      contractNo: "AGR-0012345",
       currency: "IDR",
       closedAt: null,
       installments: [],
@@ -1165,7 +1165,12 @@ describe("trades, instruments and the other new tools", () => {
     const all = (await t.handler(t.inputSchema.parse({}))) as {
       matching: number;
       omitted: number;
-      trades: { exitDate: string | null; symbol: string | null; name: string | null }[];
+      trades: {
+        exitDate: string | null;
+        status: string;
+        symbol: string | null;
+        name: string | null;
+      }[];
       totalRealized: string;
     };
     expect(all.matching).toBe(63);
@@ -1178,7 +1183,15 @@ describe("trades, instruments and the other new tools", () => {
     expect(all.trades[0]).toMatchObject({ symbol: "ABC", name: "ABC Corp" });
     // Open trades have no exit date, so they sort by entry date; closed ones newest first.
     const exits = all.trades.map((x) => x.exitDate).filter((d): d is string => Boolean(d));
-    expect([...exits].sort().reverse()).toEqual(exits.slice().sort().reverse());
+    expect(exits).toEqual([...exits].sort().reverse());
+    // The open trade (entry 2024-01-02) sorts by its entry date: after the 2025 and mid-2024
+    // closes, before the 2023 ones.
+    expect(all.trades.slice(0, 4).map((x) => x.status)).toEqual([
+      "closed",
+      "closed",
+      "open",
+      "closed",
+    ]);
 
     const closed2025 = (await t.handler(
       t.inputSchema.parse({ status: "closed", year: "2025" }),
@@ -1279,6 +1292,35 @@ describe("trades, instruments and the other new tools", () => {
     expect(JSON.stringify(out)).not.toMatch(/Erika|12\.5/);
   });
 
+  it("get_anomalies reports how many it left out", async () => {
+    const many = createTools({
+      getNetworthAnomalies: async () => ({
+        anomalies: Array.from({ length: 60 }, () => ({
+          code: "zero_price",
+          severity: "warning",
+          scope: "transaction",
+        })),
+      }),
+    } as unknown as ApiClient);
+    const t = many.find((x) => x.name === "get_anomalies")!;
+    const out = (await t.handler({})) as { count: number; omitted: number; anomalies: unknown[] };
+    expect(out).toMatchObject({ count: 60, omitted: 10 });
+    expect(out.anomalies).toHaveLength(50);
+  });
+
+  it("list_imports says when the unmapped event types could not be read", async () => {
+    const failing = createTools({
+      listImports: async () => [],
+      getUnmappedEventTypes: async () => {
+        throw new Error("boom");
+      },
+    } as unknown as ApiClient);
+    const t = failing.find((x) => x.name === "list_imports")!;
+    const out = (await t.handler({})) as { unmappedNote?: string; unmappedEventTypes: unknown[] };
+    expect(out.unmappedNote).toBe("could not be read");
+    expect(out.unmappedEventTypes).toEqual([]);
+  });
+
   it("get_loans never returns the financing contract number", async () => {
     const t = byName("get_loans");
     const out = (await t.handler(t.inputSchema.parse({ portfolioId: P1 }))) as {
@@ -1306,7 +1348,8 @@ describe("trades, instruments and the other new tools", () => {
     calls.length = 0;
     const t = byName("get_income");
     await t.handler(t.inputSchema.parse({ eventsYear: 2025 }));
-    await t.handler(t.inputSchema.parse({ portfolioId: P1, eventsYear: 2025 }));
+    expect(t.inputSchema.safeParse({ portfolioId: P1, eventsYear: 2025 }).success).toBe(false);
+    await t.handler(t.inputSchema.parse({ portfolioId: P1 }));
     expect(calls).toEqual(["getIncomeEventsByYear(2025,undefined)", `getPortfolioIncome("${P1}")`]);
   });
 

@@ -44,6 +44,8 @@ const INSTRUMENT_RANGES = [
 ] as const;
 /** Closed/open trades returned to the model in one call (the rest are counted). */
 const MAX_TRADES = 50;
+/** Ledger warnings returned in one call. */
+const MAX_ANOMALIES = 50;
 /** Recent imports returned in one call. */
 const MAX_IMPORTS = 20;
 
@@ -389,21 +391,30 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     title: "Income",
     description:
       "Dividend, coupon and interest income statistics, including the forecast for the rest of the year. " +
-      "Pass eventsYear (all portfolios, not with portfolioId) for the individual dividend/coupon/interest " +
-      "payments of that calendar year. Income is return, never contribution.",
-    inputSchema: z.object({
-      portfolioId: optionalPortfolioId,
-      holderId,
-      eventsYear: z
-        .number()
-        .int()
-        .min(1990)
-        .max(2100)
-        .optional()
-        .describe("List the income events of this year instead of the statistics (all portfolios)"),
-    }),
+      "Pass eventsYear (all portfolios; not allowed together with portfolioId) for the individual dividend and " +
+      "coupon payments of that calendar year (interest is only in the statistics). Income is return, never contribution.",
+    inputSchema: z
+      .object({
+        portfolioId: optionalPortfolioId,
+        holderId,
+        eventsYear: z
+          .number()
+          .int()
+          .min(1990)
+          .max(2100)
+          .optional()
+          .describe(
+            "List the income events of this year instead of the statistics (all portfolios)",
+          ),
+      })
+      // The events list is an all-portfolios view; combining it with a portfolio would silently
+      // return that portfolio's statistics instead of the payments that were asked for.
+      .refine((v) => !(v.eventsYear && v.portfolioId), {
+        message: "eventsYear lists payments for all portfolios; omit portfolioId",
+        path: ["eventsYear"],
+      }),
     handler: ({ portfolioId: id, holderId: h, eventsYear }) =>
-      eventsYear && !id
+      eventsYear
         ? client.getIncomeEventsByYear(eventsYear, h)
         : id
           ? client.getPortfolioIncome(id)
@@ -582,9 +593,13 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
       "types that could not be mapped. Use explain_import_duplicates for one import's duplicates.",
     inputSchema: z.object({}),
     handler: async () => {
+      let unmappedFailed = false;
       const [imports, unmapped] = await Promise.all([
         client.listImports(),
-        client.getUnmappedEventTypes().catch(() => []),
+        client.getUnmappedEventTypes().catch(() => {
+          unmappedFailed = true;
+          return [];
+        }),
       ]);
       const recent = [...imports]
         .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
@@ -602,6 +617,8 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
           createdAt: i.createdAt,
         })),
         // Counts only: the raw event sample can carry a counterparty's name and broker amounts.
+        // A failed read is not "none": say so, so the model doesn't report a clean bill.
+        ...(unmappedFailed ? { unmappedNote: "could not be read" } : {}),
         unmappedEventTypes: unmapped.map((u) => ({
           eventType: u.eventType,
           code: u.code,
@@ -618,11 +635,16 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     description:
       "Data-quality warnings on the ledger: oversold positions, sells before acquisition, negative cash, income on a " +
       "non-held instrument, missing transfer cost basis, zero prices, reconciliation gaps. One portfolio, or all. " +
+      `Up to ${MAX_ANOMALIES} are returned; count is the total and omitted the rest. ` +
       "Use it when numbers look wrong. For the invariant checks use check_integrity.",
     inputSchema: z.object({ portfolioId: optionalPortfolioId }),
     handler: async ({ portfolioId: pid }) => {
       const res = pid ? await client.getAnomalies(pid) : await client.getNetworthAnomalies();
-      return { count: res.anomalies.length, anomalies: res.anomalies.slice(0, 50) };
+      return {
+        count: res.anomalies.length,
+        omitted: Math.max(0, res.anomalies.length - MAX_ANOMALIES),
+        anomalies: res.anomalies.slice(0, MAX_ANOMALIES),
+      };
     },
   });
 
