@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const redirect = vi.fn((url: string) => {
   throw new Error(`NEXT_REDIRECT:${url}`);
@@ -32,21 +32,42 @@ describe("landing page session redirect", () => {
     getSessionState.mockReset();
     devBypass = false;
     process.env.AUTH_SECRET = "test-secret"; // pragma: allowlist secret
+    process.env.AUTH_LOCAL_SECRET = "local"; // pragma: allowlist secret
+  });
+
+  afterEach(() => {
+    delete process.env.AUTH_SECRET;
+    delete process.env.AUTH_LOCAL_SECRET;
   });
 
   it("sends a signed-in visitor to /holdings", async () => {
-    getSessionState.mockResolvedValue({ isAuthenticated: true, isExpired: false, token: "t" });
+    getSessionState.mockResolvedValue({
+      isAuthenticated: true,
+      isExpired: false,
+      isUnrecoverable: false,
+      token: "t",
+    });
     await expect(renderPage()).rejects.toThrow("NEXT_REDIRECT:/en/holdings");
     expect(getSessionState).toHaveBeenCalledWith("authjs.session-token=abc");
   });
 
   it("still redirects when the access token is expired (the app layout rotates it)", async () => {
-    getSessionState.mockResolvedValue({ isAuthenticated: true, isExpired: true, token: "t" });
+    getSessionState.mockResolvedValue({
+      isAuthenticated: true,
+      isExpired: true,
+      isUnrecoverable: false,
+      token: "t",
+    });
     await expect(renderPage()).rejects.toThrow("NEXT_REDIRECT:/en/holdings");
   });
 
   it("renders the landing for an anonymous visitor", async () => {
-    getSessionState.mockResolvedValue({ isAuthenticated: false, isExpired: false, token: null });
+    getSessionState.mockResolvedValue({
+      isAuthenticated: false,
+      isExpired: false,
+      isUnrecoverable: false,
+      token: null,
+    });
     await renderPage();
     expect(redirect).not.toHaveBeenCalled();
   });
@@ -56,5 +77,30 @@ describe("landing page session redirect", () => {
     await renderPage();
     expect(getSessionState).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not redirect a session whose refresh already failed (avoids a loop with SessionErrorGuard)", async () => {
+    getSessionState.mockResolvedValue({
+      isAuthenticated: true,
+      isExpired: true,
+      isUnrecoverable: true,
+      token: "t",
+    });
+    await renderPage();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not check the session when no login method is configured", async () => {
+    delete process.env.AUTH_LOCAL_SECRET;
+    delete process.env.AUTHENTIK_ISSUER;
+    await renderPage();
+    expect(getSessionState).not.toHaveBeenCalled();
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  it("does not check the session when AUTH_SECRET is unset", async () => {
+    delete process.env.AUTH_SECRET;
+    await renderPage();
+    expect(getSessionState).not.toHaveBeenCalled();
   });
 });
