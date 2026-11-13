@@ -36,7 +36,9 @@ const INTERRUPTED_NOTE = "This part of the response was interrupted before it fi
  * no `thinking` parameter at all, exactly as before: nothing is switched on or can 400.
  */
 export function supportsProgressUpdates(model: string): boolean {
-  return /^claude-(opus-5-5|sonnet-5-5|fable-5(-[12])?|mythos-5(-[12])?)$/.test(model);
+  return /^claude-(opus-5-5|sonnet-5-5|fable-5(-[12])?|mythos-5(-[12])?)(-20\d{6}|-latest)?$/.test(
+    model,
+  );
 }
 
 /**
@@ -78,8 +80,9 @@ export class AnthropicChatProvider implements ChatProvider {
     if (!this.isConfigured()) throw new ChatProviderError("provider_not_configured");
     // Server-side refusal fallback is a first-party-API feature: only request it there.
     const fallbacks = this.baseUrl === DEFAULT_BASE_URL;
-    // Same first-party-only rule for the progress-note beta.
-    const updates = fallbacks && supportsProgressUpdates(this.model);
+    // Same first-party-only rule for the progress-note beta. Only a streamed turn can show the
+    // notes (`complete()` has no sink for them), so only a streamed request pays for them.
+    const updates = stream && fallbacks && supportsProgressUpdates(this.model);
     const betas = [fallbacks ? FALLBACK_BETA : null, updates ? THINKING_UPDATES_BETA : null].filter(
       Boolean,
     );
@@ -270,6 +273,9 @@ export class AnthropicChatProvider implements ChatProvider {
           model: model ?? this.model,
           stop: stopReason,
           usage,
+          // Whether progress notes were requested, so "still silent with model X" can be
+          // answered from the log.
+          progressUpdates: this.baseUrl === DEFAULT_BASE_URL && supportsProgressUpdates(this.model),
           latencyMs: Date.now() - t0,
         },
         "chat turn complete",

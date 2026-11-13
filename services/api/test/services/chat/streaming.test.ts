@@ -417,7 +417,14 @@ describe("AnthropicChatProvider progress notes", () => {
   ];
 
   it("knows which models can return progress notes", () => {
-    for (const m of ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-mythos-5"])
+    for (const m of [
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+      "claude-fable-5-2",
+      "claude-mythos-5",
+      "claude-opus-5-5-20261101",
+      "claude-sonnet-5-5-latest",
+    ])
       expect(supportsProgressUpdates(m)).toBe(true);
     for (const m of ["claude-opus-4-8", "claude-opus-5", "claude-haiku-4-5", "my-own-model", ""])
       expect(supportsProgressUpdates(m)).toBe(false);
