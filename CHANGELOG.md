@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.8...v0.2.9) (2026-11-13)
+
+
+### Features
+
+* **ai:** one admin page for AI providers, one provider + model per task ([#1239](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1239)) ([af42885](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/af428851e83ef97645c8a1e38cf216b2545265f8))
+* **demo:** fixed clock and launcher hand-off for the demo instance ([#1210](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1210)) ([3ba7349](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3ba73496f71bc0f109821607c67e2ff2acbb5bd1))
+
+
+### Bug Fixes
+
+* **deps:** patch zod, vite and minimatch ([#103](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/103)-[#107](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/107), [#109](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/109), [#122](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/122)) ([#1236](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1236)) ([7b19267](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7b1926734b7337e5b965d1515bb2a2a9c93cbe6e))
+* **income:** don't let a special dividend replace a regular projected payment ([#1244](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1244)) ([0cc5b21](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0cc5b216102873445b311e8820561bec1a5d6295))
+* **income:** keep cadence projections when only some dividends are announced ([#1233](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1233)) ([884a401](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/884a401e6146148f2669c3aee48578b7d3e765b9))
+* install with npm ci in the session-start hook ([#1240](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1240)) ([1c0c3ec](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/1c0c3ecded617f9bdffd713075ad538cfa27bd4c))
+* **web:** lay the holdings value card out on whole pixels ([#1220](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1220)) ([bebe70f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bebe70f795ce2822bd21899fce82b68197d15a23))
+* **web:** send signed-in users from the landing page straight to the app ([#1245](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1245)) ([bce59bb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/bce59bbf2191027d93c15809a48967b9a870c11d))
+* **web:** whole-pixel line heights across the type scale ([#1223](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1223)) ([69c9dbb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/69c9dbb0c5271bbbc9afba6bd4e920064c615301))
+* **web:** whole-pixel line heights on component leading overrides ([#1226](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1226)) ([40ed5e1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/40ed5e13d9507d0fe0042c6865eb4b7bdbe4f2d7))
+
 ## [0.2.8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.7...v0.2.8) (2026-10-27)
 
 
