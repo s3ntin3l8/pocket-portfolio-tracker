@@ -708,6 +708,13 @@
       "when": 1794342437192,
       "tag": "0100_graceful_mantis",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "7",
+      "when": 1794607382882,
+      "tag": "0101_furry_polaris",
+      "breakpoints": true
     }
   ]
 }

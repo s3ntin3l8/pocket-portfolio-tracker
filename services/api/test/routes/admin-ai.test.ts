@@ -7,10 +7,7 @@ import {
   adminAuditLog,
   aiProviderSettings,
   aiTaskSettings,
-  chatProviderSettings,
-  chatSettings,
   providerCredentials,
-  visionProviderSettings,
 } from "@portfolio/db";
 import { buildApp } from "../../src/app.js";
 import { closeDb, getDb } from "../../src/db/client.js";
@@ -114,9 +111,6 @@ describe("admin AI providers", () => {
     await db.delete(aiProviderSettings);
     await db.delete(providerCredentials).where(like(providerCredentials.provider, "ai:%"));
     await db.delete(providerCredentials).where(like(providerCredentials.provider, "vision:%"));
-    await db.delete(visionProviderSettings);
-    await db.delete(chatProviderSettings);
-    await db.delete(chatSettings);
   });
 
   const call = async (method: "GET" | "PATCH" | "PUT" | "DELETE", url: string, payload?: object) =>
@@ -426,23 +420,6 @@ describe("admin AI providers", () => {
       expect(await getChatProvider()).toBeNull();
     });
 
-    it("honours the legacy vision switches and the admin's chat pin", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "a"); // pragma: allowlist secret
-      vi.stubEnv("OPENROUTER_API_KEY", "o"); // pragma: allowlist secret
-      const db = getDb();
-      await db
-        .insert(visionProviderSettings)
-        .values({ provider: "claude", enabled: false, priority: 1 });
-      await db.insert(chatSettings).values({ id: 1, pinnedProvider: "openrouter" });
-      await db
-        .insert(chatProviderSettings)
-        .values({ provider: "openrouter", model: "admin/model" });
-      await seedAiTaskSettings(db);
-      const byTask = Object.fromEntries((await rows()).map((r) => [r.task, r]));
-      expect(byTask.vision).toMatchObject({ provider: "openrouter" });
-      expect(byTask.chat).toMatchObject({ provider: "openrouter", model: "admin/model" });
-    });
-
     it("never overwrites a stored setting (including an explicit off) and seeds nothing when unconfigured", async () => {
       expect((await seedAiTaskSettings(getDb())).seeded).toEqual([]); // nothing configured
       expect(await rows()).toHaveLength(0);
@@ -460,35 +437,6 @@ describe("admin AI providers", () => {
       expect(await getChatProvider()).toBeNull();
       expect((await resolveScreenshotParser()).isConfigured()).toBe(false);
       expect((await view()).tasks.every((t) => t.provider === null)).toBe(true);
-    });
-
-    it("keeps a provider the admin had switched off, off, with an explicit off row that outlives the legacy tables", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "a"); // pragma: allowlist secret
-      const db = getDb();
-      await db
-        .insert(visionProviderSettings)
-        .values({ provider: "claude", enabled: false, priority: 1 });
-      await db.insert(chatProviderSettings).values({ provider: "claude", enabled: false });
-      await seedAiTaskSettings(db);
-      const byTask = Object.fromEntries((await rows()).map((r) => [r.task, r]));
-      expect(byTask.vision).toMatchObject({ provider: null });
-      expect(byTask.chat).toMatchObject({ provider: null });
-      expect(await getChatProvider()).toBeNull();
-      expect((await resolveScreenshotParser()).isConfigured()).toBe(false);
-
-      // The legacy tables are gone (a later release drops them) and the seed runs again:
-      await db.delete(visionProviderSettings);
-      await db.delete(chatProviderSettings);
-      await seedAiTaskSettings(db);
-      expect(await getChatProvider()).toBeNull(); // still off: the stored "off" held
-    });
-
-    it("keeps an admin pin to a local provider when Claude also has a key", async () => {
-      vi.stubEnv("ANTHROPIC_API_KEY", "a"); // pragma: allowlist secret
-      await getDb().insert(chatSettings).values({ id: 1, pinnedProvider: "ollama" });
-      await seedAiTaskSettings(getDb());
-      expect(task(await view(), "chat")).toMatchObject({ provider: "ollama", usable: false });
-      expect(await getChatProvider()).toBeNull(); // never falls through to Claude
     });
 
     it("carries the env data-collection opt-out into the stored option", async () => {
@@ -528,5 +476,54 @@ describe("admin AI providers", () => {
     } finally {
       await db.delete(providerCredentials).where(eq(providerCredentials.provider, "coingecko"));
     }
+  });
+
+  const legacyTables = async () => {
+    const res = await getDb().execute(
+      sql`SELECT table_name FROM information_schema.tables
+          WHERE table_name IN ('vision_provider_settings','chat_provider_settings','chat_settings')`,
+    );
+    // PGlite returns `{ rows }`, postgres-js a bare array.
+    return (res as unknown as { rows?: unknown[] }).rows ?? (res as unknown as unknown[]);
+  };
+
+  it("migration 0101 is applied by the real migrator: the legacy tables are gone from a migrated database", async () => {
+    // `buildApp()` ran every journal entry in `beforeAll`: if 0101 were missing from
+    // `meta/_journal.json` (or its tag mismatched) the migrator would skip it and these would exist.
+    expect(await legacyTables()).toHaveLength(0);
+  });
+
+  it("migration 0101 drops the three legacy tables and leaves ai_task_settings alone", async () => {
+    const file = readFileSync(
+      new URL("../../../../packages/db/drizzle/0101_furry_polaris.sql", import.meta.url),
+      "utf8",
+    );
+    const statements = file
+      .split("--> statement-breakpoint")
+      .map((p) => p.replace(/^\s*--.*$/gm, "").trim())
+      .filter(Boolean);
+    expect(statements).toHaveLength(3);
+    expect(statements.every((st) => st.startsWith("DROP TABLE"))).toBe(true);
+
+    const db = getDb();
+    await db.insert(aiTaskSettings).values({ task: "chat", provider: "claude", model: "m" });
+    // Recreate the three tables as an upgrading database has them, then run the statements.
+    await db.execute(sql`CREATE TABLE vision_provider_settings (provider text)`);
+    await db.execute(sql`CREATE TABLE chat_provider_settings (provider text)`);
+    await db.execute(sql`CREATE TABLE chat_settings (id integer)`);
+    try {
+      expect(await legacyTables()).toHaveLength(3);
+      for (const st of statements) await db.execute(sql.raw(st));
+      expect(await legacyTables()).toHaveLength(0);
+    } finally {
+      // Never leave the recreated tables behind: against a persistent database the next run
+      // (and the "gone from a migrated database" test) would otherwise fail on order alone.
+      await db.execute(sql`DROP TABLE IF EXISTS vision_provider_settings`);
+      await db.execute(sql`DROP TABLE IF EXISTS chat_provider_settings`);
+      await db.execute(sql`DROP TABLE IF EXISTS chat_settings`);
+    }
+    expect(await db.select().from(aiTaskSettings)).toMatchObject([
+      { task: "chat", provider: "claude", model: "m" },
+    ]);
   });
 });
