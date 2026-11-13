@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { z } from "zod";
 import type { AiTool } from "@portfolio/ai-tools";
-import { AnthropicChatProvider } from "../../../src/services/chat/anthropic.js";
+import {
+  AnthropicChatProvider,
+  supportsProgressUpdates,
+} from "../../../src/services/chat/anthropic.js";
 import { OpenAICompatChatProvider } from "../../../src/services/chat/openai-compat.js";
 import { idleGuard, readSseFrames } from "../../../src/services/chat/sse.js";
 import { runChat, type ChatEvent } from "../../../src/services/chat/loop.js";
@@ -377,6 +380,100 @@ describe("OpenAICompatChatProvider.stream", () => {
   });
 });
 
+describe("AnthropicChatProvider progress notes", () => {
+  const seen: { body: Record<string, unknown>; headers: Record<string, string> }[] = [];
+  const provider = (chunks: string[], opts: { model?: string; baseUrl?: string } = {}) =>
+    new AnthropicChatProvider("k", {
+      ...opts,
+      fetch: (async (_u: string, init: RequestInit) => {
+        seen.push({
+          body: JSON.parse(String(init.body)),
+          headers: init.headers as Record<string, string>,
+        });
+        return streamRes(chunks);
+      }) as unknown as typeof fetch,
+    });
+  const thinkingBlock = (index: number, text: string) => [
+    sse("content_block_start", {
+      type: "content_block_start",
+      index,
+      content_block: { type: "thinking", thinking: "" },
+    }),
+    sse("content_block_delta", {
+      type: "content_block_delta",
+      index,
+      delta: { type: "thinking_delta", thinking: text },
+    }),
+    sse("content_block_delta", {
+      type: "content_block_delta",
+      index,
+      delta: { type: "signature_delta", signature: "sig-1" },
+    }),
+    sse("content_block_stop", { type: "content_block_stop", index }),
+  ];
+  const finish = [
+    sse("message_start", { type: "message_start", message: { model: "m", usage: {} } }),
+    sse("message_delta", { type: "message_delta", delta: { stop_reason: "end_turn" }, usage: {} }),
+  ];
+
+  it("knows which models can return progress notes", () => {
+    for (const m of ["claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-mythos-5"])
+      expect(supportsProgressUpdates(m)).toBe(true);
+    for (const m of ["claude-opus-4-8", "claude-opus-5", "claude-haiku-4-5", "my-own-model", ""])
+      expect(supportsProgressUpdates(m)).toBe(false);
+  });
+
+  it("asks for progress notes on a supported model and reports each whole note", async () => {
+    const notes: string[] = [];
+    const p = provider([finish[0]!, ...thinkingBlock(0, "Looking up your holdings."), finish[1]!]);
+    const out = await p.stream(
+      REQ,
+      () => {},
+      undefined,
+      (n) => notes.push(n),
+    );
+    const { body, headers } = seen.at(-1)!;
+    expect(body.thinking).toEqual({ type: "adaptive", display: "updates" });
+    expect(headers["anthropic-beta"]).toBe(
+      "server-side-fallback-2026-07-01,thinking-display-updates-2026-08-18",
+    );
+    expect(notes).toEqual(["Looking up your holdings."]);
+    // The block is still replayed verbatim with the rest of the turn.
+    expect((out.providerState as { content: unknown[] }).content[0]).toEqual({
+      type: "thinking",
+      thinking: "Looking up your holdings.",
+      signature: "sig-1",
+    });
+  });
+
+  it("skips empty notes and the cut-off marker", async () => {
+    const notes: string[] = [];
+    const p = provider([
+      finish[0]!,
+      ...thinkingBlock(0, "   "),
+      ...thinkingBlock(1, "This part of the response was interrupted before it finished."),
+      finish[1]!,
+    ]);
+    await p.stream(
+      REQ,
+      () => {},
+      undefined,
+      (n) => notes.push(n),
+    );
+    expect(notes).toEqual([]);
+  });
+
+  it("sends no thinking parameter for an unknown model or a non-default base URL", async () => {
+    await provider([...finish], { model: "claude-opus-4-8" }).stream(REQ, () => {});
+    expect(seen.at(-1)!.body).not.toHaveProperty("thinking");
+    expect(seen.at(-1)!.headers["anthropic-beta"]).toBe("server-side-fallback-2026-07-01");
+
+    await provider([...finish], { baseUrl: "https://proxy.example" }).stream(REQ, () => {});
+    expect(seen.at(-1)!.body).not.toHaveProperty("thinking");
+    expect(seen.at(-1)!.headers).not.toHaveProperty("anthropic-beta");
+  });
+});
+
 describe("runChat with a streaming provider", () => {
   const echo: AiTool = {
     name: "echo",
@@ -440,6 +537,26 @@ describe("runChat with a streaming provider", () => {
       "message",
       "done",
     ]);
+  });
+
+  it("emits progress notes live, ahead of the text they precede", async () => {
+    const provider: ChatProvider = {
+      name: "fake",
+      label: "Fake",
+      local: false,
+      isConfigured: () => true,
+      complete: async () => {
+        throw new Error("complete must not be used when stream exists");
+      },
+      async stream(_req, onDelta, _log, onThinking) {
+        onThinking?.("Checking your holdings.");
+        onDelta("Done.");
+        return { text: "Done.", toolCalls: [], stop: "end" };
+      },
+    };
+    const events = await run(provider);
+    expect(events.map((e) => e.type)).toEqual(["thinking", "delta", "message", "done"]);
+    expect(events[0]).toEqual({ type: "thinking", text: "Checking your holdings." });
   });
 
   it("never runs tools from a turn cut off by max_tokens", async () => {

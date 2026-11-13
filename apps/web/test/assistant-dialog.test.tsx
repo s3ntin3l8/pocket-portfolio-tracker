@@ -160,6 +160,48 @@ describe("the chat panel", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: "Stop" })).toBeNull());
   });
 
+  it("shows the model's progress note as plain text while it works, then the answer", async () => {
+    const s = controllable();
+    streams.push(s);
+    render(<Shell />);
+    await openPanel();
+    type("What changed?");
+    await waitFor(() => expect(calls).toHaveLength(1));
+
+    s.push({ type: "thinking", text: "Checking **last year's** figures." });
+    // Model output is untrusted: shown as text, never rendered as Markdown.
+    expect(await screen.findByText("Checking **last year's** figures.")).toBeInTheDocument();
+    expect(screen.queryByText("Thinking…")).toBeNull();
+
+    s.push({ type: "delta", text: "Not much." });
+    expect(await screen.findByText("Not much.")).toBeInTheDocument();
+    expect(screen.queryByText("Checking **last year's** figures.")).toBeNull();
+    s.push("end");
+  });
+
+  it("still shows a progress note in a later tool round after earlier text", async () => {
+    const s = controllable();
+    streams.push(s);
+    render(<Shell />);
+    await openPanel();
+    type("Compare");
+    await waitFor(() => expect(calls).toHaveLength(1));
+
+    s.push({ type: "message", text: "First I'll check." });
+    s.push({ type: "thinking", text: "Now comparing the two years." });
+    expect(await screen.findByText("First I'll check.")).toBeInTheDocument();
+    expect(await screen.findByText("Now comparing the two years.")).toBeInTheDocument();
+    s.push("end");
+  });
+
+  it("puts the close button in the header row with the other controls", async () => {
+    render(<Shell />);
+    const dialog = await openPanel();
+    const close = within(dialog).getByRole("button", { name: "Close" });
+    expect(close).not.toHaveClass("absolute");
+    expect(close.closest("div")?.className).toContain("flex");
+  });
+
   it("sends the earlier conversation as text on the next question", async () => {
     const first = controllable();
     const second = controllable();

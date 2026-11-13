@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { Check, CircleAlert, History, RotateCcw, Send, Square, Trash2 } from "lucide-react";
+import { Check, CircleAlert, History, RotateCcw, Send, Square, Trash2, X } from "lucide-react";
 import type { AssistantConversationSummary, AssistantStatus } from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import {
+  DialogClose,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -69,7 +70,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
     );
   }
   const text = displayText(turn);
-  const waiting = turn.pending && !text && turn.steps.length === 0;
+  const waiting = turn.pending && !text && turn.steps.length === 0 && !turn.progress;
   const stoppedEmpty = turn.stopped && !text && !turn.error;
   return (
     <div className="flex justify-start">
@@ -89,6 +90,13 @@ function Turn({ turn }: { turn: ChatTurn }) {
         )}
         {stoppedEmpty && <p className="text-xs text-text-2">{t("stopped")}</p>}
         {text && <AssistantMarkdown text={text} />}
+        {turn.pending && turn.progress && !turn.streaming && (
+          // Model output: plain text only, never Markdown.
+          <p className="flex items-start gap-2 text-text-2">
+            <Spinner className="mt-0.5 size-3.5 shrink-0" />
+            <span className="line-clamp-3 break-words">{turn.progress}</span>
+          </p>
+        )}
         {turn.error && (
           <p role="alert" className="text-xs font-semibold text-destructive">
             {t.has(`errors.${turn.error}`) ? t(`errors.${turn.error}`) : t("errors.generic")}
@@ -102,17 +110,25 @@ function Turn({ turn }: { turn: ChatTurn }) {
 /** Saved conversations (opted-in users): reopen one, or delete it. */
 function HistoryPanel({
   history,
+  enabled,
+  onEnable,
   onOpened,
 }: {
   history: NonNullable<AssistantChatApi["history"]>;
+  /** Saving is on; when it is off the panel offers to turn it on instead of listing. */
+  enabled: boolean;
+  onEnable?: () => Promise<boolean>;
   onOpened: () => void;
 }) {
   const t = useTranslations("Assistant");
   const locale = useLocale();
   const [items, setItems] = useState<AssistantConversationSummary[] | null>(null);
   const [error, setError] = useState<"load" | "open" | "delete" | null>(null);
+  const [enabling, setEnabling] = useState(false);
+  const [enableFailed, setEnableFailed] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     history
       .list()
@@ -121,8 +137,39 @@ function HistoryPanel({
     return () => {
       alive = false;
     };
-  }, [history]);
+  }, [history, enabled]);
 
+  if (!enabled) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-text-2">{t("historyOff")}</p>
+        {onEnable && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={enabling}
+            onClick={async () => {
+              setEnabling(true);
+              setEnableFailed(false);
+              const ok = await onEnable();
+              setEnabling(false);
+              if (!ok) setEnableFailed(true);
+            }}
+          >
+            {enabling && <Spinner className="size-3.5" />}
+            {t("historyEnable")}
+          </Button>
+        )}
+        {enableFailed && (
+          <p role="alert" className="text-xs font-semibold text-destructive">
+            {t("historyEnableError")}
+          </p>
+        )}
+        <p className="text-micro text-text-2">{t("historyNote")}</p>
+      </div>
+    );
+  }
   if (error === "load") return <p className="text-sm text-destructive">{t("historyLoadError")}</p>;
   if (!items) {
     return (
@@ -190,16 +237,30 @@ export function AssistantDialog({
   onOpenChange,
   chat,
   status,
+  enableHistory,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   chat: AssistantChatApi;
   status: AssistantStatus | null;
+  /** Turn on saving conversations (the opt-in preference); resolves false on failure. */
+  enableHistory?: () => Promise<boolean>;
 }) {
   const t = useTranslations("Assistant");
+  const tA = useTranslations("A11y");
   const [draft, setDraft] = useState("");
   const [showHistory, setShowHistory] = useState(false);
-  const canShowHistory = Boolean(status?.saveHistory && chat.history);
+  const [savingEnabled, setSavingEnabled] = useState(false);
+  // The History button is always offered; with saving off it explains and offers the opt-in.
+  const canShowHistory = Boolean(chat.history);
+  const historyOn = Boolean(status?.saveHistory) || savingEnabled;
+  const onEnableHistory = enableHistory
+    ? async () => {
+        const ok = await enableHistory();
+        if (ok) setSavingEnabled(true);
+        return ok;
+      }
+    : undefined;
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -270,6 +331,9 @@ export function AssistantDialog({
       <DialogContent
         size="md"
         mobileHeader={{ title: t("title") }}
+        // The built-in × is absolutely positioned and sits off the header buttons' centre line;
+        // this header draws its own, in the same row.
+        hideClose
         footer={composer}
         onOpenAutoFocus={(e) => {
           // Desktop: start typing right away. On touch layouts leave focus alone — focusing
@@ -311,6 +375,18 @@ export function AssistantDialog({
                   {t("newChat")}
                 </Button>
               )}
+              {/* Mobile closes with the full-screen header's back arrow. */}
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 max-md:hidden"
+                  aria-label={tA("close")}
+                >
+                  <X />
+                </Button>
+              </DialogClose>
             </div>
           </div>
           <DialogDescription>{disclosure}</DialogDescription>
@@ -322,7 +398,12 @@ export function AssistantDialog({
           className="space-y-3 px-4 py-4 md:px-6"
         >
           {showHistory && chat.history ? (
-            <HistoryPanel history={chat.history} onOpened={() => setShowHistory(false)} />
+            <HistoryPanel
+              history={chat.history}
+              enabled={historyOn}
+              onEnable={onEnableHistory}
+              onOpened={() => setShowHistory(false)}
+            />
           ) : chat.turns.length === 0 ? (
             <div className="space-y-3">
               <p className="text-sm text-text-2">{t("emptyHint")}</p>

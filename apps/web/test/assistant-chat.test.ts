@@ -149,3 +149,24 @@ describe("streaming deltas", () => {
     expect(settleTurn(settled)).toBe(settled);
   });
 });
+
+describe("progress notes", () => {
+  const base: ChatTurn = { id: "a", role: "assistant", content: "", steps: [], pending: true };
+
+  it("keeps the latest note until the answer text starts, then drops it", () => {
+    let t = applyEvent(base, { type: "thinking", text: "Looking up your holdings." });
+    t = applyEvent(t, { type: "thinking", text: "Comparing with last year." });
+    expect(t.progress).toBe("Comparing with last year.");
+    expect(displayText(t)).toBe(""); // a note is never part of the answer
+    t = applyEvent(t, { type: "delta", text: "You" });
+    expect(t.progress).toBeUndefined();
+  });
+
+  it("drops the note when a message ends the turn", () => {
+    const t = applyEvent(applyEvent(base, { type: "thinking", text: "Working." }), {
+      type: "message",
+      text: "Done.",
+    });
+    expect(t.progress).toBeUndefined();
+  });
+});

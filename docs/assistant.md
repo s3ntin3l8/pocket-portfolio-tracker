@@ -33,11 +33,19 @@ looking at so it can pass that id to tools instead of listing portfolios first. 
 | `status`       | `{ provider, local }`                                                                                                                                                               |
 | `tool_call`    | `{ id, name, input }`                                                                                                                                                               |
 | `tool_result`  | `{ id, name, ok }`                                                                                                                                                                  |
+| `thinking`     | `{ text }` — a short progress note the model wrote about what it is doing (Claude only, see below); shown while waiting, never part of the answer                                   |
 | `delta`        | `{ text }` — a text fragment of the turn being generated                                                                                                                            |
 | `message`      | `{ text }` — the turn's complete text; ends the turn                                                                                                                                |
 | `conversation` | `{ id, saved }` — history on only: the stored conversation this turn was added to (sent just before `done`); `saved: false` = the conversation is full and this turn was not stored |
 | `error`        | `{ error, status? }` — a short code, never an upstream body                                                                                                                         |
 | `done`         | `{ rounds }`                                                                                                                                                                        |
+
+**Progress notes.** Claude Opus 5.5, Sonnet 5.5 and the Fable/Mythos 5.x models always think, and by default return
+that thinking (and the short notes they write between tool calls) empty, so a long tool turn is silent until the
+answer streams. For those models, on the first-party API, the adapter sends `thinking: {type: "adaptive", display:
+"updates"}` with the `thinking-display-updates-2026-08-18` beta; each non-empty note is forwarded whole as a `thinking`
+event. Reasoning itself stays hidden. Other model ids (older or typed in the admin) get no `thinking` parameter. If
+progress arrives late only through the public URL, a reverse proxy in front is buffering the stream (see below).
 
 `delta` events are a live preview: the following `message` carries the same turn's full text and replaces them. A
 turn cut off by `max_tokens` or a refusal still sends its `message` and then an `error`; its tool calls never run (a

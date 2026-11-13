@@ -137,11 +137,38 @@ describe("assistant history in the panel", () => {
     expect(screen.queryByText(A.historyFull)).toBeNull();
   });
 
-  it("offers History only to users who opted in", async () => {
+  it("offers History even when saving is off, and explains it instead of listing", async () => {
     status = { ...status, saveHistory: false };
     render(<Shell />);
     await openPanel();
-    expect(screen.queryByRole("button", { name: A.history })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: A.history }));
+    expect(await screen.findByText(A.historyOff)).toBeInTheDocument();
+    expect(client.listAssistantConversations).not.toHaveBeenCalled();
+  });
+
+  it("turns saving on from the History panel, then lists the saved conversations", async () => {
+    status = { ...status, saveHistory: false };
+    client.putPreferences.mockClear();
+    render(<Shell />);
+    await openPanel();
+    fireEvent.click(screen.getByRole("button", { name: A.history }));
+    fireEvent.click(await screen.findByRole("button", { name: A.historyEnable }));
+    await waitFor(() =>
+      expect(client.putPreferences).toHaveBeenCalledWith({ assistantSaveHistory: true }),
+    );
+    expect(
+      await screen.findByRole("button", { name: "Open: How am I doing?" }),
+    ).toBeInTheDocument();
+  });
+
+  it("says so when saving could not be turned on", async () => {
+    status = { ...status, saveHistory: false };
+    client.putPreferences.mockRejectedValueOnce(new Error("boom"));
+    render(<Shell />);
+    await openPanel();
+    fireEvent.click(screen.getByRole("button", { name: A.history }));
+    fireEvent.click(await screen.findByRole("button", { name: A.historyEnable }));
+    expect(await screen.findByText(A.historyEnableError)).toBeInTheDocument();
   });
 
   it("lists saved conversations, reopens one and continues it", async () => {

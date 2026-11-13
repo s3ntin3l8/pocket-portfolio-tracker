@@ -68,12 +68,15 @@ describe("AnthropicChatProvider", () => {
     expect(c.url).toBe("https://api.anthropic.com/v1/messages");
     expect(c.headers["x-api-key"]).toBe("sk-test");
     expect(c.headers["anthropic-version"]).toBe("2023-06-01");
-    expect(c.headers["anthropic-beta"]).toBe("server-side-fallback-2026-07-01");
+    expect(c.headers["anthropic-beta"]).toBe(
+      "server-side-fallback-2026-07-01,thinking-display-updates-2026-08-18",
+    );
     expect(c.body).toMatchObject({
       model: "claude-opus-5-5",
       max_tokens: 123,
       system: "SYS",
       fallbacks: "default",
+      thinking: { type: "adaptive", display: "updates" },
     });
     expect(c.body.output_config).toBeUndefined();
     expect(c.body.tools[0]).toMatchObject({
