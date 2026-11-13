@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { getToken } from "next-auth/jwt";
+import { UNRECOVERABLE_SESSION_ERRORS } from "@/lib/session-errors";
 
 /**
  * Auth.js v5 cookie-security derivation mirrors AUTH_URL's own scheme (matches
@@ -32,13 +33,16 @@ function secureCookie(): boolean {
 export interface SessionState {
   isAuthenticated: boolean;
   isExpired: boolean;
+  /** The session carries an unrecoverable refresh error (auth.ts sets `token.error`): the
+   *  cookie still decodes, but the access token is dead and only a fresh sign-in helps. */
+  isUnrecoverable: boolean;
   token: string | null;
 }
 
 export const getSessionState = cache(async (cookieHeader: string): Promise<SessionState> => {
   const secret = process.env.AUTH_SECRET;
   if (!secret) {
-    return { isAuthenticated: false, isExpired: false, token: null };
+    return { isAuthenticated: false, isExpired: false, isUnrecoverable: false, token: null };
   }
   const token = await getToken({
     req: { headers: new Headers({ cookie: cookieHeader }) },
@@ -47,7 +51,7 @@ export const getSessionState = cache(async (cookieHeader: string): Promise<Sessi
   });
 
   if (!token || typeof token.accessToken !== "string") {
-    return { isAuthenticated: false, isExpired: false, token: null };
+    return { isAuthenticated: false, isExpired: false, isUnrecoverable: false, token: null };
   }
 
   const expiresAt = token.expiresAt as number | undefined;
@@ -56,6 +60,8 @@ export const getSessionState = cache(async (cookieHeader: string): Promise<Sessi
   return {
     isAuthenticated: true,
     isExpired,
+    isUnrecoverable:
+      typeof token.error === "string" && UNRECOVERABLE_SESSION_ERRORS.has(token.error),
     token: token.accessToken,
   };
 });

@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { Landing } from "@/components/landing";
 import { isDevAuthBypass } from "@/lib/dev-auth";
+import { getSessionState } from "@/lib/session-token";
 
 // Locale-based default when no returning-user cookie is set yet — id visitors see the
 // domestic figure, everyone else a Euro one (the primary user's home currency).
@@ -15,6 +17,11 @@ const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);
 // apps/web/src/app/api/backend/[...path]/route.ts) — when DEV_AUTH_TOKEN is active, the
 // sign-in forms below are dead ends (Authentik/local auth may not be configured at all).
 const devBypass = isDevAuthBypass();
+// Same predicate as the (app) layout's `authConfigured`: only redirect into an app that
+// actually gates on the session.
+const authConfigured = Boolean(
+  process.env.AUTH_SECRET && (process.env.AUTHENTIK_ISSUER || process.env.AUTH_LOCAL_SECRET),
+);
 
 /**
  * Whether the self-host first-run flow (POST /auth/local/setup) should still be
@@ -42,6 +49,23 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   setRequestLocale(locale);
 
   const cookieStore = await cookies();
+
+  // A visitor who already holds a session (PWA start_url and bookmarks both point at "/")
+  // goes straight into the app instead of being shown the sign-in page again. An expired
+  // access token still redirects (rotation happens on the client's /api/auth/session poll). A session whose refresh
+  // already failed does NOT: SessionErrorGuard pushes those back to "/", so redirecting
+  // them would loop and lock local-auth users out of the sign-in form.
+  if (!devBypass && authConfigured) {
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; ");
+    const state = await getSessionState(cookieHeader);
+    if (state.isAuthenticated && !state.isUnrecoverable) {
+      redirect(`/${locale}/holdings`);
+    }
+  }
+
   const cookieCurrency = cookieStore.get("display_currency")?.value;
   const currency =
     cookieCurrency && SUPPORTED_DEMO_CURRENCIES.includes(cookieCurrency)

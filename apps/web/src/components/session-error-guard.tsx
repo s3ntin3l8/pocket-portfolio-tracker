@@ -3,9 +3,7 @@
 import { useEffect } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useRouter } from "@/i18n/navigation";
-
-/** Session errors that mean the access token is dead and cannot be silently rotated. */
-const UNRECOVERABLE = new Set(["RefreshAccessTokenError", "RefreshTokenMissing"]);
+import { UNRECOVERABLE_SESSION_ERRORS } from "@/lib/session-errors";
 
 /**
  * Watches the session for an unrecoverable auth error — the refresh failed, or no
@@ -31,7 +29,7 @@ export function SessionErrorGuard({
   const router = useRouter();
 
   useEffect(() => {
-    if (!error || !UNRECOVERABLE.has(error)) return;
+    if (!error || !UNRECOVERABLE_SESSION_ERRORS.has(error)) return;
     if (authentikAvailable) {
       void signIn("authentik");
     } else {
