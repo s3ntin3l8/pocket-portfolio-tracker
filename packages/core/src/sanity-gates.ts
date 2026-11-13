@@ -60,3 +60,13 @@ export const MAX_PRICE_CARRY_FORWARD_DAYS = 10;
 export const FX_MAX_CARRY_FORWARD_DAYS = 14;
 export const DEAD_FEED_MISS_THRESHOLD = 7;
 export const XIRR_MAX_RATE = 50;
+
+/**
+ * Amount band for matching an announced dividend to a projected cadence payment
+ * (`blendAnnouncedDividends`): an announced per-share amount within
+ * `[1/RATIO, RATIO]` of the projected per-share is the regular payment and replaces
+ * its slot; anything outside is a special (or a tiny stub) and is added on top.
+ * Wide enough for a normal raise or cut, an interim/final split measured against a
+ * 12-month average, and net-vs-gross withholding.
+ */
+export const SPECIAL_DIVIDEND_RATIO = 3;

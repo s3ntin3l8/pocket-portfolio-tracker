@@ -2,6 +2,7 @@ import { Decimal } from "decimal.js";
 import { toDateKey, toMonthKey } from "./date-utils.js";
 import { inferIntervalMonths, computeGrowthFactor, addUTCMonths, monthsBetween } from "./growth.js";
 import type { IncomeEntry } from "./income.js";
+import { SPECIAL_DIVIDEND_RATIO } from "./sanity-gates.js";
 
 /** A dividend payment projected from last year's actual payout, in instrument currency. */
 export interface ProjectedDividend {
@@ -385,19 +386,36 @@ const DAY_MS = 86_400_000;
  * (`floor(interval * 30 / 2)` days: monthly 15, quarterly 45, semiannual 90, annual 180) —
  * so an announced slot is never counted twice, while uncovered cadence payments stay
  * (a quarterly payer with one announced row keeps its other three). An announced row with
- * nothing in range (a special dividend) consumes nothing. Matching is by date only, not
- * amount.
+ * nothing in range (a special dividend) consumes nothing.
+ *
+ * Amount band: when both sides carry a per-share amount in the same currency, an announced
+ * row only consumes a slot whose projected per-share it is within `[1/R, R]` of
+ * (`SPECIAL_DIVIDEND_RATIO`, 3x). A special dividend near a regular slot therefore consumes
+ * nothing and is added on top of the cadence by the caller. Without comparable amounts
+ * (missing per-share, different currencies, a non-positive amount) matching is by date
+ * only. Trade-off: a regular payment that moves by more than 3x is treated as a special,
+ * and a special within 3x of the regular amount still replaces its slot.
  *
  * `announced[].date` is the announced payment date (`payDate ?? exDate`), `YYYY-MM-DD`.
  * Returns the surviving projected objects unchanged.
  */
-export function blendAnnouncedDividends<P extends { instrumentId: string; date: string }>(
+export function blendAnnouncedDividends<
+  P extends { instrumentId: string; date: string; perShare?: string; currency?: string },
+>(
   projected: P[],
-  announced: { instrumentId: string; date: string }[],
+  announced: { instrumentId: string; date: string; perShare?: string; currency?: string }[],
   intervalMonths: (instrumentId: string) => number,
 ): P[] {
   const consumed = new Set<P>();
   const dayOf = (s: string) => new Date(`${s}T00:00:00.000Z`).getTime() / DAY_MS;
+  const comparable = (a: (typeof announced)[number], p: P): boolean => {
+    if (!a.perShare || !p.perShare || !a.currency || !p.currency || a.currency !== p.currency)
+      return true;
+    const ap = new Decimal(a.perShare);
+    const pp = new Decimal(p.perShare);
+    if (pp.lte(0) || ap.lte(0)) return true;
+    return ap.lte(pp.mul(SPECIAL_DIVIDEND_RATIO)) && ap.mul(SPECIAL_DIVIDEND_RATIO).gte(pp);
+  };
   const sortedAnnounced = [...announced].sort((a, b) => a.date.localeCompare(b.date));
   for (const a of sortedAnnounced) {
     const toleranceDays = Math.floor((intervalMonths(a.instrumentId) * 30) / 2);
@@ -405,7 +423,7 @@ export function blendAnnouncedDividends<P extends { instrumentId: string; date: 
     let best: P | undefined;
     let bestGap = Infinity;
     for (const p of projected) {
-      if (p.instrumentId !== a.instrumentId || consumed.has(p)) continue;
+      if (p.instrumentId !== a.instrumentId || consumed.has(p) || !comparable(a, p)) continue;
       const gap = Math.abs(dayOf(p.date) - aDay);
       if (gap <= toleranceDays && gap < bestGap) {
         best = p;

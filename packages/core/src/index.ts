@@ -141,6 +141,7 @@ export {
   FX_MAX_CARRY_FORWARD_DAYS,
   DEAD_FEED_MISS_THRESHOLD,
   XIRR_MAX_RATE,
+  SPECIAL_DIVIDEND_RATIO,
 } from "./sanity-gates.js";
 export {
   computeTrades,

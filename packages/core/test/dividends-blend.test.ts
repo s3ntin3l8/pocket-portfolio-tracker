@@ -1,7 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { blendAnnouncedDividends, dividendIntervalMonths, type IncomeEntry } from "../src/index.js";
 
-const proj = (instrumentId: string, date: string) => ({ instrumentId, date });
+const proj = (instrumentId: string, date: string, perShare?: string, currency?: string) => ({
+  instrumentId,
+  date,
+  perShare,
+  currency,
+});
 const quarterly = () => 3;
 // Quarterly cadence: tolerance is floor(3 * 30 / 2) = 45 days.
 const Q = ["2027-01-12", "2027-04-12", "2027-07-12", "2027-10-12"].map((x) => proj("A", x));
@@ -64,6 +69,65 @@ describe("blendAnnouncedDividends", () => {
     const out = blendAnnouncedDividends(Q, [], quarterly);
     expect(out).toEqual(Q);
     expect(out[0]).toBe(Q[0]);
+  });
+});
+
+describe("blendAnnouncedDividends amount band", () => {
+  // Quarterly payer at 1.00/share USD.
+  const QA = ["2027-01-12", "2027-04-12", "2027-07-12", "2027-10-12"].map((x) =>
+    proj("A", x, "1", "USD"),
+  );
+  const ann = (date: string, perShare?: string, currency: string | undefined = "USD") => ({
+    instrumentId: "A",
+    date,
+    perShare,
+    currency,
+  });
+
+  it("keeps the regular payment when the announced row is a special", () => {
+    expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "5")], quarterly)).toHaveLength(4);
+  });
+
+  it("keeps the regular payment when the announced row is a tiny stub", () => {
+    expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "0.1")], quarterly)).toHaveLength(4);
+  });
+
+  it("still replaces the slot on a modest raise or cut", () => {
+    for (const ps of ["1.2", "0.8", "1.5"]) {
+      const out = blendAnnouncedDividends(QA, [ann("2027-01-20", ps)], quarterly);
+      expect(out.map((p) => p.date)).toEqual(["2027-04-12", "2027-07-12", "2027-10-12"]);
+    }
+  });
+
+  it("includes exactly 3x and 1/3x and excludes just outside", () => {
+    expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "3")], quarterly)).toHaveLength(3);
+    expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "0.33")], quarterly)).toHaveLength(4);
+    const p3 = ["2027-01-12"].map((x) => proj("A", x, "3", "USD"));
+    expect(blendAnnouncedDividends(p3, [ann("2027-01-20", "1")], quarterly)).toHaveLength(0);
+    expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "3.01")], quarterly)).toHaveLength(4);
+  });
+
+  it("lets the regular row take the slot and the special consume nothing, in either order", () => {
+    for (const [regular, special] of [
+      ["2027-01-10", "2027-01-25"],
+      ["2027-01-25", "2027-01-10"],
+    ]) {
+      const out = blendAnnouncedDividends(QA, [ann(regular, "1.1"), ann(special, "6")], quarterly);
+      expect(out.map((p) => p.date)).toEqual(["2027-04-12", "2027-07-12", "2027-10-12"]);
+    }
+  });
+
+  it("falls back to date-only without comparable amounts", () => {
+    const cases = [
+      ann("2027-01-20", undefined),
+      ann("2027-01-20", "50", "EUR"),
+      { instrumentId: "A", date: "2027-01-20", perShare: "50" },
+    ];
+    for (const a of cases) {
+      expect(blendAnnouncedDividends(QA, [a], quarterly)).toHaveLength(3);
+    }
+    const zero = ["2027-01-12"].map((x) => proj("A", x, "0", "USD"));
+    expect(blendAnnouncedDividends(zero, [ann("2027-01-20", "50")], quarterly)).toHaveLength(0);
   });
 });
 

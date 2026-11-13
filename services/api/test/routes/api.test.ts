@@ -2865,6 +2865,93 @@ describe("auth + portfolios + transactions", () => {
     },
   );
 
+  it("keeps the regular projected payment when a special dividend is announced near its slot", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-11-15T00:00:00Z") });
+    const { dividendEvents, fxRates } = await import("@portfolio/db");
+    const t = await token("quarterly-special-user");
+    const portfolioId = (
+      await app.inject({
+        method: "POST",
+        url: "/portfolios",
+        headers: auth(t),
+        payload: { name: "Quarterly Special", baseCurrency: "USD" },
+      })
+    ).json().id;
+    const [ins] = await app.db
+      .insert(instruments)
+      .values({
+        symbol: "QSPECIAL",
+        market: "NASDAQ",
+        assetClass: "equity",
+        currency: "USD",
+        name: "Quarterly Special",
+      })
+      .returning();
+    await app.db
+      .insert(fxRates)
+      .values({ base: "USD", quote: "USD", rate: "1", date: "2026-11-15" })
+      .onConflictDoNothing();
+    await app.inject({
+      method: "POST",
+      url: `/portfolios/${portfolioId}/transactions`,
+      headers: auth(t),
+      payload: {
+        type: "buy",
+        instrumentId: ins.id,
+        quantity: "10",
+        price: "100",
+        currency: "USD",
+        executedAt: "2025-01-02T00:00:00.000Z",
+      },
+    });
+    // 1.00/share quarterly history projects Jan/Apr/Jul/Oct 2027 at 10.00 each.
+    for (const date of ["2026-01-12", "2026-04-12", "2026-07-12", "2026-10-12"]) {
+      await app.inject({
+        method: "POST",
+        url: `/portfolios/${portfolioId}/transactions`,
+        headers: auth(t),
+        payload: {
+          type: "dividend",
+          instrumentId: ins.id,
+          quantity: "0",
+          price: "10",
+          currency: "USD",
+          executedAt: `${date}T00:00:00.000Z`,
+        },
+      });
+    }
+    // A 5.00/share special (5x the regular amount) next to the January slot.
+    await app.db.insert(dividendEvents).values({
+      instrumentId: ins.id,
+      exDate: "2027-01-14",
+      payDate: null,
+      amountPerShare: "5.00",
+      currency: "USD",
+      status: "announced",
+      source: "test",
+      fetchedAt: new Date(),
+    });
+
+    const body = (
+      await app.inject({
+        method: "GET",
+        url: `/portfolios/${portfolioId}/income`,
+        headers: auth(t),
+      })
+    ).json();
+
+    const projected = body.upcoming.filter(
+      (u: { kind: string; instrumentId: string; date: string; status: string }) =>
+        u.kind === "dividend" &&
+        u.instrumentId === ins.id &&
+        u.date.startsWith("2027") &&
+        u.status !== "announced",
+    );
+    // The special consumes no slot: all four regular payments remain, plus the 5.00 x 10.
+    expect(projected).toHaveLength(4);
+    expect(Number(body.forecastNextYear)).toBeCloseTo(40 + 50, 1);
+  });
+
   it("includes quarterly dividends in forecastRestOfYear when dividend_events has future announced rows", async () => {
     // Pin "today": the announced rows below sit 1 and 2 months ahead, and from November on the
     // second one lands in next year, which changes which rows count as rest-of-year.
@@ -2917,10 +3004,10 @@ describe("auth + portfolios + transactions", () => {
 
     // Quarterly dividends: Mar/Jun 2025 (outside source window), Sep/Dec 2025 (inside)
     for (const [date, amt] of [
-      ["2025-03-12", "0.75"],
-      ["2025-06-12", "0.75"],
-      ["2025-09-12", "0.80"],
-      ["2025-12-12", "0.80"],
+      ["2025-03-12", "7.50"],
+      ["2025-06-12", "7.50"],
+      ["2025-09-12", "8.00"],
+      ["2025-12-12", "8.00"],
     ]) {
       await app.inject({
         method: "POST",
