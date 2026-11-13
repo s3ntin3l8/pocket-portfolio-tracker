@@ -1,7 +1,9 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { setRequestLocale } from "next-intl/server";
 import { Landing } from "@/components/landing";
 import { isDevAuthBypass } from "@/lib/dev-auth";
+import { getSessionState } from "@/lib/session-token";
 
 // Locale-based default when no returning-user cookie is set yet — id visitors see the
 // domestic figure, everyone else a Euro one (the primary user's home currency).
@@ -42,6 +44,21 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   setRequestLocale(locale);
 
   const cookieStore = await cookies();
+
+  // A visitor who already holds a session (PWA start_url and bookmarks both point at "/")
+  // goes straight into the app instead of being shown the sign-in page again. An expired
+  // access token still redirects: the (app) layout's SessionErrorGuard rotates it, and
+  // falls back to a fresh sign-in only if the refresh really fails.
+  if (!devBypass && process.env.AUTH_SECRET) {
+    const cookieHeader = cookieStore
+      .getAll()
+      .map((c) => `${c.name}=${c.value}`)
+      .join("; ");
+    if ((await getSessionState(cookieHeader)).isAuthenticated) {
+      redirect(`/${locale}/holdings`);
+    }
+  }
+
   const cookieCurrency = cookieStore.get("display_currency")?.value;
   const currency =
     cookieCurrency && SUPPORTED_DEMO_CURRENCIES.includes(cookieCurrency)
