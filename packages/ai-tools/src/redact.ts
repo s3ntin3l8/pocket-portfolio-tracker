@@ -5,6 +5,7 @@
  */
 const SENSITIVE_KEYS = new Set([
   "accountNumber",
+  "contractNo", // financing contract number
   "iban",
   "userId",
   "birthYear",

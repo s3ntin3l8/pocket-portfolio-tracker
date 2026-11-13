@@ -2875,7 +2875,15 @@
       "explain_tax_concept": "Tax concept",
       "get_fsa_allocation": "FSA allocation",
       "resolve_instrument": "Instrument resolution",
-      "explain_import_duplicates": "Duplicate check"
+      "explain_import_duplicates": "Duplicate check",
+      "get_trades": "Trades and realized P&L",
+      "get_instrument": "Instrument and prices",
+      "get_loans": "Loans",
+      "get_savings_plans": "Savings plans",
+      "list_imports": "Imports",
+      "get_anomalies": "Data warnings",
+      "check_integrity": "Integrity check",
+      "propose_transactions": "Draft transactions"
     },
     "errors": {
       "generic": "Something went wrong. Please try again.",

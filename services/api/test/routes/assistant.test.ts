@@ -217,6 +217,24 @@ describe("POST /assistant/chat — request handling", () => {
 });
 
 describe("POST /assistant/chat — the loop over SSE", () => {
+  it("tells the model today's date, the tax regime and the caller's portfolios (and no one else's)", async () => {
+    use([endTurn("ok")]);
+    const res = await chat(owner, { ...ask(), scope: "all" });
+    expect(res.statusCode).toBe(200);
+    const system = provider.requests[0]!.system;
+    expect(system).toMatch(/Today is \d{4}-\d{2}-\d{2} \(UTC\)/);
+    expect(system).toContain(new Date().toISOString().slice(0, 10));
+    expect(system).toMatch(
+      /Tax regime: (DE|ID)\. Cost-basis convention: (purchase_price|total_paid)/,
+    );
+    expect(system).toContain(`id=${ownerPortfolioId}`);
+    expect(system).toContain('"Owner Depot"');
+    expect(system).not.toMatch(/DE89\s?3704|ACCT-SECRET/); // account numbers / IBANs never reach the prompt
+    // Another user's portfolios are not listed.
+    expect(system).not.toContain(`id=${otherPortfolioId}`);
+    expect(system).not.toContain("Other Depot");
+  });
+
   it("streams status, tool_call, tool_result, message, done and answers from the caller's data only", async () => {
     use([toolTurn("list_portfolios"), endTurn("You have one depot.")]);
     const res = await chat(owner, { ...ask(), scope: `p:${ownerPortfolioId}` });

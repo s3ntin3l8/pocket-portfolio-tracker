@@ -28,6 +28,27 @@ const holderId = id()
   .optional()
   .describe("Account holder id; omit for everyone. Ignored when portfolioId is given.");
 
+/** Chart-API range tokens the instrument history endpoint accepts. */
+const INSTRUMENT_RANGES = [
+  "1d",
+  "5d",
+  "1mo",
+  "3mo",
+  "6mo",
+  "1y",
+  "2y",
+  "5y",
+  "10y",
+  "ytd",
+  "max",
+] as const;
+/** Closed/open trades returned to the model in one call (the rest are counted). */
+const MAX_TRADES = 50;
+/** Ledger warnings returned in one call. */
+const MAX_ANOMALIES = 50;
+/** Recent imports returned in one call. */
+const MAX_IMPORTS = 20;
+
 /** Findings returned to the model in one call. */
 const MAX_INTEGRITY_FINDINGS = 20;
 
@@ -335,6 +356,9 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
           id: t.id,
           portfolioId: t.portfolioId,
           instrumentId: t.instrumentId,
+          instrument: t.instrument
+            ? { symbol: t.instrument.symbol, name: t.instrument.displayName ?? t.instrument.name }
+            : null,
           type: t.type,
           quantity: t.quantity,
           price: t.price,
@@ -367,10 +391,262 @@ export function createTools(client: ApiClient, opts: CreateToolsOptions = {}): A
     title: "Income",
     description:
       "Dividend, coupon and interest income statistics, including the forecast for the rest of the year. " +
-      "Income is return, never contribution.",
+      "Pass eventsYear (all portfolios, or those of holderId; not allowed together with portfolioId) for the individual dividend and " +
+      "coupon payments of that calendar year (interest is only in the statistics). Income is return, never contribution.",
+    inputSchema: z
+      .object({
+        portfolioId: optionalPortfolioId,
+        holderId,
+        eventsYear: z
+          .number()
+          .int()
+          .min(1990)
+          .max(2100)
+          .optional()
+          .describe(
+            "List the income events of this year instead of the statistics (all portfolios)",
+          ),
+      })
+      // The events list is an all-portfolios view; combining it with a portfolio would silently
+      // return that portfolio's statistics instead of the payments that were asked for.
+      .refine((v) => !(v.eventsYear && v.portfolioId), {
+        message:
+          "eventsYear lists payments across portfolios (optionally one holder); omit portfolioId",
+        path: ["eventsYear"],
+      }),
+    handler: ({ portfolioId: id, holderId: h, eventsYear }) =>
+      eventsYear
+        ? client.getIncomeEventsByYear(eventsYear, h)
+        : id
+          ? client.getPortfolioIncome(id)
+          : client.getIncome(h),
+  });
+
+  add({
+    name: "get_trades",
+    title: "Trades & realized P&L",
+    description:
+      "Round-trip trades with realized and unrealized P&L, dividends and total return per trade, plus " +
+      "realized/dividends by year. Use it for 'what did I make selling X' or 'how did my closed trades do'. " +
+      `At most ${MAX_TRADES} trades (newest first); the rest are counted in omitted. The headline totals and ` +
+      "the by-year figures cover every trade in scope, not just the filtered rows (see totalsScope); a calendar " +
+      "year's realized P&L is realizedByYear. " +
+      BASIS_NOTE,
+    inputSchema: z.object({
+      portfolioId: optionalPortfolioId,
+      holderId,
+      method: z.enum(["average", "fifo"]).optional().describe("Cost-basis method; default average"),
+      costBasis,
+      status: z.enum(["open", "closed"]).optional(),
+      year: z
+        .string()
+        .regex(/^\d{4}$/)
+        .optional()
+        .describe("Only trades closed in this calendar year"),
+      instrumentId: id().optional(),
+    }),
+    handler: async ({
+      portfolioId: pid,
+      holderId: h,
+      method,
+      costBasis: cb,
+      status,
+      year,
+      instrumentId,
+    }) => {
+      const log = pid
+        ? await client.getTrades(pid, method, cb)
+        : await client.getNetWorthTrades(method, cb, h);
+      const matching = log.trades
+        .filter((t) => (status ? t.status === status : true))
+        .filter((t) => (instrumentId ? t.instrumentId === instrumentId : true))
+        .filter((t) => (year ? (t.exitDate ?? "").startsWith(year) : true))
+        .sort((a, b) => (b.exitDate ?? b.entryDate).localeCompare(a.exitDate ?? a.entryDate));
+      return {
+        displayCurrency: log.displayCurrency,
+        method: log.method,
+        fxMissingCurrencies: log.fxMissingCurrencies ?? [],
+        totalsScope:
+          "totalRealized, totalDividends, totalReturn, winRate, realizedByYear and dividendsByYear cover ALL trades in " +
+          "the scope (portfolio/holder), before the status, year and instrument filters; they are not totals of `trades`. " +
+          "For a calendar year's realized P&L use realizedByYear, not a sum of the rows (a trade's realizedPnL spans all its sales).",
+        totalRealized: log.totalRealized,
+        totalDividends: log.totalDividends,
+        totalReturn: log.totalReturn,
+        winRate: log.winRate,
+        realizedByYear: log.realizedByYear,
+        dividendsByYear: log.dividendsByYear,
+        matching: matching.length,
+        omitted: Math.max(0, matching.length - MAX_TRADES),
+        trades: matching.slice(0, MAX_TRADES).map((t) => ({
+          instrumentId: t.instrumentId,
+          symbol: t.instrument?.symbol ?? null,
+          name: t.instrument ? (t.instrument.displayName ?? t.instrument.name) : null,
+          status: t.status,
+          entryDate: t.entryDate,
+          exitDate: t.exitDate,
+          holdingDays: t.holdingDays,
+          longTerm: t.longTerm,
+          quantity: t.quantity,
+          currency: t.currency,
+          avgEntryPrice: t.avgEntryPrice,
+          avgExitPrice: t.avgExitPrice,
+          invested: t.invested,
+          realizedPnL: t.realizedPnL,
+          unrealizedPnL: t.unrealizedPnL,
+          dividends: t.dividends,
+          totalReturn: t.totalReturn,
+          totalReturnPct: t.totalReturnPct,
+        })),
+      };
+    },
+  });
+
+  add({
+    name: "get_instrument",
+    title: "Instrument & price history",
+    description:
+      "One instrument: identity (symbol, name, ISIN, asset class, market, currency), its price history over a " +
+      "range as a downsampled series (≤60 points, native currency, with the latest close) and, for a " +
+      "write-scoped login only, fundamentals (P/E, dividend yield, 52-week range). Get the instrumentId " +
+      "from get_holdings, search_transactions or lookup_instrument. Prices are market data, not advice.",
+    inputSchema: z.object({
+      instrumentId: id().describe("Instrument id"),
+      range: z.enum(INSTRUMENT_RANGES).default("1y"),
+    }),
+    handler: async ({ instrumentId, range: r }) => {
+      const [inst, candles] = await Promise.all([
+        client.getInstrument(instrumentId),
+        client.getInstrumentHistory(instrumentId, r),
+      ]);
+      const { points, total } = downsample(candles);
+      // Fundamentals refresh and persist a stored row, so the API refuses a read-only
+      // credential. Say so rather than failing the whole call.
+      let fundamentals: unknown = null;
+      let fundamentalsNote: string | undefined;
+      if (!opts.write) {
+        fundamentalsNote = "not available with a read-only login";
+      } else {
+        try {
+          fundamentals = await client.getInstrumentFundamentals(instrumentId);
+        } catch (err) {
+          fundamentalsNote =
+            err instanceof ApiError && (err.status === 403 || err.status === 401)
+              ? "not available with a read-only login"
+              : "could not be read";
+        }
+      }
+      return {
+        instrument: {
+          id: inst.id,
+          symbol: inst.symbol,
+          name: inst.displayName ?? inst.name,
+          isin: inst.isin,
+          assetClass: inst.assetClass,
+          market: inst.market,
+          currency: inst.currency,
+        },
+        range: r,
+        totalPoints: total,
+        latestClose: candles.at(-1) ?? null,
+        points,
+        fundamentals,
+        ...(fundamentalsNote ? { fundamentalsNote } : {}),
+      };
+    },
+  });
+
+  add({
+    name: "get_loans",
+    title: "Loans (cicilan)",
+    description:
+      "Financed-gold (cicilan) loans of one portfolio with each installment's due date, principal, margin and " +
+      "status (paid, skipped, overdue, upcoming, closed). Outstanding totals are in get_net_worth (liabilities).",
+    inputSchema: z.object({ portfolioId }),
+    // Explicit fields: the contract number is an account specific that must not reach the model.
+    handler: async ({ portfolioId: pid }) =>
+      (await client.listLoans(pid)).map((l) => ({
+        loanId: l.loanId,
+        provider: l.provider,
+        currency: l.currency,
+        closedAt: l.closedAt,
+        installments: l.installments,
+      })),
+  });
+
+  add({
+    name: "get_savings_plans",
+    title: "Savings plans (Sparplan)",
+    description:
+      "Detected recurring savings plans (Sparplan): amounts per tier, cadence, totals and stats, for one portfolio " +
+      "or all. Contributions on the portfolio's boundary are in get_contributions.",
     inputSchema: z.object({ portfolioId: optionalPortfolioId, holderId }),
-    handler: ({ portfolioId: id, holderId: h }) =>
-      id ? client.getPortfolioIncome(id) : client.getIncome(h),
+    handler: ({ portfolioId: pid, holderId: h }) =>
+      pid ? client.getPortfolioSparplan(pid) : client.getSparplan(h),
+  });
+
+  add({
+    name: "list_imports",
+    title: "Imports",
+    description:
+      `The ${MAX_IMPORTS} most recent imports (screenshot/CSV/PDF/broker sync) with parser, status ` +
+      "(draft = waiting for the user's confirmation, confirmed, discarded) and row count, plus broker event " +
+      "types that could not be mapped. Use explain_import_duplicates for one import's duplicates.",
+    inputSchema: z.object({}),
+    handler: async () => {
+      let unmappedFailed = false;
+      const [imports, unmapped] = await Promise.all([
+        client.listImports(),
+        client.getUnmappedEventTypes().catch(() => {
+          unmappedFailed = true;
+          return [];
+        }),
+      ]);
+      const recent = [...imports]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, MAX_IMPORTS);
+      return {
+        total: imports.length,
+        omitted: Math.max(0, imports.length - recent.length),
+        imports: recent.map((i) => ({
+          id: i.id,
+          portfolioId: i.portfolioId,
+          parser: i.parser,
+          status: i.status,
+          count: i.count,
+          confidence: i.confidence,
+          createdAt: i.createdAt,
+        })),
+        // Counts only: the raw event sample can carry a counterparty's name and broker amounts.
+        // A failed read is not "none": say so, so the model doesn't report a clean bill.
+        ...(unmappedFailed ? { unmappedNote: "could not be read" } : {}),
+        unmappedEventTypes: unmapped.map((u) => ({
+          eventType: u.eventType,
+          code: u.code,
+          count: u.count,
+          lastSeen: u.lastSeen,
+        })),
+      };
+    },
+  });
+
+  add({
+    name: "get_anomalies",
+    title: "Data warnings",
+    description:
+      "Data-quality warnings on the ledger: oversold positions, sells before acquisition, negative cash, income on a " +
+      "non-held instrument, missing transfer cost basis, zero prices, reconciliation gaps. One portfolio, or all. " +
+      `Up to ${MAX_ANOMALIES} are returned; count is the total and omitted the rest. ` +
+      "Use it when numbers look wrong. For the invariant checks use check_integrity.",
+    inputSchema: z.object({ portfolioId: optionalPortfolioId }),
+    handler: async ({ portfolioId: pid }) => {
+      const res = pid ? await client.getAnomalies(pid) : await client.getNetworthAnomalies();
+      return {
+        count: res.anomalies.length,
+        omitted: Math.max(0, res.anomalies.length - MAX_ANOMALIES),
+        anomalies: res.anomalies.slice(0, MAX_ANOMALIES),
+      };
+    },
   });
 
   add({

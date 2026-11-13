@@ -26,6 +26,11 @@ resolve an unknown instrument or ISIN (`resolve_instrument`) and explain duplica
 `scope` has the web's grammar — `all`, `p:<portfolio id>` or `h:<holder id>` — and tells the model what the user is
 looking at so it can pass that id to tools instead of listing portfolios first. Ids must be GUIDs.
 
+The system prompt also carries a short "about this user" block, built per request from the caller's own data: today's
+date (UTC), the tax regime and cost-basis convention, and the portfolios (name, id, currency, cash boundary), so
+"this year" and "my depots" resolve without a tool call. Portfolio names go through the same scrub as tool results
+(IBAN-shaped text becomes `[iban]`); account holders, account numbers and ids of other users never appear.
+
 ### Events
 
 | event          | data                                                                                                                                                                                |

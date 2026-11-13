@@ -2875,7 +2875,15 @@
       "explain_tax_concept": "Penjelasan istilah pajak",
       "get_fsa_allocation": "Alokasi FSA",
       "resolve_instrument": "Penelusuran instrumen",
-      "explain_import_duplicates": "Pemeriksaan duplikat"
+      "explain_import_duplicates": "Pemeriksaan duplikat",
+      "get_trades": "Perdagangan dan laba terealisasi",
+      "get_instrument": "Instrumen dan harga",
+      "get_loans": "Pinjaman",
+      "get_savings_plans": "Rencana tabungan",
+      "list_imports": "Impor",
+      "get_anomalies": "Peringatan data",
+      "check_integrity": "Pemeriksaan integritas",
+      "propose_transactions": "Draf transaksi"
     },
     "errors": {
       "generic": "Terjadi kesalahan. Silakan coba lagi.",
