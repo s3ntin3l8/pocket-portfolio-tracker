@@ -117,6 +117,20 @@ describe("blendAnnouncedDividends amount band", () => {
     }
   });
 
+  it("treats a replayed special slot as the slot a regular announcement replaces", () => {
+    // Last year's 5.00 special is projected into the January slot; the other three are 1.00.
+    const withSpecial = [
+      proj("A", "2027-01-12", "5", "USD"),
+      ...["2027-04-12", "2027-07-12", "2027-10-12"].map((x) => proj("A", x, "1", "USD")),
+    ];
+    const out = blendAnnouncedDividends(withSpecial, [ann("2027-01-20", "1")], quarterly);
+    expect(out.map((p) => p.date)).toEqual(["2027-04-12", "2027-07-12", "2027-10-12"]);
+    // A new 5.00 special is still out of band against the 1.00 run-rate.
+    expect(blendAnnouncedDividends(withSpecial, [ann("2027-01-20", "5")], quarterly)).toHaveLength(
+      4,
+    );
+  });
+
   it("falls back to date-only without comparable amounts", () => {
     const cases = [
       ann("2027-01-20", undefined),

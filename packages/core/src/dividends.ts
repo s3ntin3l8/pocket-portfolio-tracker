@@ -389,12 +389,16 @@ const DAY_MS = 86_400_000;
  * nothing in range (a special dividend) consumes nothing.
  *
  * Amount band: when both sides carry a per-share amount in the same currency, an announced
- * row only consumes a slot whose projected per-share it is within `[1/R, R]` of
- * (`SPECIAL_DIVIDEND_RATIO`, 3x). A special dividend near a regular slot therefore consumes
- * nothing and is added on top of the cadence by the caller. Without comparable amounts
- * (missing per-share, different currencies, a non-positive amount) matching is by date
- * only. Trade-off: a regular payment that moves by more than 3x is treated as a special,
- * and a special within 3x of the regular amount still replaces its slot.
+ * row only consumes a slot if it is within `[1/R, R]` (`SPECIAL_DIVIDEND_RATIO`, 3x) of the
+ * instrument's regular run-rate, the median projected per-share of that instrument and
+ * currency. The median, not the nearest slot, so a projected slot that is itself a replayed
+ * special (last year's special, this year's regular announcement) neither blocks the regular
+ * row nor makes it look like a special. A special near a regular slot consumes nothing and is
+ * added on top of the cadence by the caller. Without comparable amounts (missing per-share,
+ * different currencies, a non-positive amount) matching is by date only. Trade-offs: a
+ * regular payment that moves by more than 3x is treated as a special, a special within 3x of
+ * the run-rate still replaces its slot, and an instrument with a single projected slot has
+ * that slot as its own run-rate.
  *
  * `announced[].date` is the announced payment date (`payDate ?? exDate`), `YYYY-MM-DD`.
  * Returns the surviving projected objects unchanged.
@@ -408,22 +412,42 @@ export function blendAnnouncedDividends<
 ): P[] {
   const consumed = new Set<P>();
   const dayOf = (s: string) => new Date(`${s}T00:00:00.000Z`).getTime() / DAY_MS;
-  const comparable = (a: (typeof announced)[number], p: P): boolean => {
-    if (!a.perShare || !p.perShare || !a.currency || !p.currency || a.currency !== p.currency)
-      return true;
+  const runRates = new Map<string, Decimal>();
+  const runRate = (instrumentId: string, currency: string): Decimal | null => {
+    const key = `${instrumentId}|${currency}`;
+    if (!runRates.has(key)) {
+      const vals = projected
+        .filter((p) => p.instrumentId === instrumentId && p.currency === currency && p.perShare)
+        .map((p) => new Decimal(p.perShare as string))
+        .filter((v) => v.gt(0))
+        .sort((x, y) => x.comparedTo(y));
+      const mid = vals.length >> 1;
+      const median =
+        vals.length === 0
+          ? null
+          : vals.length % 2
+            ? vals[mid]
+            : vals[mid - 1].add(vals[mid]).div(2);
+      runRates.set(key, median as Decimal);
+    }
+    return runRates.get(key) ?? null;
+  };
+  const inBand = (a: (typeof announced)[number]): boolean => {
+    if (!a.perShare || !a.currency) return true;
     const ap = new Decimal(a.perShare);
-    const pp = new Decimal(p.perShare);
-    if (pp.lte(0) || ap.lte(0)) return true;
-    return ap.lte(pp.mul(SPECIAL_DIVIDEND_RATIO)) && ap.mul(SPECIAL_DIVIDEND_RATIO).gte(pp);
+    const rate = runRate(a.instrumentId, a.currency);
+    if (!rate || ap.lte(0)) return true;
+    return ap.lte(rate.mul(SPECIAL_DIVIDEND_RATIO)) && ap.mul(SPECIAL_DIVIDEND_RATIO).gte(rate);
   };
   const sortedAnnounced = [...announced].sort((a, b) => a.date.localeCompare(b.date));
   for (const a of sortedAnnounced) {
+    if (!inBand(a)) continue;
     const toleranceDays = Math.floor((intervalMonths(a.instrumentId) * 30) / 2);
     const aDay = dayOf(a.date);
     let best: P | undefined;
     let bestGap = Infinity;
     for (const p of projected) {
-      if (p.instrumentId !== a.instrumentId || consumed.has(p) || !comparable(a, p)) continue;
+      if (p.instrumentId !== a.instrumentId || consumed.has(p)) continue;
       const gap = Math.abs(dayOf(p.date) - aDay);
       if (gap <= toleranceDays && gap < bestGap) {
         best = p;
