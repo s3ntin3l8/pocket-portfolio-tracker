@@ -44,6 +44,8 @@ interface View {
     hasKey: boolean;
     keyHint: string | null;
     hasUrl: boolean;
+    url: string | null;
+    optionalKey: boolean;
     keySource: "db" | "env" | null;
     local: boolean | null;
     allowDataCollection: boolean | null;
@@ -70,6 +72,9 @@ const ENV = [
   "OPENROUTER_ALLOW_DATA_COLLECTION",
   "OLLAMA_BASE_URL",
   "OLLAMA_CHAT_MODEL",
+  "OPENAI_COMPAT_BASE_URL",
+  "OPENAI_COMPAT_API_KEY",
+  "OPENAI_COMPAT_CHAT_MODEL",
   "SCREENSHOT_PARSER",
   "CHAT_PROVIDER",
 ];
@@ -179,6 +184,98 @@ describe("admin AI providers", () => {
         hasUrl: true,
         keySource: "db",
         local: true,
+      });
+    });
+
+    it("OpenAI-compatible: stores a URL plus an optional key, exposes the URL but never the key", async () => {
+      const put = await call("PUT", "/admin/ai/providers/openai-compatible/credential", {
+        urlOverride: "http://lmstudio:1234/v1",
+        apiKey: "lm-secret-1234", // pragma: allowlist secret
+      });
+      expect(put.statusCode).toBe(200);
+      expect(put.body).not.toContain("lm-secret-1234");
+      const v = put.json<View>();
+      expect(v.connections.find((c) => c.id === "openai-compatible")).toMatchObject({
+        configured: true,
+        hasUrl: true,
+        hasKey: true,
+        keyHint: "••••1234",
+        url: "http://lmstudio:1234/v1",
+        optionalKey: true,
+        keySource: "db",
+        local: true,
+      });
+      // Only a key (URL kept) updates the key; the other connections carry no URL.
+      const again = await call("PUT", "/admin/ai/providers/openai-compatible/credential", {
+        apiKey: "other-key-9999", // pragma: allowlist secret
+      });
+      expect(
+        again.json<View>().connections.find((c) => c.id === "openai-compatible"),
+      ).toMatchObject({ url: "http://lmstudio:1234/v1", keyHint: "••••9999" });
+      expect(again.json<View>().connections.find((c) => c.id === "claude")).toMatchObject({
+        url: null,
+        optionalKey: false,
+      });
+    });
+
+    it("repointing the URL without a new key drops the stored key; the same URL keeps it", async () => {
+      const path = "/admin/ai/providers/openai-compatible/credential";
+      const find = (r: { json: <T>() => T }) =>
+        r.json<View>().connections.find((c) => c.id === "openai-compatible");
+      await call("PUT", path, { urlOverride: "http://a:1234", apiKey: "key-for-a-1111" }); // pragma: allowlist secret
+      expect(find(await call("PUT", path, { urlOverride: "http://a:1234" }))).toMatchObject({
+        hasKey: true,
+      });
+      expect(find(await call("PUT", path, { urlOverride: "http://b:1234" }))).toMatchObject({
+        hasKey: false,
+        url: "http://b:1234",
+      });
+    });
+
+    it("exposes the env URL, and a key is rejected for Ollama (URL only)", async () => {
+      vi.stubEnv("OPENAI_COMPAT_BASE_URL", "http://env-lm:1234");
+      const v = (await call("GET", "/admin/ai")).json<View>();
+      expect(v.connections.find((c) => c.id === "openai-compatible")).toMatchObject({
+        configured: true,
+        url: "http://env-lm:1234",
+        keySource: "env",
+        hasUrl: false,
+      });
+      const bad = await call("PUT", "/admin/ai/providers/ollama/credential", {
+        urlOverride: "http://ollama:11434",
+        apiKey: "nope", // pragma: allowlist secret
+      });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json()).toEqual({ error: "key_not_supported" });
+      const ok = await call("PUT", "/admin/ai/providers/ollama/credential", {
+        urlOverride: "http://ollama:11434",
+      });
+      expect(ok.statusCode).toBe(200);
+    });
+
+    it("a task can be pointed at OpenAI-compatible once connected, and it lists the server's models", async () => {
+      const url = "http://lmstudio:1234";
+      await call("PUT", "/admin/ai/providers/openai-compatible/credential", { urlOverride: url });
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (u: string) => {
+          expect(u).toBe(`${url}/v1/models`);
+          return new Response(JSON.stringify({ data: [{ id: "qwen" }] }), { status: 200 });
+        }),
+      );
+      const models = await call("GET", "/admin/ai/providers/openai-compatible/models?task=chat");
+      expect(models.json()).toEqual({
+        models: [{ id: "qwen", label: "qwen", vision: null, tools: null }],
+      });
+      const set = await call("PATCH", "/admin/ai/tasks/chat", {
+        provider: "openai-compatible",
+        model: "qwen",
+      });
+      expect(set.statusCode).toBe(200);
+      expect(set.json<View>().tasks.find((t) => t.task === "chat")).toMatchObject({
+        provider: "openai-compatible",
+        model: "qwen",
+        usable: true,
       });
     });
 

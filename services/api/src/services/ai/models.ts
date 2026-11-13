@@ -1,5 +1,5 @@
 import type { ResolvedSecret } from "../market-data/types.js";
-import { env, findProvider, type AiTask } from "./registry.js";
+import { env, findProvider, openAiV1, type AiTask } from "./registry.js";
 
 /** One selectable model. A null capability means the provider's API doesn't say. */
 export interface AiModel {
@@ -152,6 +152,21 @@ async function listOllama(doFetch: Fetch, baseUrl: string): Promise<AiModel[]> {
   );
 }
 
+/** `GET {base}/v1/models` of an OpenAI-compatible server; it reports no capabilities. */
+async function listOpenAICompat(
+  doFetch: Fetch,
+  baseUrl: string,
+  apiKey: string,
+): Promise<AiModel[]> {
+  const json = await getJson(doFetch, `${openAiV1(baseUrl)}/models`, {
+    headers: apiKey ? { authorization: `Bearer ${apiKey}` } : {},
+  });
+  return rows(json.data).flatMap((m) => {
+    const id = str(m.id);
+    return id ? [{ id, label: id, vision: null, tools: null }] : [];
+  });
+}
+
 const cache = new Map<string, { at: number; models: AiModel[] }>();
 
 /** Drop cached model lists (all, or one provider's) — e.g. after its credential changed. */
@@ -177,22 +192,43 @@ export async function listModels(
 
   const doFetch = opts.fetch ?? globalThis.fetch;
   const now = opts.now ?? Date.now();
-  const apiKey = secret?.apiKey ?? env(d.credentialEnvVar) ?? "";
+  // A URL provider's `credentialEnvVar` is the URL, not a key: only its optional key counts.
+  const apiKey =
+    secret?.apiKey ??
+    // An env key goes with the env URL only (see `compatKey` in registry.ts).
+    (d.credential === "url"
+      ? secret?.url
+        ? ""
+        : env(d.optionalKeyEnvVar ?? "")
+      : env(d.credentialEnvVar)) ??
+    "";
   const baseUrl = d.baseUrl(secret) ?? "";
   // Keyed by credential so a changed key/URL never serves the previous account's list.
-  const cacheKey = `${provider}|${d.credential === "url" ? baseUrl : apiKey}`;
+  const cacheKey = `${provider}|${d.credential === "url" ? `${baseUrl}|${apiKey}` : apiKey}`;
 
   let all = cache.get(cacheKey);
   if (!all || now - all.at > CACHE_TTL_MS) {
     try {
-      const models =
-        provider === "claude"
-          ? await listClaude(doFetch, apiKey)
-          : provider === "gemini"
-            ? await listGemini(doFetch, apiKey)
-            : provider === "openrouter"
-              ? await listOpenRouter(doFetch, apiKey)
-              : await listOllama(doFetch, baseUrl);
+      let models: AiModel[];
+      switch (provider) {
+        case "claude":
+          models = await listClaude(doFetch, apiKey);
+          break;
+        case "gemini":
+          models = await listGemini(doFetch, apiKey);
+          break;
+        case "openrouter":
+          models = await listOpenRouter(doFetch, apiKey);
+          break;
+        case "ollama":
+          models = await listOllama(doFetch, baseUrl);
+          break;
+        case "openai-compatible":
+          models = await listOpenAICompat(doFetch, baseUrl, apiKey);
+          break;
+        default:
+          return { models: [], error: "unknown_provider" };
+      }
       all = { at: now, models };
       cache.set(cacheKey, all);
     } catch (err) {

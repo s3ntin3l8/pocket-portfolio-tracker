@@ -18,31 +18,46 @@ import { useApiCall } from "@/lib/use-api-call";
 export function CredentialEditorPanel({
   label,
   isUrl,
+  initialValue = "",
+  urlPlaceholder,
+  optionalKey,
+  hasKey,
   hasCredential,
   onSave,
   onClear,
   onClose,
 }: {
-  /** Provider label, interpolated into "API key · {label}". */
+  /** Provider label, interpolated into "API key · {label}" (or "URL · {label}"). */
   label: string;
   /** Ollama-style URL-based credential — no show/hide eye, `type="url"`, different placeholder. */
   isUrl?: boolean;
+  /** Prefill (the URL currently in use). */
+  initialValue?: string;
+  /** Placeholder for the URL field; defaults to Ollama's. */
+  urlPlaceholder?: string;
+  /** A URL credential that also takes an optional API key (an authenticated OpenAI-compatible server). */
+  optionalKey?: boolean;
+  /** An API key is already stored (only meaningful with `optionalKey`). */
+  hasKey?: boolean;
   hasCredential: boolean;
-  onSave: (value: string) => Promise<void>;
+  /** `key` is the optional API key, only passed (non-empty) when `optionalKey` and one was typed. */
+  onSave: (value: string, key?: string) => Promise<void>;
   onClear: () => Promise<void>;
   onClose: () => void;
 }) {
   const t = useTranslations("Admin");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(initialValue);
+  const [key, setKey] = useState("");
   const [showValue, setShowValue] = useState(false);
 
   const [saveState, save] = useApiCall(
     useCallback(async () => {
       const v = value.trim();
       if (!v) return;
-      await onSave(v);
+      const k = optionalKey ? key.trim() : "";
+      await (k ? onSave(v, k) : onSave(v));
       onClose();
-    }, [value, onSave, onClose]),
+    }, [value, key, optionalKey, onSave, onClose]),
     { fallbackMessage: t("credentialError") },
   );
   const [clearState, clear] = useApiCall(
@@ -54,6 +69,7 @@ export function CredentialEditorPanel({
   );
 
   const inputId = useId();
+  const keyId = useId();
   const busy = saveState.busy || clearState.busy;
   const error = saveState.error ?? clearState.error;
   const trimmed = value.trim();
@@ -62,13 +78,15 @@ export function CredentialEditorPanel({
     <div className="border-t border-line bg-card px-3.5 pb-3.5 pt-2.5">
       <div className="rounded-md border border-border bg-card-2 p-3.5">
         <label htmlFor={inputId} className="mb-1.5 block px-0.5 text-xs font-semibold text-text-2">
-          {t("credentialEditorLabel", { label })}
+          {isUrl ? t("credentialEditorUrlLabel", { label }) : t("credentialEditorLabel", { label })}
         </label>
         <div className="relative">
           <Input
             id={inputId}
             type={isUrl ? "url" : showValue ? "text" : "password"}
-            placeholder={isUrl ? t("visionUrlPlaceholder") : t("credentialPlaceholder")}
+            placeholder={
+              isUrl ? (urlPlaceholder ?? t("visionUrlPlaceholder")) : t("credentialPlaceholder")
+            }
             value={value}
             onChange={(e) => setValue(e.target.value)}
             className="pr-10 font-mono text-sm"
@@ -86,6 +104,28 @@ export function CredentialEditorPanel({
             </button>
           )}
         </div>
+        {isUrl && optionalKey && (
+          <div className="mt-2.5">
+            <label
+              htmlFor={keyId}
+              className="mb-1.5 block px-0.5 text-xs font-semibold text-text-2"
+            >
+              {t("credentialEditorOptionalKeyLabel", { label })}
+            </label>
+            <Input
+              id={keyId}
+              type="password"
+              placeholder={t("credentialPlaceholder")}
+              value={key}
+              onChange={(e) => setKey(e.target.value)}
+              className="font-mono text-sm"
+              autoComplete="off"
+            />
+            {hasKey && (
+              <p className="mt-1 px-0.5 text-micro text-text-2">{t("credentialOptionalKeyKeep")}</p>
+            )}
+          </div>
+        )}
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <button
             type="button"

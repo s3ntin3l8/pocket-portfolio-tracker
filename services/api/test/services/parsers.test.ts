@@ -98,6 +98,39 @@ describe("OllamaVisionParser", () => {
     expect(result.contracts).toHaveLength(0);
   });
 
+  it("sends a Bearer key when set, and names its errors after the provider", async () => {
+    let headers: Record<string, string> = {};
+    const fakeFetch: typeof fetch = (async (_url: string, init?: RequestInit) => {
+      headers = init?.headers as Record<string, string>;
+      return { ok: false, status: 401, statusText: "Unauthorized" };
+    }) as unknown as typeof fetch;
+    const p = new OllamaVisionParser({
+      name: "openai-compatible",
+      baseUrl: "http://lm:1234",
+      apiKey: "secret-key", // pragma: allowlist secret
+      fetch: fakeFetch,
+    });
+    expect(p.name).toBe("openai-compatible");
+    await expect(p.parse({ data: Buffer.from("img"), mimeType: "image/png" })).rejects.toThrow(
+      "openai_compatible_vision_error_401",
+    );
+    expect(headers.authorization).toBe("Bearer secret-key");
+    await expect(
+      p.parse({ data: Buffer.from("pdf"), mimeType: "application/pdf" }),
+    ).rejects.toThrow("openai_compatible_pdf_not_supported");
+  });
+
+  it("sends no auth header without a key", async () => {
+    let headers: Record<string, string> = {};
+    const fakeFetch: typeof fetch = (async (_url: string, init?: RequestInit) => {
+      headers = init?.headers as Record<string, string>;
+      return { ok: false, status: 500, statusText: "x" };
+    }) as unknown as typeof fetch;
+    const p = new OllamaVisionParser({ baseUrl: "http://ollama:11434", fetch: fakeFetch });
+    await expect(p.parse({ data: Buffer.from("img"), mimeType: "image/png" })).rejects.toThrow();
+    expect(headers.authorization).toBeUndefined();
+  });
+
   it("parse() throws a clear error on HTTP failure", async () => {
     const fakeFetch: typeof fetch = (async () => ({
       ok: false,

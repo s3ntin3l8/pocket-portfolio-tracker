@@ -2,7 +2,7 @@
 
 export interface AssistantStatus {
   available: boolean;
-  /** Provider id (`claude`, `openrouter`, `ollama`), or null when chat is unavailable. */
+  /** Provider id (`claude`, `openrouter`, `ollama`, `openai-compatible`, …), or null when chat is unavailable. */
   provider: string | null;
   label: string | null;
   /** True when data never leaves the user's own infrastructure. */

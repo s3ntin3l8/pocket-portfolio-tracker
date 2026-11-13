@@ -18,7 +18,14 @@ function fakeFetch(routes: Record<string, (init?: RequestInit) => Response>) {
 
 beforeEach(() => {
   clearModelCache();
-  for (const k of ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "OLLAMA_BASE_URL"])
+  for (const k of [
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "OLLAMA_BASE_URL",
+    "OPENAI_COMPAT_BASE_URL",
+    "OPENAI_COMPAT_API_KEY",
+  ])
     vi.stubEnv(k, "");
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -146,6 +153,68 @@ describe("listModels", () => {
     expect(vision.models.map((m) => m.id)).toEqual(["llava", "old"]); // qwen3 has no vision
     const chat = await listModels("ollama", "chat", secret, { fetch: f });
     expect(chat.models.map((m) => m.id)).toEqual(["old", "qwen3"]); // llava has no tools
+  });
+
+  it("OpenAI-compatible: lists /v1/models (ids only, capabilities unknown), with or without /v1", async () => {
+    const { f, calls } = fakeFetch({
+      "/v1/models": () =>
+        json({ data: [{ id: "qwen2.5-vl" }, { id: "llama-3" }, { object: "x" }] }),
+    });
+    const r = await listModels(
+      "openai-compatible",
+      "vision",
+      { url: "http://lm:1234/" },
+      { fetch: f },
+    );
+    expect(r.models).toEqual([
+      { id: "llama-3", label: "llama-3", vision: null, tools: null },
+      { id: "qwen2.5-vl", label: "qwen2.5-vl", vision: null, tools: null },
+    ]);
+    expect(calls[0]!.url).toBe("http://lm:1234/v1/models");
+    expect(new Headers(calls[0]!.init?.headers).get("authorization")).toBeNull();
+
+    clearModelCache();
+    await listModels("openai-compatible", "chat", { url: "http://lm:1234/v1" }, { fetch: f });
+    expect(calls[1]!.url).toBe("http://lm:1234/v1/models");
+  });
+
+  it("OpenAI-compatible: sends the stored or env key as a Bearer token and caches per key", async () => {
+    const { f, calls } = fakeFetch({ "/v1/models": () => json({ data: [{ id: "m" }] }) });
+    await listModels(
+      "openai-compatible",
+      "chat",
+      { url: "http://lm:1234", apiKey: "k1" }, // pragma: allowlist secret
+      { fetch: f },
+    ); // pragma: allowlist secret
+    expect(new Headers(calls[0]!.init?.headers).get("authorization")).toBe("Bearer k1");
+
+    vi.stubEnv("OPENAI_COMPAT_BASE_URL", "http://lm:1234");
+    vi.stubEnv("OPENAI_COMPAT_API_KEY", "env-key"); // pragma: allowlist secret
+    await listModels("openai-compatible", "chat", undefined, { fetch: f });
+    expect(calls).toHaveLength(2); // a different key is a different cache entry
+    expect(new Headers(calls[1]!.init?.headers).get("authorization")).toBe("Bearer env-key");
+  });
+
+  it("OpenAI-compatible: the env key is not sent to a stored URL", async () => {
+    vi.stubEnv("OPENAI_COMPAT_API_KEY", "env-key"); // pragma: allowlist secret
+    const { f, calls } = fakeFetch({ "/v1/models": () => json({ data: [] }) });
+    await listModels("openai-compatible", "chat", { url: "http://other:1234" }, { fetch: f });
+    expect(new Headers(calls[0]!.init?.headers).get("authorization")).toBeNull();
+  });
+
+  it("OpenAI-compatible: needs a URL, and a failure is a code", async () => {
+    const { f, calls } = fakeFetch({});
+    expect(await listModels("openai-compatible", "chat", { apiKey: "k" }, { fetch: f })).toEqual({
+      // pragma: allowlist secret
+      models: [],
+      error: "provider_not_configured",
+    });
+    expect(calls).toHaveLength(0);
+    const down = (async () => json({}, 503)) as unknown as typeof fetch;
+    expect(
+      (await listModels("openai-compatible", "chat", { url: "http://lm:1234" }, { fetch: down }))
+        .error,
+    ).toBe("provider_http_503");
   });
 
   it("reports a provider failure as a code, not the upstream body", async () => {

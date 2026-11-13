@@ -14,6 +14,10 @@ export const OFF: TaskSetting = { provider: null, model: null, effort: null };
 
 export const visionModel = (d: AiProviderDescriptor) =>
   env(d.visionModelEnvVar) ?? d.defaultVisionModel;
+/** A provider with no default model seeds none (the admin has to pick one), never "". */
+const modelOrNull = (m: string) => m || null;
+/** Only the default order skips a provider that opted out of it; an explicit pin never does. */
+const autoSelectable = (d: AiProviderDescriptor) => d.autoSelect !== false;
 
 /**
  * What a task selects from env: the pin if set, else the first configured provider in registry
@@ -27,12 +31,19 @@ export const visionModel = (d: AiProviderDescriptor) =>
  *   good for tool calling), so a Gemini vision key never starts answering chat.
  */
 export function deriveTask(task: AiTask, credentials: Map<string, ResolvedSecret>): TaskSetting {
+  // Registry order is the default order; a provider with `autoSelect: false` (the
+  // OpenAI-compatible one) is only ever chosen by an explicit pin.
+  const candidates = AI_PROVIDER_REGISTRY.filter(autoSelectable);
+
   if (task === "vision") {
     const pin = env("SCREENSHOT_PARSER")?.toLowerCase();
     const pinned = findProvider(pin);
-    if (pinned) return { provider: pinned.id, model: visionModel(pinned), effort: null };
-    const first = AI_PROVIDER_REGISTRY.find((d) => d.isConfigured(credentials.get(d.id)));
-    return first ? { provider: first.id, model: visionModel(first), effort: null } : OFF;
+    if (pinned)
+      return { provider: pinned.id, model: modelOrNull(visionModel(pinned)), effort: null };
+    const first = candidates.find((d) => d.isConfigured(credentials.get(d.id)));
+    return first
+      ? { provider: first.id, model: modelOrNull(visionModel(first)), effort: null }
+      : OFF;
   }
 
   const chatModel = (d: AiProviderDescriptor) =>
@@ -48,7 +59,7 @@ export function deriveTask(task: AiTask, credentials: Map<string, ResolvedSecret
     const pinned = findProvider(pin);
     return pinned ? setting(pinned) : OFF;
   }
-  const first = AI_PROVIDER_REGISTRY.find(
+  const first = candidates.find(
     (d) => d.isConfigured(credentials.get(d.id)) && Boolean(chatModel(d)),
   );
   return first ? setting(first) : OFF;
