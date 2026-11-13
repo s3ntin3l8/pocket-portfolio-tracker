@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import type { ResolvedSecret } from "../market-data/types.js";
 import { compatKey, env, findProvider, openAiV1, type AiTask } from "./registry.js";
 
@@ -168,6 +168,9 @@ async function listOpenAICompat(
   });
 }
 
+/** Random per process: makes the cache identity of a key unguessable and unreproducible elsewhere. */
+const CACHE_ID_SECRET = randomBytes(32);
+
 const cache = new Map<string, { at: number; models: AiModel[] }>();
 
 /** Drop cached model lists (all, or one provider's) — e.g. after its credential changed. */
@@ -203,8 +206,10 @@ export async function listModels(
         : "";
   const baseUrl = d.baseUrl(secret) ?? "";
   // Keyed by credential so a changed key/URL never serves the previous account's list.
-  // The key is hashed so the process-lifetime cache never holds it in plaintext.
-  const keyId = createHash("sha256").update(apiKey).digest("hex").slice(0, 16);
+  // The key is never held in plaintext by the process-lifetime cache: only a keyed digest (HMAC
+  // under a per-process random secret) identifies it. This is a cache identity, not password
+  // storage, and the secret never leaves the process.
+  const keyId = createHmac("sha256", CACHE_ID_SECRET).update(apiKey).digest("hex").slice(0, 16);
   const cacheKey = `${provider}|${d.credential === "url" ? `${baseUrl}|${keyId}` : keyId}`;
 
   let all = cache.get(cacheKey);
