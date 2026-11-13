@@ -511,9 +511,17 @@ describe("admin AI providers", () => {
     await db.execute(sql`CREATE TABLE vision_provider_settings (provider text)`);
     await db.execute(sql`CREATE TABLE chat_provider_settings (provider text)`);
     await db.execute(sql`CREATE TABLE chat_settings (id integer)`);
-    expect(await legacyTables()).toHaveLength(3);
-    for (const st of statements) await db.execute(sql.raw(st));
-    expect(await legacyTables()).toHaveLength(0);
+    try {
+      expect(await legacyTables()).toHaveLength(3);
+      for (const st of statements) await db.execute(sql.raw(st));
+      expect(await legacyTables()).toHaveLength(0);
+    } finally {
+      // Never leave the recreated tables behind: against a persistent database the next run
+      // (and the "gone from a migrated database" test) would otherwise fail on order alone.
+      await db.execute(sql`DROP TABLE IF EXISTS vision_provider_settings`);
+      await db.execute(sql`DROP TABLE IF EXISTS chat_provider_settings`);
+      await db.execute(sql`DROP TABLE IF EXISTS chat_settings`);
+    }
     expect(await db.select().from(aiTaskSettings)).toMatchObject([
       { task: "chat", provider: "claude", model: "m" },
     ]);
