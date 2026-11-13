@@ -412,12 +412,19 @@ export function blendAnnouncedDividends<
 ): P[] {
   const consumed = new Set<P>();
   const dayOf = (s: string) => new Date(`${s}T00:00:00.000Z`).getTime() / DAY_MS;
+  const normCcy = (c: string) => c.trim().toUpperCase();
   const runRates = new Map<string, Decimal>();
   const runRate = (instrumentId: string, currency: string): Decimal | null => {
-    const key = `${instrumentId}|${currency}`;
+    const key = `${instrumentId}|${normCcy(currency)}`;
     if (!runRates.has(key)) {
       const vals = projected
-        .filter((p) => p.instrumentId === instrumentId && p.currency === currency && p.perShare)
+        .filter(
+          (p) =>
+            p.instrumentId === instrumentId &&
+            p.currency !== undefined &&
+            normCcy(p.currency) === normCcy(currency) &&
+            p.perShare,
+        )
         .map((p) => new Decimal(p.perShare as string))
         .filter((v) => v.gt(0))
         .sort((x, y) => x.comparedTo(y));

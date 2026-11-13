@@ -131,6 +131,12 @@ describe("blendAnnouncedDividends amount band", () => {
     );
   });
 
+  it("compares currencies case- and whitespace-insensitively", () => {
+    expect(blendAnnouncedDividends(QA, [ann("2027-01-20", "5", " usd ")], quarterly)).toHaveLength(
+      4,
+    );
+  });
+
   it("falls back to date-only without comparable amounts", () => {
     const cases = [
       ann("2027-01-20", undefined),
