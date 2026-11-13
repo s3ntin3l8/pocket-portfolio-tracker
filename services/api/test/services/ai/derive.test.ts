@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { deriveTask, NO_LEGACY, type LegacyRows } from "../../../src/services/ai/derive.js";
+import { deriveTask } from "../../../src/services/ai/derive.js";
 import { AI_PROVIDER_REGISTRY, isLocalProvider } from "../../../src/services/ai/registry.js";
 
 const ENV = [
@@ -25,7 +25,6 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 const none = new Map();
-const legacy = (over: Partial<LegacyRows>): LegacyRows => ({ ...NO_LEGACY, ...over });
 
 describe("registry", () => {
   it("lists claude, gemini, openrouter, ollama in default order", () => {
@@ -97,18 +96,6 @@ describe("deriveTask · vision", () => {
     const creds = new Map([["gemini", { apiKey: "from-db" }]]); // pragma: allowlist secret
     expect(deriveTask("vision", creds).provider).toBe("gemini");
   });
-
-  it("follows the legacy priority and enabled switches when seeding", () => {
-    vi.stubEnv("ANTHROPIC_API_KEY", "a");
-    vi.stubEnv("GEMINI_API_KEY", "g");
-    vi.stubEnv("OPENROUTER_API_KEY", "o");
-    const rows = [
-      { provider: "claude", enabled: false, priority: 1 },
-      { provider: "openrouter", enabled: true, priority: 0 },
-    ];
-    expect(deriveTask("vision", none, legacy({ vision: rows })).provider).toBe("openrouter");
-    expect(deriveTask("vision", none, legacy({ vision: [rows[0]!] })).provider).toBe("gemini"); // claude switched off by the admin
-  });
 });
 
 describe("deriveTask · chat", () => {
@@ -155,32 +142,5 @@ describe("deriveTask · chat", () => {
     expect(deriveTask("chat", none)).toMatchObject({ provider: "ollama", model: null });
     vi.stubEnv("CHAT_PROVIDER", "nope");
     expect(deriveTask("chat", none).provider).toBeNull();
-  });
-
-  it("the admin's legacy pin beats the env pin, and legacy overrides win", () => {
-    vi.stubEnv("ANTHROPIC_API_KEY", "k");
-    vi.stubEnv("OPENROUTER_API_KEY", "k");
-    vi.stubEnv("CHAT_PROVIDER", "claude");
-    const l = legacy({
-      pinned: "openrouter",
-      chat: [{ provider: "openrouter", enabled: null, priority: null, model: "admin/model" }],
-    });
-    expect(deriveTask("chat", none, l)).toMatchObject({
-      provider: "openrouter",
-      model: "admin/model",
-    });
-  });
-
-  it("inherits the legacy vision order and switches unless chat overrides them", () => {
-    vi.stubEnv("ANTHROPIC_API_KEY", "k");
-    vi.stubEnv("OPENROUTER_API_KEY", "k");
-    vi.stubEnv("OPENROUTER_CHAT_MODEL", "m");
-    const off = legacy({ vision: [{ provider: "claude", enabled: false, priority: 1 }] });
-    expect(deriveTask("chat", none, off).provider).toBe("openrouter");
-    const back = legacy({
-      vision: [{ provider: "claude", enabled: false, priority: 1 }],
-      chat: [{ provider: "claude", enabled: true, priority: null, model: null }],
-    });
-    expect(deriveTask("chat", none, back).provider).toBe("claude");
   });
 });

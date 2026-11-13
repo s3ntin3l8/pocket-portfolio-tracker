@@ -87,20 +87,18 @@ be loaded. A credential is an encrypted DB value, else the provider's env var; s
 | `ollama`     | `OLLAMA_BASE_URL`    | tool-calling quality depends on the model. `local` is derived from the URL (loopback, private ranges, `.local`/`.internal`, single-label/Docker names), so a remote URL is reported as not local                                                                         |
 | `gemini`     | `GEMINI_API_KEY`     | Gemini `generateContent` with function calling, streamed. The model's parts (including thought signatures) are replayed verbatim between tool rounds                                                                                                                     |
 
-### Upgrading from the priority lists
+### Seeding the task settings
 
-At startup, for each task that has no stored setting yet, the API stores today's effective choice
-(`ai_task_settings`), so nothing changes on upgrade: the old vision order, the chat overrides and pin, and
-`SCREENSHOT_PARSER` / `CHAT_PROVIDER` / `*_VISION_MODEL` / `*_CHAT_MODEL` / `ANTHROPIC_CHAT_EFFORT` /
-`OPENROUTER_ALLOW_DATA_COLLECTION` are folded in. A task that has nothing selectable at that start (no key yet) stays
-without a setting and is seeded again on a later start, e.g. after a key is added to `.env`.
-A provider with only a vision key is **not** moved to chat (a chat model was always required for Gemini, OpenRouter
-and Ollama), and a provider the admin had switched off, or a chat pin to a local one, stays that way: when the old
-state resolved to "off" an explicit "off" is stored (it holds once the old tables are dropped), and a task with no
-stored setting is **off**, never filled in from env at runtime (so a failed seed can't switch a provider on either). Once a task has a stored setting **those env vars no
-longer select anything for it**; edit the setting in the UI. Keys and URLs in
-the environment still work as the fallback for a connection with no stored credential. Stored credentials move from
-the `vision:` to the `ai:` namespace in migration `0100`.
+At startup, for each task that has no stored setting yet, the API stores the choice derived from env
+(`SCREENSHOT_PARSER` / `CHAT_PROVIDER` / `*_VISION_MODEL` / `*_CHAT_MODEL` / `ANTHROPIC_CHAT_EFFORT` /
+`OPENROUTER_ALLOW_DATA_COLLECTION`) in `ai_task_settings`. A task that has nothing selectable at that start (no key
+yet) stays without a setting and is seeded again on a later start, e.g. after a key is added to `.env`. A provider
+with only a vision key is **not** chosen for chat (a chat model is always required for Gemini, OpenRouter and Ollama).
+A task with no stored setting is **off**, never filled in from env at runtime (so a failed seed can't switch a
+provider on either). Once a task has a stored setting **those env vars no longer select anything for it**; edit the
+setting in the UI. Keys and URLs in the environment still work as the fallback for a connection with no stored
+credential. Stored credentials moved from the `vision:` to the `ai:` namespace in migration `0100`; the old
+`vision_provider_settings` / `chat_provider_settings` / `chat_settings` tables were dropped in `0101`.
 
 Provider adapters use plain `fetch` (no SDK), like the vision parsers.
 

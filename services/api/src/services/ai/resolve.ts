@@ -13,9 +13,9 @@ export interface AiConfig {
   /** The admin's stored settings. */
   tasks: Map<AiTask, TaskSetting>;
   /**
-   * A task with no stored row is off, never derived from env: only `seedAiTaskSettings` (which
-   * also sees the legacy admin switches and pin) may turn env into a selection. If the seed
-   * failed, or the legacy state resolved to "off", env must not quietly switch a provider on.
+   * A task with no stored row is off, never derived from env: only `seedAiTaskSettings` may turn
+   * env into a selection. If the seed failed, or a task was stored as an explicit "off", env
+   * must not quietly switch a provider on.
    * Under test there is no DB, so the env-derived choice stands in for the seed.
    */
   envFallback: boolean;

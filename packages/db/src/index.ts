@@ -12,7 +12,6 @@ import type {
   providerUsage,
   scrapedQuotes,
   providerCredentials,
-  visionProviderSettings,
   adminAuditLog,
   importSettings,
   storageSettings,
@@ -81,8 +80,6 @@ export type DividendEvent = typeof dividendEvents.$inferSelect;
 export type NewDividendEvent = typeof dividendEvents.$inferInsert;
 export type ProviderCredential = typeof providerCredentials.$inferSelect;
 export type NewProviderCredential = typeof providerCredentials.$inferInsert;
-export type VisionProviderSetting = typeof visionProviderSettings.$inferSelect;
-export type NewVisionProviderSetting = typeof visionProviderSettings.$inferInsert;
 export type AdminAuditEntry = typeof adminAuditLog.$inferSelect;
 export type NewAdminAuditEntry = typeof adminAuditLog.$inferInsert;
 export type ImportSettingsRow = typeof importSettings.$inferSelect;
