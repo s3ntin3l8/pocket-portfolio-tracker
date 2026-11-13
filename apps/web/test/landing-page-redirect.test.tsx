@@ -38,6 +38,7 @@ describe("landing page session redirect", () => {
   afterEach(() => {
     delete process.env.AUTH_SECRET;
     delete process.env.AUTH_LOCAL_SECRET;
+    delete process.env.AUTHENTIK_ISSUER;
   });
 
   it("sends a signed-in visitor to /holdings", async () => {

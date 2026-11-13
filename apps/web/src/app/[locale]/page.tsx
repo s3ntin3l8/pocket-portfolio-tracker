@@ -52,7 +52,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
 
   // A visitor who already holds a session (PWA start_url and bookmarks both point at "/")
   // goes straight into the app instead of being shown the sign-in page again. An expired
-  // access token still redirects (the jwt callback rotates it). A session whose refresh
+  // access token still redirects (rotation happens on the client's /api/auth/session poll). A session whose refresh
   // already failed does NOT: SessionErrorGuard pushes those back to "/", so redirecting
   // them would loop and lock local-auth users out of the sign-in form.
   if (!devBypass && authConfigured) {

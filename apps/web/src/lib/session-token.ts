@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { getToken } from "next-auth/jwt";
+import { UNRECOVERABLE_SESSION_ERRORS } from "@/lib/session-errors";
 
 /**
  * Auth.js v5 cookie-security derivation mirrors AUTH_URL's own scheme (matches
@@ -60,7 +61,7 @@ export const getSessionState = cache(async (cookieHeader: string): Promise<Sessi
     isAuthenticated: true,
     isExpired,
     isUnrecoverable:
-      token.error === "RefreshAccessTokenError" || token.error === "RefreshTokenMissing",
+      typeof token.error === "string" && UNRECOVERABLE_SESSION_ERRORS.has(token.error),
     token: token.accessToken,
   };
 });
