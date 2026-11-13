@@ -2904,6 +2904,9 @@
     "historyNote": "Saved conversations keep only the text of your questions and the answers, for 90 days.",
     "historyOpen": "Open: {title}",
     "historyDelete": "Delete: {title}",
+    "historyOff": "Saving chats is off, so there is nothing to reopen yet. Turn it on to keep the text of your conversations for 90 days and reopen them here.",
+    "historyEnable": "Turn on saving",
+    "historyEnableError": "Couldn't turn on saving. You can also do it in Settings → Investing.",
     "historyFull": "This conversation is full, so new messages aren't being saved. Start a new chat to keep going."
   }
 }

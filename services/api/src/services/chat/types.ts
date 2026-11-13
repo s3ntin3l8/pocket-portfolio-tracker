@@ -61,8 +61,15 @@ export interface ChatProvider {
   /**
    * Same turn as `complete`, but text is reported through `onDelta` as it arrives. Resolves with
    * the complete result once the turn ends. Optional: the loop falls back to `complete`.
+   * `onThinking` receives a short progress note the model wrote about what it is doing (only
+   * providers that expose one call it; it is never part of the answer).
    */
-  stream?(req: ChatRequest, onDelta: (text: string) => void, log?: Logger): Promise<ChatResult>;
+  stream?(
+    req: ChatRequest,
+    onDelta: (text: string) => void,
+    log?: Logger,
+    onThinking?: (text: string) => void,
+  ): Promise<ChatResult>;
 }
 
 /**

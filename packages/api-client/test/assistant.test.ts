@@ -225,6 +225,23 @@ describe("delta events", () => {
   });
 });
 
+describe("thinking events", () => {
+  it("are parsed as a known event type (a progress note, not part of the answer)", async () => {
+    const events = [];
+    for await (const e of parseAssistantStream(
+      bodyOf([
+        enc.encode('event: thinking\ndata: {"text":"Checking your holdings."}\n\n'),
+        enc.encode('event: delta\ndata: {"text":"Hi"}\n\n'),
+      ]),
+    ))
+      events.push(e);
+    expect(events).toEqual([
+      { type: "thinking", text: "Checking your holdings." },
+      { type: "delta", text: "Hi" },
+    ]);
+  });
+});
+
 describe("conversation events", () => {
   it("are parsed as a known event type", async () => {
     const events = [];

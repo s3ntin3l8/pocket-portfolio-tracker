@@ -2904,6 +2904,9 @@
     "historyNote": "Percakapan tersimpan hanya menyimpan teks pertanyaan dan jawaban, selama 90 hari.",
     "historyOpen": "Buka: {title}",
     "historyDelete": "Hapus: {title}",
+    "historyOff": "Penyimpanan chat nonaktif, jadi belum ada yang bisa dibuka kembali. Aktifkan untuk menyimpan teks percakapan selama 90 hari dan membukanya lagi di sini.",
+    "historyEnable": "Aktifkan penyimpanan",
+    "historyEnableError": "Gagal mengaktifkan penyimpanan. Anda juga bisa mengaturnya di Pengaturan → Investasi.",
     "historyFull": "Percakapan ini sudah penuh, sehingga pesan baru tidak disimpan. Mulai chat baru untuk melanjutkan."
   }
 }

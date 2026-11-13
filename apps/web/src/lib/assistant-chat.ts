@@ -18,6 +18,8 @@ export interface ChatTurn {
   content: string;
   /** Text of the model turn still being generated (a preview; `message` replaces it). */
   streaming?: string;
+  /** The model's latest progress note ("what I'm doing"); shown until the answer text starts. */
+  progress?: string;
   /** Tool calls the assistant made while answering (assistant turns only). */
   steps: ToolStep[];
   /** An i18n key under `Assistant.errors` when this turn ended in a failure. */
@@ -45,12 +47,15 @@ export function toRequestMessages(turns: ChatTurn[]): AssistantChatMessage[] {
 /** Fold one stream event into the assistant turn it belongs to. */
 export function applyEvent(turn: ChatTurn, event: AssistantEvent): ChatTurn {
   switch (event.type) {
+    case "thinking":
+      return { ...turn, progress: event.text };
     case "delta":
-      return { ...turn, streaming: (turn.streaming ?? "") + event.text };
+      return { ...turn, progress: undefined, streaming: (turn.streaming ?? "") + event.text };
     case "message":
       // A turn with tool calls can produce several model messages; keep them as paragraphs.
       return {
         ...turn,
+        progress: undefined,
         streaming: undefined,
         content: turn.content ? `${turn.content}\n\n${event.text}` : event.text,
       };

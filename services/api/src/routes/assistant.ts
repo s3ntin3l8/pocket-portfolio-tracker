@@ -76,7 +76,8 @@ function systemPrompt(scope: string | undefined, canPropose: boolean): string {
  * so per-user scoping, redaction and rate limits are identical. Nothing is stored unless the
  * user opted in (`assistantSaveHistory`); then only the text of each completed turn is.
  *
- * Events: `status` {provider,local}, `tool_call`, `tool_result`, `delta` {text}, `message` {text}
+ * Events: `status` {provider,local}, `thinking` {text} (a progress note, Claude only), `tool_call`,
+ * `tool_result`, `delta` {text}, `message` {text}
  * (one per model turn), `conversation` {id,saved} (history on), `error` {error,status?}, `done`
  * {rounds}. Failures are short
  * codes; upstream bodies never reach the client.

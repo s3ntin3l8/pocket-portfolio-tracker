@@ -43,7 +43,8 @@ export interface AssistantChatRequest {
 
 /**
  * One event of the chat stream. Within a model turn all `tool_call`s come first (in call
- * order), then the `tool_result`s in the same order; pair them by `id`. `delta` is a text
+ * order), then the `tool_result`s in the same order; pair them by `id`. `thinking` is a short
+ * progress note (what the model is doing; show it while waiting, never as the answer). `delta` is a text
  * fragment of the turn being generated; `message` is that turn's complete text and marks it
  * finished (it supersedes the deltas, which are only a preview). `error` ends the stream;
  * `done` is the normal end.
@@ -52,6 +53,7 @@ export type AssistantEvent =
   | { type: "status"; provider: string; local: boolean }
   | { type: "tool_call"; id: string; name: string; input: unknown }
   | { type: "tool_result"; id: string; name: string; ok: boolean }
+  | { type: "thinking"; text: string }
   | { type: "delta"; text: string }
   | { type: "message"; text: string }
   | { type: "conversation"; id: string; saved: boolean }
@@ -66,6 +68,7 @@ const EVENT_TYPES = new Set<AssistantEvent["type"]>([
   "status",
   "tool_call",
   "tool_result",
+  "thinking",
   "delta",
   "message",
   "conversation",

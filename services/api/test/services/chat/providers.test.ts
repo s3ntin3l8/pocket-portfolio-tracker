@@ -68,6 +68,7 @@ describe("AnthropicChatProvider", () => {
     expect(c.url).toBe("https://api.anthropic.com/v1/messages");
     expect(c.headers["x-api-key"]).toBe("sk-test");
     expect(c.headers["anthropic-version"]).toBe("2023-06-01");
+    // A non-streamed turn has nowhere to show progress notes, so it doesn't request them.
     expect(c.headers["anthropic-beta"]).toBe("server-side-fallback-2026-07-01");
     expect(c.body).toMatchObject({
       model: "claude-opus-5-5",
@@ -75,6 +76,7 @@ describe("AnthropicChatProvider", () => {
       system: "SYS",
       fallbacks: "default",
     });
+    expect(c.body).not.toHaveProperty("thinking");
     expect(c.body.output_config).toBeUndefined();
     expect(c.body.tools[0]).toMatchObject({
       name: "list_portfolios",

@@ -48,5 +48,22 @@ export default function AssistantHost({
     if (send(seed.text)) handledSeed.current = seed.id;
   }, [seed, send, streaming]);
 
-  return <AssistantDialog open={open} onOpenChange={onOpenChange} chat={chat} status={status} />;
+  const enableHistory = useCallback(async () => {
+    try {
+      await client.putPreferences({ assistantSaveHistory: true });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [client]);
+
+  return (
+    <AssistantDialog
+      open={open}
+      onOpenChange={onOpenChange}
+      chat={chat}
+      status={status}
+      enableHistory={enableHistory}
+    />
+  );
 }

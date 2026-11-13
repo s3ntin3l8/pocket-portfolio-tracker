@@ -23,10 +23,29 @@ type Block = { type: string; [k: string]: unknown };
 
 const DEFAULT_BASE_URL = "https://api.anthropic.com";
 
+const FALLBACK_BETA = "server-side-fallback-2026-07-01";
+const THINKING_UPDATES_BETA = "thinking-display-updates-2026-08-18";
+
+/** What the API writes in place of a progress note that was cut off; never shown. */
+const INTERRUPTED_NOTE = "This part of the response was interrupted before it finished.";
+
+/**
+ * Models whose between-tool progress notes can be requested as text (`thinking.display:
+ * "updates"`). On these, thinking is always on and its text is hidden by default, so a long
+ * tool turn looks silent. Anything else (older or unknown ids, e.g. typed in the admin) gets
+ * no `thinking` parameter at all, exactly as before: nothing is switched on or can 400.
+ */
+export function supportsProgressUpdates(model: string): boolean {
+  return /^claude-(opus-5-5|sonnet-5-5|fable-5(-[12])?|mythos-5(-[12])?)(-20\d{6}|-latest)?$/.test(
+    model,
+  );
+}
+
 /**
  * Chat with tools over the Anthropic Messages API (raw fetch with an injectable `fetch`,
- * like the vision parser — no SDK dependency). Thinking is left at the model default; for
- * the thinking-on models the assistant turn's content blocks are replayed verbatim between
+ * like the vision parser — no SDK dependency). Thinking stays at the model default, except that
+ * models in `supportsProgressUpdates` also return their between-tool progress notes as text;
+ * for the thinking-on models the assistant turn's content blocks are replayed verbatim between
  * tool rounds (`providerState`), as the API requires.
  */
 export class AnthropicChatProvider implements ChatProvider {
@@ -61,6 +80,12 @@ export class AnthropicChatProvider implements ChatProvider {
     if (!this.isConfigured()) throw new ChatProviderError("provider_not_configured");
     // Server-side refusal fallback is a first-party-API feature: only request it there.
     const fallbacks = this.baseUrl === DEFAULT_BASE_URL;
+    // Same first-party-only rule for the progress-note beta. Only a streamed turn can show the
+    // notes (`complete()` has no sink for them), so only a streamed request pays for them.
+    const updates = stream && fallbacks && supportsProgressUpdates(this.model);
+    const betas = [fallbacks ? FALLBACK_BETA : null, updates ? THINKING_UPDATES_BETA : null].filter(
+      Boolean,
+    );
 
     let res: Response;
     try {
@@ -70,7 +95,7 @@ export class AnthropicChatProvider implements ChatProvider {
           "content-type": "application/json",
           "x-api-key": this.apiKey,
           "anthropic-version": "2023-06-01",
-          ...(fallbacks ? { "anthropic-beta": "server-side-fallback-2026-07-01" } : {}),
+          ...(betas.length > 0 ? { "anthropic-beta": betas.join(",") } : {}),
         },
         signal,
         body: JSON.stringify({
@@ -88,6 +113,7 @@ export class AnthropicChatProvider implements ChatProvider {
               }
             : {}),
           messages: req.messages.map(toAnthropicMessage),
+          ...(updates ? { thinking: { type: "adaptive", display: "updates" } } : {}),
           ...(this.effort ? { output_config: { effort: this.effort } } : {}),
           ...(fallbacks ? { fallbacks: "default" } : {}),
         }),
@@ -144,6 +170,7 @@ export class AnthropicChatProvider implements ChatProvider {
     req: ChatRequest,
     onDelta: (text: string) => void,
     log?: Logger,
+    onThinking?: (text: string) => void,
   ): Promise<ChatResult> {
     const t0 = Date.now();
     const guard = idleGuard(withTimeout(req.signal), STREAM_IDLE_TIMEOUT_MS);
@@ -197,6 +224,12 @@ export class AnthropicChatProvider implements ChatProvider {
             }
             case "content_block_stop": {
               const i = ev.index;
+              // A thinking block is, under `display: "updates"`, a short progress note. It is
+              // reported whole (so a cut-off marker can be dropped), never as it streams.
+              if (typeof i === "number" && blocks[i]?.type === "thinking") {
+                const note = String(blocks[i]!.thinking ?? "").trim();
+                if (note && note !== INTERRUPTED_NOTE) onThinking?.(note);
+              }
               if (typeof i === "number" && toolJson.has(i) && blocks[i]) {
                 // Parsed only once the block is complete. Empty input means "no arguments";
                 // truncated/invalid JSON becomes null so the loop refuses to run the call.
@@ -240,6 +273,9 @@ export class AnthropicChatProvider implements ChatProvider {
           model: model ?? this.model,
           stop: stopReason,
           usage,
+          // Whether progress notes were requested, so "still silent with model X" can be
+          // answered from the log.
+          progressUpdates: this.baseUrl === DEFAULT_BASE_URL && supportsProgressUpdates(this.model),
           latencyMs: Date.now() - t0,
         },
         "chat turn complete",
