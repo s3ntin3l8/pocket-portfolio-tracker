@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.10](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.9...v0.2.10) (2026-11-14)
+
+
+### Features
+
+* **ai-tools:** give the assistant and MCP trades, prices, loans, plans, imports and data warnings ([#1251](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1251)) ([496e5de](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/496e5defffcf9fa1aceba10d45a329f2d1b939f8))
+* **ai:** configurable OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp) ([#1249](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1249)) ([66a3955](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/66a39552cb0644b838941dfdeb6692524d40712f))
+
+
+### Bug Fixes
+
+* **assistant:** show Claude's progress while it works, align the panel header, make history findable ([#1247](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1247)) ([ec4fdbc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ec4fdbc43dd4275b4189100aa8583123e035f2e0))
+
 ## [0.2.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.8...v0.2.9) (2026-11-13)
 
 
