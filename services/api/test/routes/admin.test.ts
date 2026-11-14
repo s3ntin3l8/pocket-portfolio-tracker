@@ -358,7 +358,13 @@ describe("admin provider config", () => {
       tasks: { task: string; usable: boolean }[];
       encryptionEnabled: boolean;
     };
-    expect(res.connections.map((c) => c.id)).toEqual(["claude", "gemini", "openrouter", "ollama"]);
+    expect(res.connections.map((c) => c.id)).toEqual([
+      "claude",
+      "gemini",
+      "openrouter",
+      "ollama",
+      "openai-compatible",
+    ]);
     // Ollama is not configured by default (OLLAMA_BASE_URL not set in tests).
     expect(res.connections.find((c) => c.id === "ollama")).toMatchObject({
       configured: false,

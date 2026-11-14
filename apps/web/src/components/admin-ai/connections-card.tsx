@@ -17,7 +17,8 @@ import { Switch } from "@/components/ui/switch";
 import { useApiCall } from "@/lib/use-api-call";
 import type { AdminAiClient } from "./types";
 
-const hasCredential = (c: AdminAiConnection) => (c.credential === "url" ? c.hasUrl : c.hasKey);
+const hasCredential = (c: AdminAiConnection) =>
+  c.credential === "url" ? c.hasUrl || (c.optionalKey && c.hasKey) : c.hasKey;
 
 /** The key/URL state line under a provider's name. Never shows a secret, only a hint. */
 function StatusLine({
@@ -31,7 +32,11 @@ function StatusLine({
   if (!encryptionEnabled) {
     return (
       <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-        {c.keySource === "env" && <span className="font-mono">{t("keyFromEnv")}</span>}
+        {c.url ? (
+          <span className="break-all font-mono">{c.url}</span>
+        ) : (
+          c.keySource === "env" && <span className="font-mono">{t("keyFromEnv")}</span>
+        )}
         <span className="inline-flex items-center gap-1 text-warning">
           <ShieldOff className="size-3 shrink-0" />
           {t("encryptionDisabled")}
@@ -39,8 +44,18 @@ function StatusLine({
       </span>
     );
   }
+  if (c.credential === "url") {
+    // The URL itself is shown (it isn't secret); a stored key only as its hint.
+    const base = c.url ?? (hasCredential(c) ? t("visionUrlSet") : null);
+    const text = base
+      ? `${base}${c.keyHint ? ` · ${c.keyHint}` : ""}`
+      : c.keySource === "env"
+        ? t("keyFromEnv")
+        : t("keyNone");
+    return <span className="break-all font-mono">{text}</span>;
+  }
   const text = hasCredential(c)
-    ? (c.keyHint ?? (c.credential === "url" ? t("visionUrlSet") : "••••"))
+    ? (c.keyHint ?? "••••")
     : c.keySource === "env"
       ? t("keyFromEnv")
       : t("keyNone");
@@ -89,7 +104,7 @@ function TestButton({
 }
 
 /**
- * The providers' connections: one key (or, for Ollama, URL) per provider, shared by both
+ * The providers' connections: one key (or, for Ollama and OpenAI-compatible servers, a URL) per provider, shared by both
  * tasks. Saving a key needs server-side encryption; picking a provider for a task does not.
  */
 export function ConnectionsCard({
@@ -182,10 +197,17 @@ export function ConnectionsCard({
                 <CredentialEditorPanel
                   label={c.label}
                   isUrl={isUrl}
+                  // Prefill only a stored URL: saving an env one would silently pin it in the DB.
+                  initialValue={isUrl && c.hasUrl ? (c.url ?? "") : ""}
+                  urlPlaceholder={
+                    c.id === "openai-compatible" ? t("aiOpenAiCompatUrlPlaceholder") : undefined
+                  }
+                  optionalKey={isUrl && c.optionalKey}
+                  hasKey={c.hasKey}
                   hasCredential={hasCredential(c)}
-                  onSave={async (value) => {
+                  onSave={async (value, key) => {
                     const body: ProviderCredentialInput = isUrl
-                      ? { urlOverride: value }
+                      ? { urlOverride: value, ...(key ? { apiKey: key } : {}) }
                       : { apiKey: value };
                     onChange(await client.setAdminAiCredential(c.id, body));
                   }}

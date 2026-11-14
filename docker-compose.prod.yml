@@ -126,6 +126,11 @@ services:
       OPENROUTER_ALLOW_DATA_COLLECTION: ${OPENROUTER_ALLOW_DATA_COLLECTION:-}
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-}
+      # Any OpenAI-compatible server (LM Studio, vLLM, ...): never auto-selected, see docs/assistant.md.
+      OPENAI_COMPAT_BASE_URL: ${OPENAI_COMPAT_BASE_URL:-}
+      OPENAI_COMPAT_API_KEY: ${OPENAI_COMPAT_API_KEY:-}
+      OPENAI_COMPAT_VISION_MODEL: ${OPENAI_COMPAT_VISION_MODEL:-}
+      OPENAI_COMPAT_CHAT_MODEL: ${OPENAI_COMPAT_CHAT_MODEL:-}
       ASSISTANT_RATE_LIMIT_MAX: ${ASSISTANT_RATE_LIMIT_MAX:-30}
       # Public web origin, so AI clients that propose transactions get an absolute review link.
       PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:-}

@@ -16,6 +16,10 @@ const ENV = [
   "OLLAMA_BASE_URL",
   "OLLAMA_VISION_MODEL",
   "OLLAMA_CHAT_MODEL",
+  "OPENAI_COMPAT_BASE_URL",
+  "OPENAI_COMPAT_API_KEY",
+  "OPENAI_COMPAT_VISION_MODEL",
+  "OPENAI_COMPAT_CHAT_MODEL",
   "SCREENSHOT_PARSER",
   "CHAT_PROVIDER",
 ];
@@ -27,13 +31,73 @@ afterEach(() => vi.unstubAllEnvs());
 const none = new Map();
 
 describe("registry", () => {
-  it("lists claude, gemini, openrouter, ollama in default order", () => {
+  it("lists claude, gemini, openrouter, ollama, openai-compatible in default order", () => {
     expect(AI_PROVIDER_REGISTRY.map((d) => d.id)).toEqual([
       "claude",
       "gemini",
       "openrouter",
       "ollama",
+      "openai-compatible",
     ]);
+  });
+
+  it("openai-compatible: URL credential with an optional key, no default model, not auto-selected", () => {
+    const d = AI_PROVIDER_REGISTRY.find((x) => x.id === "openai-compatible")!;
+    expect(d).toMatchObject({
+      label: "OpenAI-compatible",
+      credential: "url",
+      credentialEnvVar: "OPENAI_COMPAT_BASE_URL",
+      optionalKeyEnvVar: "OPENAI_COMPAT_API_KEY",
+      visionModelEnvVar: "OPENAI_COMPAT_VISION_MODEL",
+      chatModelEnvVar: "OPENAI_COMPAT_CHAT_MODEL",
+      defaultVisionModel: "",
+      autoSelect: false,
+    });
+    expect(d.defaultChatModel).toBeUndefined();
+    // Configured by a URL only (stored or env); a key alone is not a connection.
+    expect(d.isConfigured()).toBe(false);
+    expect(d.isConfigured({ apiKey: "k" })).toBe(false); // pragma: allowlist secret
+    expect(d.isConfigured({ url: "http://lmstudio:1234" })).toBe(true);
+    vi.stubEnv("OPENAI_COMPAT_BASE_URL", "http://localhost:1234/");
+    expect(d.isConfigured()).toBe(true);
+    expect(d.baseUrl()).toBe("http://localhost:1234");
+    expect(isLocalProvider(d, { url: "https://llm.example.com/v1" })).toBe(false);
+    expect(isLocalProvider(d)).toBe(true);
+  });
+
+  it("openai-compatible: the env key only goes with the env URL", () => {
+    const d = AI_PROVIDER_REGISTRY.find((x) => x.id === "openai-compatible")!;
+    vi.stubEnv("OPENAI_COMPAT_API_KEY", "env-key"); // pragma: allowlist secret
+    const key = (s: { url?: string; apiKey?: string }) =>
+      (d.createChat(s, "m", {}) as unknown as { apiKey?: string }).apiKey;
+    expect(key({ url: "http://other:1234" })).toBeUndefined();
+    expect(key({ url: "http://other:1234", apiKey: "own" })).toBe("own"); // pragma: allowlist secret
+    expect(key({})).toBe("env-key");
+  });
+
+  it("openai-compatible: chat and vision normalise the URL with or without /v1 and send the key", () => {
+    const d = AI_PROVIDER_REGISTRY.find((x) => x.id === "openai-compatible")!;
+    for (const url of [
+      "http://lm:1234",
+      "http://lm:1234/",
+      "http://lm:1234/v1",
+      "http://lm:1234/v1/",
+    ]) {
+      const chat = d.createChat({ url, apiKey: "k" }, "m", {}) as unknown as {
+        baseUrl: string;
+        apiKey: string;
+        name: string;
+        local: boolean;
+      };
+      expect(chat).toMatchObject({
+        baseUrl: "http://lm:1234/v1",
+        apiKey: "k",
+        name: "openai-compatible",
+        local: true,
+      }); // pragma: allowlist secret
+      const vision = d.createVision({ url }, "m") as unknown as { baseUrl: string; name: string };
+      expect(vision).toMatchObject({ baseUrl: "http://lm:1234", name: "openai-compatible" });
+    }
   });
 
   it("ollama is configured by an explicit URL only (env or stored), never by the localhost default", () => {
@@ -62,6 +126,44 @@ describe("registry", () => {
       expect(isLocalProvider(ollama, { url }), url).toBe(local);
     }
     expect(isLocalProvider(AI_PROVIDER_REGISTRY[0]!)).toBeNull(); // cloud: not applicable
+  });
+});
+
+describe("deriveTask · openai-compatible is never auto-selected", () => {
+  const creds = new Map([["openai-compatible", { url: "http://lm:1234" }]]);
+
+  it("a configured endpoint alone selects nothing for vision or chat", () => {
+    vi.stubEnv("OPENAI_COMPAT_VISION_MODEL", "qwen-vl");
+    vi.stubEnv("OPENAI_COMPAT_CHAT_MODEL", "qwen");
+    expect(deriveTask("vision", creds).provider).toBeNull();
+    expect(deriveTask("chat", creds).provider).toBeNull();
+    vi.stubEnv("OPENAI_COMPAT_BASE_URL", "http://lm:1234");
+    expect(deriveTask("vision", none).provider).toBeNull();
+    expect(deriveTask("chat", none).provider).toBeNull();
+  });
+
+  it("is passed over for a later-configured provider too, but an explicit pin selects it", () => {
+    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama:11434");
+    vi.stubEnv("OPENAI_COMPAT_CHAT_MODEL", "qwen");
+    expect(deriveTask("vision", creds).provider).toBe("ollama");
+    vi.stubEnv("SCREENSHOT_PARSER", "openai-compatible");
+    vi.stubEnv("CHAT_PROVIDER", "openai-compatible");
+    vi.stubEnv("OPENAI_COMPAT_VISION_MODEL", "qwen-vl");
+    expect(deriveTask("vision", creds)).toEqual({
+      provider: "openai-compatible",
+      model: "qwen-vl",
+      effort: null,
+    });
+    expect(deriveTask("chat", creds)).toEqual({
+      provider: "openai-compatible",
+      model: "qwen",
+      effort: null,
+    });
+  });
+
+  it("a pinned endpoint with no model seeds no model (none is assumed)", () => {
+    vi.stubEnv("SCREENSHOT_PARSER", "openai-compatible");
+    expect(deriveTask("vision", creds).model).toBeNull();
   });
 });
 

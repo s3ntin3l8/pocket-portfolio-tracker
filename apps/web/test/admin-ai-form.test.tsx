@@ -18,6 +18,8 @@ function conn(over: Partial<AdminAiConnection> & Pick<AdminAiConnection, "id" | 
     hasKey: false,
     keyHint: null,
     hasUrl: false,
+    url: null,
+    optionalKey: false,
     keySource: null,
     local: null,
     allowDataCollection: null,
@@ -42,8 +44,15 @@ const CONNECTIONS: AdminAiConnection[] = [
     credential: "url",
     configured: true,
     hasUrl: true,
+    url: "http://ollama:11434",
     keySource: "db",
     local: true,
+  }),
+  conn({
+    id: "openai-compatible",
+    label: "OpenAI-compatible",
+    credential: "url",
+    optionalKey: true,
   }),
 ];
 
@@ -294,7 +303,7 @@ describe("AdminAiForm · connections", () => {
     renderForm(makeClient());
     expect(connections().getByText("••••abcd")).toBeInTheDocument();
     expect(connections().getAllByText("from .env")).toHaveLength(1); // OpenRouter via env
-    expect(connections().getByText("URL set")).toBeInTheDocument();
+    expect(connections().getByText("http://ollama:11434")).toBeInTheDocument();
     expect(connections().getByText("Stays on your network")).toBeInTheDocument();
   });
 
@@ -317,7 +326,7 @@ describe("AdminAiForm · connections", () => {
       ),
     });
     renderForm(client);
-    fireEvent.click(connections().getByRole("button", { name: "Set API key" }));
+    fireEvent.click(connections().getAllByRole("button", { name: "Set API key" })[0]!); // Gemini
     fireEvent.change(screen.getByLabelText("API key · Gemini (Google)"), {
       target: { value: "AIza-test-9999" }, // pragma: allowlist secret
     });
@@ -336,13 +345,14 @@ describe("AdminAiForm · connections", () => {
     const client = makeClient();
     renderForm(client);
     fireEvent.click(connections().getByRole("button", { name: "Edit API key: Ollama (local)" }));
-    fireEvent.change(screen.getByLabelText("API key · Ollama (local)"), {
-      target: { value: "http://ollama:11434" },
+    expect(screen.queryByLabelText(/API key \(optional\)/)).not.toBeInTheDocument(); // URL only
+    fireEvent.change(screen.getByLabelText("URL · Ollama (local)"), {
+      target: { value: "http://ollama:11435" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() =>
       expect(client.setAdminAiCredential).toHaveBeenCalledWith("ollama", {
-        urlOverride: "http://ollama:11434",
+        urlOverride: "http://ollama:11435",
       }),
     );
 
@@ -351,6 +361,80 @@ describe("AdminAiForm · connections", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Clear key" }));
     await waitFor(() => expect(client.clearAdminAiCredential).toHaveBeenCalledWith("claude"));
+  });
+
+  it("connects an OpenAI-compatible server by URL plus an optional key", async () => {
+    const client = makeClient();
+    renderForm(client);
+    fireEvent.click(connections().getAllByRole("button", { name: "Set API key" })[1]!); // OpenAI-compatible
+    const urlInput = screen.getByLabelText("URL · OpenAI-compatible");
+    expect(urlInput).toHaveAttribute("placeholder", "http://localhost:1234/v1");
+    expect(screen.getByLabelText("API key (optional) · OpenAI-compatible")).toBeInTheDocument();
+    fireEvent.change(urlInput, { target: { value: "http://lmstudio:1234" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" })); // key left blank
+    await waitFor(() =>
+      expect(client.setAdminAiCredential).toHaveBeenCalledWith("openai-compatible", {
+        urlOverride: "http://lmstudio:1234",
+      }),
+    );
+
+    fireEvent.click(connections().getAllByRole("button", { name: "Set API key" })[1]!); // OpenAI-compatible
+    fireEvent.change(screen.getByLabelText("URL · OpenAI-compatible"), {
+      target: { value: "http://lmstudio:1234" },
+    });
+    fireEvent.change(screen.getByLabelText("API key (optional) · OpenAI-compatible"), {
+      target: { value: "lm-key" }, // pragma: allowlist secret
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(client.setAdminAiCredential).toHaveBeenLastCalledWith("openai-compatible", {
+        urlOverride: "http://lmstudio:1234",
+        apiKey: "lm-key", // pragma: allowlist secret
+      }),
+    );
+  });
+
+  it("shows a connected server's URL and key hint, prefilled in the editor", () => {
+    renderForm(
+      makeClient(),
+      view({
+        connections: CONNECTIONS.map((c) =>
+          c.id === "openai-compatible"
+            ? {
+                ...c,
+                configured: true,
+                hasUrl: true,
+                hasKey: true,
+                keyHint: "••••4321",
+                url: "http://lmstudio:1234",
+                keySource: "db" as const,
+                local: true,
+              }
+            : c,
+        ),
+      }),
+    );
+    expect(connections().getByText("http://lmstudio:1234 · ••••4321")).toBeInTheDocument();
+    fireEvent.click(connections().getByRole("button", { name: "Edit API key: OpenAI-compatible" }));
+    expect(screen.getByLabelText("URL · OpenAI-compatible")).toHaveValue("http://lmstudio:1234");
+    expect(
+      screen.getByText("Leave blank to keep the stored key (it is dropped if you change the URL)."),
+    ).toBeInTheDocument();
+  });
+
+  it("without encryption, an env-supplied URL is still shown", () => {
+    renderForm(
+      makeClient(),
+      view({
+        encryptionEnabled: false,
+        connections: CONNECTIONS.map((c) =>
+          c.id === "openai-compatible"
+            ? { ...c, configured: true, url: "http://env-lm:1234", keySource: "env" as const }
+            : c,
+        ),
+      }),
+    );
+    expect(connections().getByText("http://env-lm:1234")).toBeInTheDocument();
   });
 
   it("without server-side encryption, credentials can't be edited but tasks still can", () => {

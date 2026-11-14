@@ -36,6 +36,17 @@ export interface AiProviderDescriptor {
   credential: "key" | "url";
   /** Env var supplying the key/URL when no DB credential is stored. */
   credentialEnvVar: string;
+  /**
+   * A URL provider that can also carry an API key (an authenticated OpenAI-compatible server).
+   * The key is optional; this is the env var it falls back to. Absent = the provider takes none.
+   */
+  optionalKeyEnvVar?: string;
+  /**
+   * false = never picked by the default vision/chat order (`deriveTask`): only an explicit
+   * `SCREENSHOT_PARSER` / `CHAT_PROVIDER` pin or the admin selects it. For an endpoint that being
+   * "configured" says nothing about (it can be any server, so it must not receive data unasked).
+   */
+  autoSelect?: boolean;
   /** Env var seeding the vision / chat model on first boot. */
   visionModelEnvVar: string;
   chatModelEnvVar: string;
@@ -55,8 +66,20 @@ export interface AiProviderDescriptor {
 }
 
 const key = (s: ResolvedSecret | undefined, envVar: string) => s?.apiKey ?? env(envVar) ?? "";
-const url = (s: ResolvedSecret | undefined) =>
-  (s?.url ?? env("OLLAMA_BASE_URL") ?? "").replace(/\/+$/, "");
+const urlFrom = (s: ResolvedSecret | undefined, envVar: string) =>
+  (s?.url ?? env(envVar) ?? "").trim().replace(/\/+$/, "");
+const url = (s: ResolvedSecret | undefined) => urlFrom(s, "OLLAMA_BASE_URL");
+
+/** The server root of an OpenAI-compatible URL, whether or not it was entered with `/v1`. */
+export const openAiRoot = (u: string) => u.trim().replace(/\/+$/, "").replace(/\/v1$/i, "");
+/** The same URL as the `/v1` base the chat and models endpoints hang off. */
+export const openAiV1 = (u: string) => (u.trim() ? `${openAiRoot(u)}/v1` : "");
+
+export const compatUrl = (s: ResolvedSecret | undefined) => urlFrom(s, "OPENAI_COMPAT_BASE_URL");
+// The env key belongs to the env URL: with a stored URL it is never sent there, so repointing
+// the URL cannot hand a key to another host.
+export const compatKey = (s: ResolvedSecret | undefined) =>
+  s?.apiKey ?? (s?.url ? "" : (env("OPENAI_COMPAT_API_KEY") ?? ""));
 
 /** In default order: the first configured one is what an env-only deployment gets. */
 export const AI_PROVIDER_REGISTRY: AiProviderDescriptor[] = [
@@ -134,12 +157,43 @@ export const AI_PROVIDER_REGISTRY: AiProviderDescriptor[] = [
         model,
       }),
   },
+  {
+    // LM Studio, vLLM, llama.cpp, LocalAI, a LiteLLM proxy: any server speaking the OpenAI dialect.
+    id: "openai-compatible",
+    label: "OpenAI-compatible",
+    credential: "url",
+    credentialEnvVar: "OPENAI_COMPAT_BASE_URL",
+    optionalKeyEnvVar: "OPENAI_COMPAT_API_KEY",
+    autoSelect: false,
+    visionModelEnvVar: "OPENAI_COMPAT_VISION_MODEL",
+    chatModelEnvVar: "OPENAI_COMPAT_CHAT_MODEL",
+    // No default: which models a server has loaded is up to it, so a model must be chosen.
+    defaultVisionModel: "",
+    isConfigured: (s) => Boolean(compatUrl(s)),
+    baseUrl: (s) => compatUrl(s) || null,
+    createVision: (s, model) =>
+      new OllamaVisionParser({
+        name: "openai-compatible",
+        baseUrl: openAiRoot(compatUrl(s)),
+        apiKey: compatKey(s) || undefined,
+        model,
+      }),
+    createChat: (s, model) =>
+      new OpenAICompatChatProvider({
+        name: "openai-compatible",
+        label: "OpenAI-compatible",
+        local: isLocalUrl(compatUrl(s)),
+        baseUrl: openAiV1(compatUrl(s)),
+        apiKey: compatKey(s) || undefined,
+        model,
+      }),
+  },
 ];
 
 export const findProvider = (id: string | null | undefined) =>
   id ? AI_PROVIDER_REGISTRY.find((d) => d.id === id) : undefined;
 
-/** Whether this provider's endpoint is on the operator's own network (only Ollama can be). */
+/** Whether this provider's endpoint is on the operator's own network (Ollama or an OpenAI-compatible server). */
 export function isLocalProvider(d: AiProviderDescriptor, secret?: ResolvedSecret): boolean | null {
   const base = d.baseUrl(secret);
   return base === null ? null : isLocalUrl(base);

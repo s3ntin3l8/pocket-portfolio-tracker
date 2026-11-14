@@ -19,6 +19,7 @@ import {
   env,
   findProvider,
   isLocalProvider,
+  openAiRoot,
 } from "../../services/ai/registry.js";
 import {
   AI_CREDENTIAL_PREFIX,
@@ -26,6 +27,9 @@ import {
   loadAiConfig,
   resolveTask,
 } from "../../services/ai/resolve.js";
+
+// Compared normalised (trailing slash, `/v1`): the editor sends back the URL the view showed.
+const sameUrl = (a: string | null | undefined, b: string) => openAiRoot(a ?? "") === openAiRoot(b);
 
 const maskKey = (plain: string) => (plain.length >= 4 ? `••••${plain.slice(-4)}` : "••••");
 
@@ -52,6 +56,9 @@ async function aiView(app: FastifyInstance) {
       hasKey,
       keyHint,
       hasUrl,
+      // Not a secret (a plain-text column), unlike the key: shown so the admin sees where it points.
+      url: d.credential === "url" ? d.baseUrl(secret) : null,
+      optionalKey: Boolean(d.optionalKeyEnvVar),
       keySource:
         hasKey || hasUrl ? ("db" as const) : env(d.credentialEnvVar) ? ("env" as const) : null,
       local: isLocalProvider(d, secret),
@@ -138,10 +145,26 @@ export function registerAiRoutes(app: FastifyInstance) {
         return reply.code(503).send({ error: "encryption_required" });
       }
       const { id } = request.params as { id: string };
-      if (!findProvider(id)) return reply.code(404).send({ error: "unknown_provider" });
+      const d = findProvider(id);
+      if (!d) return reply.code(404).send({ error: "unknown_provider" });
       const body = providerCredentialSchema.parse(request.body);
+      // A URL provider takes a key only where the descriptor allows one (an authenticated
+      // OpenAI-compatible server); Ollama is URL-only.
+      if (body.apiKey && d.credential === "url" && !d.optionalKeyEnvVar) {
+        return reply.code(400).send({ error: "key_not_supported" });
+      }
       const namespacedId = `${AI_CREDENTIAL_PREFIX}${id}`;
       const apiKeyEnc = body.apiKey ? app.encryption.encryptString(body.apiKey) : null;
+      // A stored key belongs to the URL it was saved with: repointing the URL without a new key
+      // drops it, so it can never be sent to a different host.
+      let dropKey = false;
+      if (apiKeyEnc === null && body.urlOverride !== undefined) {
+        const [row] = await app.db
+          .select({ url: providerCredentials.urlOverride, key: providerCredentials.apiKeyEnc })
+          .from(providerCredentials)
+          .where(eq(providerCredentials.provider, namespacedId));
+        dropKey = Boolean(row?.key) && !sameUrl(row?.url, body.urlOverride);
+      }
 
       await app.db
         .insert(providerCredentials)
@@ -153,7 +176,7 @@ export function registerAiRoutes(app: FastifyInstance) {
         .onConflictDoUpdate({
           target: providerCredentials.provider,
           set: {
-            ...(apiKeyEnc !== null ? { apiKeyEnc } : {}),
+            ...(apiKeyEnc !== null ? { apiKeyEnc } : dropKey ? { apiKeyEnc: null } : {}),
             ...(body.urlOverride !== undefined ? { urlOverride: body.urlOverride } : {}),
             updatedAt: new Date(),
           },

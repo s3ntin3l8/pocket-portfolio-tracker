@@ -84,7 +84,9 @@ export function TaskCard({
     client,
     provider,
     task,
-    connection ? `${connection.hasKey}${connection.hasUrl}${connection.keySource}` : "",
+    connection
+      ? `${connection.hasKey}${connection.hasUrl}${connection.keySource}${connection.url ?? ""}${connection.keyHint ?? ""}`
+      : "",
   );
 
   const showEffort = task === "chat" && provider === "claude";
@@ -208,7 +210,7 @@ export function TaskCard({
             )}
             {privacy}
           </p>
-          {task === "vision" && provider === "ollama" && (
+          {task === "vision" && (provider === "ollama" || provider === "openai-compatible") && (
             <p className="text-xs text-muted-foreground">{t("aiOllamaPdf")}</p>
           )}
         </>

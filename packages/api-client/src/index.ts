@@ -117,9 +117,9 @@ export interface AdminAuditEntry {
 
 /** One AI provider's connection (GET /admin/ai). Never carries a secret. */
 export interface AdminAiConnection {
-  id: string; // "claude" | "gemini" | "openrouter" | "ollama"
+  id: string; // a registry id, e.g. "claude", "ollama", "openai-compatible"
   label: string;
-  /** Ollama is configured by URL, the others by API key. */
+  /** Ollama and OpenAI-compatible servers are configured by URL, the others by API key. */
   credential: "key" | "url";
   /** Usable: a DB credential or an env key/URL is present. */
   configured: boolean;
@@ -129,9 +129,13 @@ export interface AdminAiConnection {
   keyHint: string | null;
   /** Whether a URL override is stored in the DB. */
   hasUrl: boolean;
+  /** The URL in use (stored override, else env) for URL providers; null otherwise. Not a secret. */
+  url: string | null;
+  /** A URL provider that also accepts an optional API key (an authenticated OpenAI-compatible server). */
+  optionalKey: boolean;
   /** "db" = stored credential, "env" = only an env var, null = nothing set. */
   keySource: "db" | "env" | null;
-  /** Ollama: whether the URL points at the operator's own network (data stays local). */
+  /** URL providers: whether the URL points at the operator's own network (data stays local). */
   local: boolean | null;
   /** OpenRouter: allow endpoints that may retain prompts. null = default (deny). */
   allowDataCollection: boolean | null;
@@ -2403,7 +2407,7 @@ export function apiErrorIssues(err: unknown): ApiErrorIssue[] {
 
 /** The vision-provider failure detail carried by a 502 `screenshot_parse_failed` response. */
 export interface VisionProviderError {
-  /** Which provider failed ("claude" | "gemini" | "openrouter" | "ollama"), or null if absent. */
+  /** Which provider failed (its registry id, e.g. "claude", "ollama"), or null if absent. */
   provider: string | null;
   /** The provider's own HTTP status (429 rate-limit, 401/403 auth, 5xx down), or null if unknown. */
   providerStatus: number | null;

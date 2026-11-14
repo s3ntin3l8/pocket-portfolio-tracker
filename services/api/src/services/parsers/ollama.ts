@@ -11,12 +11,16 @@ export interface OllamaParserOptions {
   baseUrl?: string;
   /** Vision model to use (e.g. qwen2.5vl:7b). Falls back to OLLAMA_VISION_MODEL env. */
   model?: string;
+  /** Sent as `Authorization: Bearer` when set (an authenticated OpenAI-compatible server). */
+  apiKey?: string;
+  /** Provider name for logs and error codes (default "ollama"; `openai-compatible` reuses this). */
+  name?: string;
   /** Override fetch for tests. */
   fetch?: typeof fetch;
 }
 
 /**
- * Ollama / LM Studio vision parser (OpenAI-compatible chat completions at /v1/chat/completions).
+ * Ollama / LM Studio vision parser (also the `openai-compatible` provider, via `name` + `apiKey`) (OpenAI-compatible chat completions at /v1/chat/completions).
  * Requires a local multimodal model (e.g. qwen2.5vl:7b) to be running at the base URL.
  *
  * Configured via the `OLLAMA_BASE_URL` env var or an admin-managed DB url-override on the
@@ -29,12 +33,17 @@ export interface OllamaParserOptions {
  * images before routing to this parser.
  */
 export class OllamaVisionParser implements ScreenshotParser {
-  readonly name = "ollama";
+  readonly name: string;
+  private readonly code: string;
+  private readonly apiKey: string | undefined;
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly doFetch: typeof fetch;
 
   constructor(opts: OllamaParserOptions = {}) {
+    this.name = opts.name ?? "ollama";
+    this.code = this.name.replace(/\W+/g, "_");
+    this.apiKey = opts.apiKey || undefined;
     this.baseUrl = opts.baseUrl ?? "";
     this.model = opts.model ?? process.env.OLLAMA_VISION_MODEL ?? "qwen2.5vl:7b";
     this.doFetch = opts.fetch ?? globalThis.fetch;
@@ -46,10 +55,10 @@ export class OllamaVisionParser implements ScreenshotParser {
 
   async parse(image: ParserImage, log?: Logger): Promise<ParseResult> {
     if (!this.isConfigured()) {
-      throw new Error("ollama_parser_not_configured");
+      throw new Error(`${this.code}_parser_not_configured`);
     }
     if (image.mimeType === "application/pdf") {
-      throw new Error("ollama_pdf_not_supported");
+      throw new Error(`${this.code}_pdf_not_supported`);
     }
 
     log?.debug(
@@ -66,7 +75,10 @@ export class OllamaVisionParser implements ScreenshotParser {
     const dataUrl = `data:${image.mimeType};base64,${image.data.toString("base64")}`;
     const res = await this.doFetch(`${this.baseUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(this.apiKey ? { authorization: `Bearer ${this.apiKey}` } : {}),
+      },
       body: JSON.stringify({
         model: this.model,
         messages: [
@@ -86,7 +98,7 @@ export class OllamaVisionParser implements ScreenshotParser {
         { provider: this.name, status: res.status, statusText: res.statusText },
         "vision http error",
       );
-      throw new Error(`ollama_vision_error_${res.status}`);
+      throw new Error(`${this.code}_vision_error_${res.status}`);
     }
 
     const data = (await res.json()) as {

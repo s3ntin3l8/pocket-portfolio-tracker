@@ -371,6 +371,21 @@ describe("OpenAICompatChatProvider", () => {
     expect(f.calls[0]!.url).toBe("http://localhost:11434/v1/chat/completions");
   });
 
+  it("sends Bearer for a keyed OpenAI-compatible endpoint", async () => {
+    const f = fakeFetch(() =>
+      json({ choices: [{ message: { content: "x" }, finish_reason: "stop" }] }),
+    );
+    const p = make(f.impl, {
+      name: "openai-compatible",
+      local: true,
+      apiKey: "lm-key", // pragma: allowlist secret
+      baseUrl: "http://lm:1234/v1",
+    });
+    await p.complete({ system: "s", messages: [], tools: [], maxTokens: 1 });
+    expect(f.calls[0]!.headers.authorization).toBe("Bearer lm-key");
+    expect(f.calls[0]!.url).toBe("http://lm:1234/v1/chat/completions");
+  });
+
   it("codes upstream failures without leaking bodies", async () => {
     const http = make(fakeFetch(() => json({ error: "SECRET" }, 500)).impl);
     const err = await http

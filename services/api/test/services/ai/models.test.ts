@@ -18,7 +18,14 @@ function fakeFetch(routes: Record<string, (init?: RequestInit) => Response>) {
 
 beforeEach(() => {
   clearModelCache();
-  for (const k of ["ANTHROPIC_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY", "OLLAMA_BASE_URL"])
+  for (const k of [
+    "ANTHROPIC_API_KEY",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY",
+    "OLLAMA_BASE_URL",
+    "OPENAI_COMPAT_BASE_URL",
+    "OPENAI_COMPAT_API_KEY",
+  ])
     vi.stubEnv(k, "");
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -148,6 +155,73 @@ describe("listModels", () => {
     expect(chat.models.map((m) => m.id)).toEqual(["old", "qwen3"]); // llava has no tools
   });
 
+  it("OpenAI-compatible: lists /v1/models (ids only, capabilities unknown), with or without /v1", async () => {
+    const { f, calls } = fakeFetch({
+      "/v1/models": () =>
+        json({ data: [{ id: "qwen2.5-vl" }, { id: "llama-3" }, { object: "x" }] }),
+    });
+    const r = await listModels(
+      "openai-compatible",
+      "vision",
+      { url: "http://lm:1234/" },
+      { fetch: f },
+    );
+    expect(r.models).toEqual([
+      { id: "llama-3", label: "llama-3", vision: null, tools: null },
+      { id: "qwen2.5-vl", label: "qwen2.5-vl", vision: null, tools: null },
+    ]);
+    expect(calls[0]!.url).toBe("http://lm:1234/v1/models");
+    expect(new Headers(calls[0]!.init?.headers).get("authorization")).toBeNull();
+
+    clearModelCache();
+    await listModels("openai-compatible", "chat", { url: "http://lm:1234/v1" }, { fetch: f });
+    expect(calls[1]!.url).toBe("http://lm:1234/v1/models");
+  });
+
+  it("OpenAI-compatible: sends the stored or env key as a Bearer token; a credential change clears the cache", async () => {
+    const { f, calls } = fakeFetch({ "/v1/models": () => json({ data: [{ id: "m" }] }) });
+    await listModels(
+      "openai-compatible",
+      "chat",
+      { url: "http://lm:1234", apiKey: "k1" }, // pragma: allowlist secret
+      { fetch: f },
+    ); // pragma: allowlist secret
+    expect(new Headers(calls[0]!.init?.headers).get("authorization")).toBe("Bearer k1");
+
+    vi.stubEnv("OPENAI_COMPAT_BASE_URL", "http://lm:1234");
+    vi.stubEnv("OPENAI_COMPAT_API_KEY", "env-key"); // pragma: allowlist secret
+    // Same URL: served from the cache (the key is not part of it)...
+    await listModels("openai-compatible", "chat", undefined, { fetch: f });
+    expect(calls).toHaveLength(1);
+    // ...until the credential changes, which the admin routes signal with clearModelCache.
+    clearModelCache("openai-compatible");
+    await listModels("openai-compatible", "chat", undefined, { fetch: f });
+    expect(calls).toHaveLength(2);
+    expect(new Headers(calls[1]!.init?.headers).get("authorization")).toBe("Bearer env-key");
+  });
+
+  it("OpenAI-compatible: the env key is not sent to a stored URL", async () => {
+    vi.stubEnv("OPENAI_COMPAT_API_KEY", "env-key"); // pragma: allowlist secret
+    const { f, calls } = fakeFetch({ "/v1/models": () => json({ data: [] }) });
+    await listModels("openai-compatible", "chat", { url: "http://other:1234" }, { fetch: f });
+    expect(new Headers(calls[0]!.init?.headers).get("authorization")).toBeNull();
+  });
+
+  it("OpenAI-compatible: needs a URL, and a failure is a code", async () => {
+    const { f, calls } = fakeFetch({});
+    expect(await listModels("openai-compatible", "chat", { apiKey: "k" }, { fetch: f })).toEqual({
+      // pragma: allowlist secret
+      models: [],
+      error: "provider_not_configured",
+    });
+    expect(calls).toHaveLength(0);
+    const down = (async () => json({}, 503)) as unknown as typeof fetch;
+    expect(
+      (await listModels("openai-compatible", "chat", { url: "http://lm:1234" }, { fetch: down }))
+        .error,
+    ).toBe("provider_http_503");
+  });
+
   it("reports a provider failure as a code, not the upstream body", async () => {
     const down = (async () =>
       json({ error: { message: "secret echoed sk-test" } }, 401)) as unknown as typeof fetch;
@@ -162,7 +236,7 @@ describe("listModels", () => {
     ).toBe("provider_unreachable");
   });
 
-  it("caches per credential for ten minutes and re-fetches after", async () => {
+  it("caches per provider for ten minutes, re-fetches after, and drops the entry when the credential changes", async () => {
     let n = 0;
     const f = (async () => {
       n++;
@@ -173,12 +247,12 @@ describe("listModels", () => {
     await listModels("openrouter", "chat", secret, { fetch: f, now: t0 });
     await listModels("openrouter", "vision", secret, { fetch: f, now: t0 + 60_000 });
     expect(n).toBe(1); // both tasks share one upstream list
-    await listModels("openrouter", "chat", { apiKey: "key-2" }, { fetch: f, now: t0 + 60_000 }); // pragma: allowlist secret
-    expect(n).toBe(2); // another credential never sees the first one's list
-    await listModels("openrouter", "chat", secret, { fetch: f, now: t0 + 11 * 60_000 });
-    expect(n).toBe(3);
+    // The key is not part of the cache (nothing secret is held): a credential change is signalled
+    // by the admin routes with clearModelCache, which drops the entry so the next call re-fetches.
     clearModelCache("openrouter");
-    await listModels("openrouter", "chat", secret, { fetch: f, now: t0 + 11 * 60_000 });
-    expect(n).toBe(4);
+    await listModels("openrouter", "chat", { apiKey: "key-2" }, { fetch: f, now: t0 + 60_000 }); // pragma: allowlist secret
+    expect(n).toBe(2);
+    await listModels("openrouter", "chat", secret, { fetch: f, now: t0 + 12 * 60_000 });
+    expect(n).toBe(3); // past the ten minutes
   });
 });

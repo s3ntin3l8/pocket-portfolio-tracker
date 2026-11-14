@@ -62,6 +62,7 @@ const SOURCE_LABELS: Record<string, string> = {
   ollama: "screenshot",
   gemini: "screenshot",
   openrouter: "screenshot",
+  "openai-compatible": "screenshot",
 };
 
 function friendlySource(source: string | null | undefined): string {
