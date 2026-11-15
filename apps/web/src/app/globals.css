@@ -343,6 +343,35 @@
   }
 }
 
+/* Translucent chrome (header, bottom nav, selection bar, sticky list headers, sheet scrim).
+   `.material-chrome` is a surface that carries content, so it goes solid; `.material-blur`
+   is a scrim that only loses its blur. Unlayered on purpose: it must beat the Tailwind
+   background-opacity and backdrop-blur utilities, which live in a cascade layer. Under
+   prefers-contrast the chrome also gets a defined edge instead of relying on the blur. */
+@media (prefers-reduced-transparency: reduce) {
+  .material-chrome {
+    background-color: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .material-blur {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+@media (prefers-contrast: more) {
+  .material-chrome {
+    background-color: var(--card);
+    border-color: color-mix(in srgb, var(--foreground) 45%, transparent);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .material-blur {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
 /* View Transitions (React <ViewTransition>, see route-transition.tsx). The class names are
    assigned by React via `view-transition-class`. Opacity-only for route changes so there is no
    layout movement; the net-worth tick is short. Unsupported browsers

@@ -17,6 +17,9 @@ function vibrate(pattern: number | number[]): void {
 export const haptics = {
   /** Long-press entered multi-select mode. */
   selectionStart: () => vibrate(15),
+  /** A meaningful save landed (a transaction booked, an import confirmed). Deliberately
+   *  short and used for those commits only, never for routine taps. */
+  success: () => vibrate(10),
   /** A destructive action (e.g. bulk delete) was just confirmed. */
   destructiveConfirm: () => vibrate([20, 40, 20]),
 };

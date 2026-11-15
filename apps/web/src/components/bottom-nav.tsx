@@ -38,7 +38,7 @@ export function BottomNav({
       ref={navRef}
       aria-label={tA("primaryNav")}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 flex items-start justify-around border-t border-border bg-card/80 px-3 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg md:hidden",
+        "fixed inset-x-0 bottom-0 z-30 flex items-start justify-around material-chrome border-t border-border bg-card/80 px-3 pt-2.5 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-lg md:hidden",
         overlayOpen && "hidden",
       )}
     >
@@ -51,7 +51,7 @@ export function BottomNav({
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex min-w-14 flex-col items-center gap-1 py-0.5 transition-colors",
+              "flex min-w-14 touch-manipulation flex-col items-center gap-1 py-0.5 transition-[color,transform,opacity] duration-150 active:scale-95 active:opacity-70 motion-reduce:active:scale-100",
               active ? "text-primary" : "text-muted-foreground",
             )}
           >

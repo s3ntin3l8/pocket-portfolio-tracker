@@ -34,4 +34,14 @@ describe("BottomNav", () => {
     renderNav({ anomalyCount: 250 });
     expect(screen.getByText("99+")).toBeInTheDocument();
   });
+
+  it("gives each tab instant press feedback and opts into reduced transparency", () => {
+    const { container } = renderNav();
+    const nav = container.querySelector("nav")!;
+    expect(nav.className).toContain("material-chrome");
+    const tab = screen.getByText("Holdings").closest("a")!;
+    expect(tab.className).toContain("active:scale-95");
+    expect(tab.className).toContain("motion-reduce:active:scale-100");
+    expect(tab.className).toContain("touch-manipulation");
+  });
 });

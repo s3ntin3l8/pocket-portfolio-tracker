@@ -160,7 +160,7 @@ export function useSheetFooterChrome() {
 function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Drawer.Overlay>) {
   return (
     <Drawer.Overlay
-      className={cn("fixed inset-0 z-50 bg-scrim backdrop-blur-[2px]", className)}
+      className={cn("material-blur fixed inset-0 z-50 bg-scrim backdrop-blur-[2px]", className)}
       {...props}
     />
   );
