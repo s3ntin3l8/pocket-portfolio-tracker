@@ -14,4 +14,4 @@
 #
 # We rely on pytr's no-browser AWS-WAF solver (PYTR_WAF_STRATEGY=awswaf). playwright is an
 # optional pytr extra and is deliberately NOT installed (no `pytr[playwright]`, no Chromium).
-pytr @ git+https://github.com/pytr-org/pytr.git@6cb84d817370fbe539cd1c20babb85be89ec5c03
+pytr @ git+https://github.com/pytr-org/pytr.git@85f76576856f0e97c3461a6b16716d6f93b4e62e
