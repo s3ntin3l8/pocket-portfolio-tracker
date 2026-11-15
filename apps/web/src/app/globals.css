@@ -228,8 +228,14 @@
   --text-heading--line-height: 1.75rem; /* 28px */
   --text-display: 1.75rem; /* 28px */
   --text-display--line-height: 2rem; /* 32px */
+  /* Optical tracking: large figures sit tighter. Horizontal tracking is exempt from the
+     whole-pixel rule above: that rule is about the vertical line box (where a half-pixel
+     baseline is a raster tie-break); letter-spacing only moves glyphs sideways and is
+     applied per glyph, so a fractional advance is ordinary subpixel text positioning. */
+  --text-display--letter-spacing: -0.015em;
   --text-hero: 2.25rem; /* 36px: hero figures */
   --text-hero--line-height: 2.5rem; /* 40px */
+  --text-hero--letter-spacing: -0.02em;
 
   /* Route-transition content blend + skeleton shimmer sweep. Registered here so Tailwind
      generates `animate-fade-in` / `animate-shimmer` utilities (Tailwind v4 CSS config —
@@ -240,6 +246,57 @@
      instead of the viewport's. The end state equals no styling, so nothing is lost. */
   --animate-fade-in: fade-in 0.35s ease-out backwards;
   --animate-shimmer: shimmer 1.6s linear infinite;
+}
+
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes overlay-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@theme {
+  /* Overlay enter/exit (dialog, popover, dropdown, tooltip). Opacity + the individual
+     `scale`/`translate` properties only, so the `-translate-x-1/2` centering of a dialog
+     (which Tailwind v4 also writes to `translate`) is never clobbered by a keyframe that
+     sets `transform`. Deliberately NOT `@theme inline`: inline bakes the value into the
+     utility, so the reduced-motion `:root` override below could never reach it. Exits are keyed on Radix `data-[state=closed]`; Presence waits for
+     `animationend`, and unmounts at once when the animation is `none` (reduced motion). */
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-overlay-in: overlay-in 150ms ease-out;
+  --animate-overlay-out: overlay-out 120ms ease-in forwards;
+  --animate-pop-in: pop-in 160ms var(--ease-out-quint);
+  --animate-pop-out: pop-out 110ms ease-in forwards;
+  --animate-page-in: page-in 220ms var(--ease-out-quint);
+  --animate-page-out: page-out 140ms ease-in forwards;
 }
 
 @keyframes fade-in {
@@ -270,6 +327,19 @@
   :root {
     --animate-fade-in: none;
     --animate-shimmer: none;
+  }
+}
+
+/* Overlay enter/exit motion off for motion-sensitive users: `none` also makes Radix's
+   Presence unmount on close immediately instead of waiting for an animationend. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --animate-overlay-in: none;
+    --animate-overlay-out: none;
+    --animate-pop-in: none;
+    --animate-pop-out: none;
+    --animate-page-in: none;
+    --animate-page-out: none;
   }
 }
 

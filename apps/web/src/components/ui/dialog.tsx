@@ -42,6 +42,7 @@ function DialogOverlay({
         // A full-screen mobile overlay isn't a modal over other content — no scrim.
         // Non-full-screen (confirms/pickers) always gets the scrim.
         fullScreenOnMobile ? "bg-transparent md:bg-scrim" : "bg-scrim",
+        "data-[state=open]:animate-overlay-in data-[state=closed]:animate-overlay-out",
         className,
       )}
       {...props}
@@ -153,6 +154,9 @@ function DialogContent({
       <DialogPrimitive.Content
         className={cn(
           "fixed z-50 border-border bg-card text-card-foreground shadow-lg",
+          fullScreenOnMobile
+            ? "data-[state=open]:max-md:animate-page-in data-[state=closed]:max-md:animate-page-out data-[state=open]:md:animate-pop-in data-[state=closed]:md:animate-pop-out"
+            : "data-[state=open]:animate-pop-in data-[state=closed]:animate-pop-out",
           structured ? "flex flex-col" : "grid gap-4 overflow-y-auto",
           fullScreenOnMobile
             ? cn(

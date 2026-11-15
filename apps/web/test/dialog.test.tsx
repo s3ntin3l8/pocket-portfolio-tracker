@@ -318,3 +318,36 @@ describe("full-screen overlay registration", () => {
     }
   });
 });
+
+// Enter/exit motion lives in the primitive so every call site gets it. Exits are keyed on
+// Radix's `data-state="closed"` (Presence waits for animationend); jsdom runs no animations,
+// so assert the classes. The reduced-motion override is covered in motion-tokens.test.ts.
+describe("DialogContent motion", () => {
+  it("fades the scrim and pops the centered card in and out", () => {
+    render(
+      <Dialog open>
+        <DialogContent fullScreenOnMobile={false}>
+          <DialogTitle>t</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    const content = screen.getByRole("dialog");
+    expect(content.className).toContain("data-[state=open]:animate-pop-in");
+    expect(content.className).toContain("data-[state=closed]:animate-pop-out");
+    const overlay = document.querySelector("[data-state=open].fixed.inset-0");
+    expect(overlay?.className).toContain("data-[state=closed]:animate-overlay-out");
+  });
+
+  it("slides full-screen mobile dialogs as a page and pops them on desktop", () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>t</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    const cls = screen.getByRole("dialog").className;
+    expect(cls).toContain("data-[state=open]:max-md:animate-page-in");
+    expect(cls).toContain("data-[state=open]:md:animate-pop-in");
+  });
+});
