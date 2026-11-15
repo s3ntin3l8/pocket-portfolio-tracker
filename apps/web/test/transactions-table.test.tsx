@@ -11,6 +11,7 @@ vi.setConfig({ testTimeout: 20_000 });
 
 const refresh = vi.fn();
 const push = vi.fn();
+const replace = vi.fn();
 // Mutable per-test "current route" — defaults to Activity's own path. Tests that need to
 // prove the instrument page's filter chips/search stay in place (rather than hardcoding
 // `/transactions`, #585) override this before rendering.
@@ -55,7 +56,7 @@ const listMatchingTransactionKeys = vi.fn(
 );
 
 vi.mock("@/i18n/navigation", () => ({
-  useRouter: () => ({ refresh, push }),
+  useRouter: () => ({ refresh, push, replace }),
   usePathname: () => mockPathname,
   Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
 }));
@@ -891,6 +892,33 @@ describe("TransactionsTable", () => {
       expect(draftSelect).toHaveTextContent("Drafts only (30)");
       fireEvent.change(draftSelect, { target: { value: "drafts" } });
       expect(push).toHaveBeenCalledWith("/transactions?status=draft&page=1");
+    });
+
+    it("resets ?status=draft with a replace when the server says no drafts remain", () => {
+      push.mockClear();
+      replace.mockClear();
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={[]} total={0} draftCount={0} statusFilter="draft" />
+        </NextIntlClientProvider>,
+      );
+      expect(replace).toHaveBeenCalledWith("/transactions?page=1");
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("does not reset the drafts filter while drafts remain, or without a server count", () => {
+      replace.mockClear();
+      const { rerender } = render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={[]} total={0} draftCount={3} statusFilter="draft" />
+        </NextIntlClientProvider>,
+      );
+      rerender(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable rows={[]} total={0} statusFilter="draft" />
+        </NextIntlClientProvider>,
+      );
+      expect(replace).not.toHaveBeenCalled();
     });
 
     it("keeps the drafts chip (to leave the filter) when the server says zero drafts remain", () => {

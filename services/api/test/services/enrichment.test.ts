@@ -479,6 +479,34 @@ describe("sourcesForTransactions", () => {
     expect(types).toEqual(["csv", "pdf"]);
   });
 
+  it("returns a transaction's sources in the order they were attached", async () => {
+    const db = getDb();
+    const s = nextSuffix();
+    const { portfolio } = await makeUserAndPortfolio(db, s);
+    const tx = await makeTx(db, portfolio.id);
+
+    // Inserted in the reverse of their createdAt order, so a plain heap-order read
+    // (no ORDER BY) would hand them back as pdf, pytr.
+    await db.insert(transactionSources).values([
+      {
+        transactionId: tx.id,
+        sourceType: "pdf",
+        externalId: "tr:exec:ord-002",
+        createdAt: new Date("2026-01-02T00:00:00Z"),
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "pytr",
+        externalId: "pytr:ord-001",
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ]);
+
+    const app = { db, log: { warn: vi.fn(), info: vi.fn() } };
+    const map = await sourcesForTransactions(app as never, [tx.id], portfolio.id);
+    expect((map.get(tx.id) ?? []).map((r) => r.sourceType)).toEqual(["pytr", "pdf"]);
+  });
+
   it("returns empty map for empty input", async () => {
     const app = { db: getDb(), log: { warn: vi.fn(), info: vi.fn() } };
     // portfolioId is unused on the empty-input early-return path.

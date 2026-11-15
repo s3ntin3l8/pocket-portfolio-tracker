@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { transactionSources, documents } from "@portfolio/db";
 import type { TaxComponents } from "@portfolio/schema";
 import { dbHelper, type AppLike } from "./core.js";
@@ -44,7 +44,8 @@ export async function sourcesForTransactions(
       createdAt: transactionSources.createdAt,
     })
     .from(transactionSources)
-    .where(inArray(transactionSources.transactionId, txIds));
+    .where(inArray(transactionSources.transactionId, txIds))
+    .orderBy(asc(transactionSources.createdAt), asc(transactionSources.id));
 
   const fallbackRows = rows.filter((r) => !r.documentId && r.sourceType !== "pytr");
   const docIds = [...new Set(rows.map((r) => r.documentId).filter((d): d is string => !!d))];

@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { documents, transactionSources, transactions } from "@portfolio/db";
 import { buildShareTimelines, sharesHeldAt, toDateKey } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
@@ -116,7 +116,8 @@ export async function enrichRows(
           confidence: transactionSources.confidence,
         })
         .from(transactionSources)
-        .where(inArray(transactionSources.transactionId, allTxIds));
+        .where(inArray(transactionSources.transactionId, allTxIds))
+        .orderBy(asc(transactionSources.createdAt), asc(transactionSources.id));
       sourcesMs = performance.now() - s;
       return r;
     })(),
@@ -280,7 +281,8 @@ export async function enrichAggregateRows(
         confidence: transactionSources.confidence,
       })
       .from(transactionSources)
-      .where(inArray(transactionSources.transactionId, allTxIds)),
+      .where(inArray(transactionSources.transactionId, allTxIds))
+      .orderBy(asc(transactionSources.createdAt), asc(transactionSources.id)),
     app.db
       .select()
       .from(documents)
