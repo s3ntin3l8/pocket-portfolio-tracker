@@ -6,9 +6,10 @@ import { useEffect } from "react";
  * Fixes #451: on Android, a `backdrop-filter` layer that survives the browser freezing a
  * backgrounded PWA can come back from "thaw" visually intact but with its hit-test region
  * never re-established by the compositor — taps land on the layer and do nothing. The
- * bottom nav (`bg-card/80 backdrop-blur-lg`) is the app's only interactive fixed element
- * using `backdrop-filter`, which matches the report exactly: nav fully visible, taps dead,
- * rest of the app fine.
+ * bottom nav and the sticky top header (both `bg-card/80 backdrop-blur-lg`) are the app's
+ * interactive fixed/sticky elements using `backdrop-filter`, which matches the report
+ * exactly: bar fully visible, taps dead, rest of the app fine. Any new interactive
+ * `backdrop-filter` layer needs this hook too.
  *
  * Forcing the browser to drop and recreate the backdrop-filter layer re-establishes hit
  * testing. We do that on every resume signal (`visibilitychange` → visible, and `pageshow`

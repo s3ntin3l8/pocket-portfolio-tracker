@@ -102,7 +102,10 @@ export function AppShell({
     const header = headerRef.current;
     if (!scroller || !header) return;
     const update = () => {
-      header.dataset.scrolled = String(scroller.scrollTop > 0);
+      // Only touch the DOM when the value flips: a write re-invalidates the [data-scrolled]
+      // rule, and almost every scroll event leaves it unchanged.
+      const next = String(scroller.scrollTop > 0);
+      if (header.dataset.scrolled !== next) header.dataset.scrolled = next;
     };
     update();
     scroller.addEventListener("scroll", update, { passive: true });
@@ -241,8 +244,10 @@ export function AppShell({
                   {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps.
               Padding lives on the INNER wrapper (not the outer bar) so its cap/center
               matches <main>'s content edges exactly — see the widescreen note on <main>.
-              The outer bar stays edge-to-edge (bg-card, sticky, safe-area-top only) so it
-              still reads as one continuous surface across the full width. */}
+              The outer bar stays edge-to-edge (translucent bg-card/80 + backdrop-blur-lg,
+              sticky, safe-area-top only; its bottom border shows only once content has
+              scrolled under it) so it still reads as one continuous surface across the
+              full width. */}
                   {/* w-full + will-change-transform: workaround for an iOS Safari compositor
                 bug where `sticky` element backgrounds paint only ~60% across the scroll
                 container's content width instead of the element's full width (#472).
