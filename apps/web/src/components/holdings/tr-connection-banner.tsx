@@ -43,11 +43,20 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
 
   const expired = connection.status !== "error";
 
-  // The flow calls this once the approval lands; a sync pulls what was missed meanwhile.
-  const renewed = () => {
-    setOpen(false);
-    void api.syncTr().catch(() => undefined);
-    router.refresh();
+  // The flow reports every change: an approval, but also a cancelled renew. Only a connection
+  // that is actually `connected` again closes the dialog and syncs; anything else just
+  // refreshes so the banner reflects the server's state.
+  const changed = () => {
+    void api
+      .getTrConnection()
+      .then((latest) => {
+        if (latest.status === "connected") {
+          setOpen(false);
+          void api.syncTr().catch(() => undefined);
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => router.refresh());
   };
 
   return (
@@ -81,7 +90,7 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
             cashCounted
             initial={flowConnection}
             compact
-            onChanged={renewed}
+            onChanged={changed}
           />
         </DialogContent>
       </Dialog>

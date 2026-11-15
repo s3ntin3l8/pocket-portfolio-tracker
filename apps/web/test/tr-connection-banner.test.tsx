@@ -7,7 +7,7 @@ import messages from "../messages/en.json";
 const refresh = vi.fn();
 const api = {
   connectTr: vi.fn(),
-  cancelTrPairing: vi.fn(),
+  cancelTrPairing: vi.fn(async () => undefined),
   renewTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
   verifyTr: vi.fn(async () => ({ status: "connected" as const })),
   syncTr: vi.fn(async () => ({ queued: true })),
@@ -68,6 +68,27 @@ describe("TrConnectionBanner", () => {
     await waitFor(() => expect(api.renewTr).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(api.syncTr).toHaveBeenCalled(), { timeout: 5000 });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("a cancelled renew neither syncs nor closes the dialog", async () => {
+    api.syncTr.mockClear();
+    api.getTrConnection.mockResolvedValueOnce({
+      status: "expired" as never,
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: null,
+      lastReconciliation: null,
+      syncing: false,
+    });
+    renderBanner(base);
+    fireEvent.click(screen.getByRole("button", { name: "Renew" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Renew login/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(api.cancelTrPairing).toHaveBeenCalled());
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(api.syncTr).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /Renew login/ })).toBeTruthy();
   });
 
   it("keeps prompting after a renew was abandoned (awaiting_2fa with no pairing behind it)", () => {
