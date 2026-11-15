@@ -63,6 +63,24 @@ answered the approval poll with a status pytr doesn't treat as pending or confir
 vendored login tolerated a response with no terminal state if it set a session cookie; pytr's
 does not.
 
+## Expired login and one-tap renew
+
+Trade Republic ends a web session after a while. The app finds out when a sync cannot resume
+the stored cookies (`tr_export.py` exits 2) or when Trade Republic rejects them part-way through
+an export (HTTP 401/403, an authentication error on a subscription, or a refused websocket
+connect; `is_auth_failure`). Either way the connection flips to `expired` with a sanitized
+`lastError`, and the hourly sync skips it. A failure that is not an auth failure leaves it in
+`error`.
+
+The Holdings page shows a banner for an `expired` or `error` connection with a **Renew** button.
+`POST /tr/connection/renew` starts a fresh push login from the stored (encrypted) phone and PIN,
+so the user only confirms in the Trade Republic app (an authenticator-app account is asked for
+its 6-digit code). It completes through `POST /tr/connection/verify` like a first pairing, after
+which the banner triggers a sync. Renew answers `409 not_connected` with nothing to renew,
+`409 already_connected` for a working connection (its session is only replaced by a login that
+succeeds) and `409 sync_in_progress` while a sync runs. The full form stays available for
+different credentials.
+
 ## How sync works
 
 Once paired, `syncTrConnection()` (`services/api/src/services/pytr/sync.ts`) is the

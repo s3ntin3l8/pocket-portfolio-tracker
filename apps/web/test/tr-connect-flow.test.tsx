@@ -9,6 +9,7 @@ import messages from "../messages/en.json";
 function makeClient(over: Partial<TrConnectClient> = {}): TrConnectClient {
   return {
     connectTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
+    renewTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
     verifyTr: vi.fn(async () => ({ status: "connected" as const })),
     syncTr: vi.fn(async () => ({ status: "connected" as const, drafts: 3 })),
     disconnectTr: vi.fn(async () => undefined),
@@ -269,6 +270,45 @@ describe("TrConnectFlow", () => {
     });
     expect(screen.getByText(/Your session expired/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Connect/ })).toBeTruthy();
+  });
+
+  it("renews an expired login in one tap with no credentials typed", async () => {
+    const client = makeClient();
+    const onChanged = renderFlow(client, {
+      status: "expired",
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: "Trade Republic session expired",
+      lastReconciliation: null,
+      syncing: false,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Renew login/ }));
+
+    await waitFor(() => expect(client.renewTr).toHaveBeenCalledTimes(1));
+    expect(client.connectTr).not.toHaveBeenCalled();
+    // Same completion path as a first pairing: verify fires, the poll sees `connected`.
+    await waitFor(() => expect(client.verifyTr).toHaveBeenCalledWith());
+    expect(await screen.findByRole("button", { name: /Sync now/ }, { timeout: 4000 })).toBeTruthy();
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("offers no renew for a never-connected or healthy connection", () => {
+    renderFlow(makeClient());
+    expect(screen.queryByRole("button", { name: /Renew login/ })).toBeNull();
+  });
+
+  it("shows the failure reason and a renew button after a failed sync", () => {
+    renderFlow(makeClient(), {
+      status: "error",
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: "pytr failed (see server logs)",
+      lastReconciliation: null,
+      syncing: false,
+    });
+    expect(screen.getByText("pytr failed (see server logs)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Renew login/ })).toBeTruthy();
   });
 
   it("surfaces an error when connect fails", async () => {

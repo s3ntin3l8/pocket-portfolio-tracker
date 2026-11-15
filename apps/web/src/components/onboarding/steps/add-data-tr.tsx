@@ -22,6 +22,7 @@ export function AddDataTrConnect({
   api: Pick<
     ApiClient,
     | "connectTr"
+    | "renewTr"
     | "verifyTr"
     | "syncTr"
     | "disconnectTr"

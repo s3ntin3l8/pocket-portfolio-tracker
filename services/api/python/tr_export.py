@@ -1120,6 +1120,27 @@ async def _probe_events(tr) -> int:
     return 0
 
 
+_AUTH_MARKERS = ("AUTHENTICATION", "UNAUTHORIZED", "UNAUTHENTICATED", "SESSION_EXPIRED")
+
+
+def is_auth_failure(exc: BaseException) -> bool:
+    """True when `exc` means Trade Republic rejected our session (not a transient failure).
+
+    Covers an HTTP 401/403 from the REST calls, a websocket subscription error whose payload
+    names an authentication problem, and the websocket connect refusal pytr raises as
+    ``ValueError("Connection Error: ...")`` when the cookies no longer authenticate.
+    """
+    response = getattr(exc, "response", None)
+    if getattr(response, "status_code", None) in (401, 403):
+        return True
+    payload = getattr(exc, "error", None)
+    if payload is not None:
+        text = json.dumps(payload, default=str).upper()
+        if any(marker in text for marker in _AUTH_MARKERS):
+            return True
+    return str(exc).startswith("Connection Error")
+
+
 async def _run(tr) -> int:
     events = await _collect_transactions(tr)
     events = await _attach_details(tr, events)
@@ -1215,6 +1236,11 @@ def main() -> int:
             return asyncio.run(_probe_feed(tr, args.probe_feed))
         return asyncio.run(_run(tr))
     except Exception as exc:  # noqa: BLE001
+        if is_auth_failure(exc):
+            # The cookies resumed, then TR refused them mid-export: the same "login expired"
+            # outcome as a failed resume, so the user gets a Renew prompt, not a generic error.
+            print(f"session expired mid-export: {exc}", file=sys.stderr)
+            return 2
         print(f"export failed: {exc}", file=sys.stderr)
         return 1
 

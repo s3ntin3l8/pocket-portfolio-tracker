@@ -1520,3 +1520,47 @@ class TestTransfers:
         # A cancelled transfer carries no top-level status — must come from the header so the
         # Node mapper skips it (and un-imports it if a prior sync confirmed it).
         assert tx._normalize(event, {})["status"] == "CANCELED"
+
+
+# --- auth-failure classification ------------------------------------------------------
+
+
+class _Resp:
+    def __init__(self, status_code):
+        self.status_code = status_code
+
+
+class _HttpErr(Exception):
+    def __init__(self, status_code):
+        super().__init__(f"{status_code} error")
+        self.response = _Resp(status_code)
+
+
+class _TrErr(ValueError):
+    def __init__(self, error):
+        super().__init__(str(error))
+        self.error = error
+
+
+def test_http_401_and_403_are_auth_failures():
+    assert tx.is_auth_failure(_HttpErr(401))
+    assert tx.is_auth_failure(_HttpErr(403))
+
+
+def test_other_http_errors_are_not_auth_failures():
+    assert not tx.is_auth_failure(_HttpErr(500))
+    assert not tx.is_auth_failure(_HttpErr(429))
+
+
+def test_subscription_error_naming_authentication_is_an_auth_failure():
+    assert tx.is_auth_failure(_TrErr({"errors": [{"errorCode": "AUTHENTICATION_ERROR"}]}))
+    assert tx.is_auth_failure(_TrErr({"errorCode": "unauthorized"}))
+
+
+def test_unrelated_subscription_error_is_not_an_auth_failure():
+    assert not tx.is_auth_failure(_TrErr({"errors": [{"errorCode": "BAD_SUBSCRIPTION_TYPE"}]}))
+
+
+def test_websocket_connect_refusal_is_an_auth_failure():
+    assert tx.is_auth_failure(ValueError("Connection Error: ..."))
+    assert not tx.is_auth_failure(ValueError("something else"))

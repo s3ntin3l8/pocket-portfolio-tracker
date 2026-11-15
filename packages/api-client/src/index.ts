@@ -3824,6 +3824,13 @@ export function createApiClient(config: ApiClientConfig) {
         "/tr/connection",
         input,
       ),
+    // One-tap renew of an expired/errored connection: reuses the stored phone + PIN, so only
+    // the in-app approval is needed. Completes through verifyTr() like a first pairing.
+    renewTr: () =>
+      request<{ status: TrStatus; method: "push" | "authenticator" }>(
+        "POST",
+        "/tr/connection/renew",
+      ),
     // Push accounts send no code: this long-polls until the user approves the login in the TR
     // mobile app (or it is declined / the window expires). Authenticator-app accounts pass
     // the 6-digit `code`; a refused code fails with `code_invalid` and can be retried.

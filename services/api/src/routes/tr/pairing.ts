@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { eq } from "drizzle-orm";
 import { trConnections } from "@portfolio/db";
@@ -21,6 +21,29 @@ const connectBodySchema = z.object({
 // Authenticator-app (TOTP) pairings send the 6-digit code here. The strict pattern also keeps
 // anything but digits (newlines included) out of the login process's stdin.
 const verifyBodySchema = z.object({ code: z.string().regex(/^\d{6}$/) }).nullish();
+
+type PairingStart =
+  { method: "push" | "authenticator" } | { reply: { code: number; body: { error: string } } };
+
+// Starts a pytr login and maps its failures to the route contract. Shared by the first
+// pairing and by Renew so both answer identically.
+async function beginPairing(
+  app: FastifyInstance,
+  request: FastifyRequest,
+  userId: string,
+  creds: { phone: string; pin: string; wafToken?: string },
+): Promise<PairingStart> {
+  try {
+    const { method } = await app.pytr.startPairing(userId, creds);
+    return { method };
+  } catch (err) {
+    if (err instanceof PytrUnavailableError) {
+      return { reply: { code: 503, body: { error: "pytr_not_available" } } };
+    }
+    request.log.error({ err }, "tr pairing failed to start");
+    return { reply: { code: 502, body: { error: "tr_pairing_failed" } } };
+  }
+}
 
 export function registerPairingRoutes(app: FastifyInstance) {
   app.post("/tr/connection", { preHandler: app.authenticate }, async (request, reply) => {
@@ -45,20 +68,13 @@ export function registerPairingRoutes(app: FastifyInstance) {
       },
       "tr pairing started",
     );
-    let method: "push" | "authenticator";
-    try {
-      ({ method } = await app.pytr.startPairing(id, {
-        phone: body.phone,
-        pin: body.pin,
-        wafToken: body.wafToken,
-      }));
-    } catch (err) {
-      if (err instanceof PytrUnavailableError) {
-        return reply.code(503).send({ error: "pytr_not_available" });
-      }
-      request.log.error({ err }, "tr pairing failed to start");
-      return reply.code(502).send({ error: "tr_pairing_failed" });
-    }
+    const started = await beginPairing(app, request, id, {
+      phone: body.phone,
+      pin: body.pin,
+      wafToken: body.wafToken,
+    });
+    if ("reply" in started) return reply.code(started.reply.code).send(started.reply.body);
+    const { method } = started;
 
     await app.db
       .insert(trConnections)
@@ -86,6 +102,40 @@ export function registerPairingRoutes(app: FastifyInstance) {
 
     reply.code(202);
     return { status: "awaiting_2fa", method };
+  });
+
+  // One-tap renew: the stored (encrypted) phone + PIN start a fresh push login, so the user
+  // only confirms in the Trade Republic app. Completion reuses POST /tr/connection/verify.
+  // Only a connection that already needs attention (or is mid-pairing) can be renewed: a
+  // working one keeps its session until a login actually replaces it.
+  app.post("/tr/connection/renew", { preHandler: app.authenticate }, async (request, reply) => {
+    const id = request.userId;
+    if (!app.encryption.isEnabled) {
+      return reply.code(503).send({ error: "encryption_required" });
+    }
+    const conn = await getConnection(app, id);
+    if (!conn || conn.status === "disconnected") {
+      return reply.code(409).send({ error: "not_connected" });
+    }
+    if (conn.syncing) return reply.code(409).send({ error: "sync_in_progress" });
+    if (conn.status === "connected") {
+      return reply.code(409).send({ error: "already_connected" });
+    }
+
+    request.log.info({ userId: id }, "tr renew started");
+    const started = await beginPairing(app, request, id, {
+      phone: app.encryption.decryptString(conn.phoneEnc),
+      pin: app.encryption.decryptString(conn.pinEnc),
+    });
+    if ("reply" in started) return reply.code(started.reply.code).send(started.reply.body);
+
+    await app.db
+      .update(trConnections)
+      .set({ status: "awaiting_2fa", lastError: null, updatedAt: new Date() })
+      .where(eq(trConnections.userId, id));
+
+    reply.code(202);
+    return { status: "awaiting_2fa", method: started.method };
   });
 
   app.post("/tr/connection/verify", { preHandler: app.authenticate }, async (request, reply) => {

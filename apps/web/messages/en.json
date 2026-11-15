@@ -1983,6 +1983,21 @@
     },
     "disconnect": "Disconnect",
     "expiredHint": "Your session expired. Reconnect to resume syncing.",
+    "banner": {
+      "action": "Renew",
+      "dialogTitle": "Renew Trade Republic login",
+      "expired": {
+        "title": "Trade Republic login expired.",
+        "body": "Syncing is paused until you renew it."
+      },
+      "error": {
+        "title": "Trade Republic sync needs attention.",
+        "body": "The last sync failed. Renew the login to resume."
+      }
+    },
+    "renewHint": "Your Trade Republic login expired. Renewing reuses your saved phone number and PIN, so you only confirm in the Trade Republic app.",
+    "renew": "Renew login",
+    "useOtherCredentials": "Or enter different credentials below.",
     "error": "Something went wrong. Please try again.",
     "boundElsewhere": "This Trade Republic account is connected to another portfolio. Connecting here will move it to this portfolio.",
     "errors": {
@@ -1993,6 +2008,12 @@
       "tr_pairing_failed": "Couldn't start the Trade Republic login. Please try again.",
       "portfolio_not_found": "That portfolio could no longer be found.",
       "not_connected": "Not connected. Reconnect and try again.",
+      "not_approved": "The login wasn't approved in the Trade Republic app. Try again.",
+      "tr_approval_failed": "Couldn't complete the Trade Republic login. Please try again.",
+      "sync_in_progress": "A sync is running. Try again when it finishes.",
+      "tr_child_account_unsupported": "Trade Republic child accounts aren't supported yet.",
+      "no_pairing_in_progress": "No login is in progress. Start again.",
+      "already_connected": "Already connected.",
       "tr_sync_failed": "Sync failed. Please try again."
     }
   },
