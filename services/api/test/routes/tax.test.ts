@@ -916,8 +916,14 @@ describe("tax routes", () => {
     const currentYear = new Date().getUTCFullYear();
     const lastYear = currentYear - 1;
 
-    // A date in last year's rest-of-year window (Nov 15 of last year ensures it is strictly after pastStart and before lastYearEnd).
-    const lastYearDivDate = `${lastYear}-11-15T00:00:00.000Z`;
+    // A date strictly inside projectDividends' source window, (now - 1yr, Dec 31 last year]:
+    // its midpoint, so the projected date (+1yr) also lands strictly between today and Dec 31.
+    // A fixed calendar date drifts out of the window as the year advances (a Nov 15 date
+    // stopped matching from Nov 15 on). Only the last day or two of December leave no room.
+    const windowStart = new Date();
+    windowStart.setUTCFullYear(lastYear);
+    const windowEnd = Date.UTC(lastYear, 11, 31, 23, 59, 59, 999);
+    const lastYearDivDate = new Date((windowStart.getTime() + windowEnd) / 2).toISOString();
     // A buy date well before the dividend.
     const buyDate = `${lastYear}-01-01T00:00:00.000Z`;
 
