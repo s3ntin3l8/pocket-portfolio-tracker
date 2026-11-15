@@ -301,6 +301,16 @@ describe("projectDividends", () => {
     expect(projectDividends(past, heldQty, () => "0", NOW)).toHaveLength(0);
   });
 
+  it("projects nothing on Dec 31: the source window and the horizon are both empty", () => {
+    // On Dec 31 the source window (now - 1yr, Dec 31 last year] is a sliver and a payment in it
+    // would project to today or earlier, which is not strictly future. Pinned so the year-end
+    // boundary is explicit (the API forecast tests freeze the clock mid-year and don't cover it).
+    const dec31 = new Date("2026-12-31T12:00:00.000Z");
+    const past = [hist("msft", "2025-12-31", "8.00"), hist("msft", "2025-11-15", "8.00")];
+    const heldQty = new Map([["msft", "10"]]);
+    expect(projectDividends(past, heldQty, () => "10", dec31)).toHaveLength(0);
+  });
+
   it("projects dividends for a held instrument with history in the source window", () => {
     // Once the opening buy is added, both Sep and Dec entries project one year forward.
     const past = [hist("msft", "2025-09-12", "8.00"), hist("msft", "2025-12-12", "8.00")];
