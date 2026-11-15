@@ -228,7 +228,11 @@
   --text-heading--line-height: 1.75rem; /* 28px */
   --text-display: 1.75rem; /* 28px */
   --text-display--line-height: 2rem; /* 32px */
-  --text-display--letter-spacing: -0.015em; /* optical tracking: large figures sit tighter */
+  /* Optical tracking: large figures sit tighter. Horizontal tracking is exempt from the
+     whole-pixel rule above: that rule is about the vertical line box (where a half-pixel
+     baseline is a raster tie-break); letter-spacing only moves glyphs sideways and is
+     applied per glyph, so a fractional advance is ordinary subpixel text positioning. */
+  --text-display--letter-spacing: -0.015em;
   --text-hero: 2.25rem; /* 36px: hero figures */
   --text-hero--line-height: 2.5rem; /* 40px */
   --text-hero--letter-spacing: -0.02em;
@@ -323,6 +327,13 @@
   :root {
     --animate-fade-in: none;
     --animate-shimmer: none;
+  }
+}
+
+/* Overlay enter/exit motion off for motion-sensitive users: `none` also makes Radix's
+   Presence unmount on close immediately instead of waiting for an animationend. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
     --animate-overlay-in: none;
     --animate-overlay-out: none;
     --animate-pop-in: none;

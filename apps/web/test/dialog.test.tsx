@@ -321,7 +321,7 @@ describe("full-screen overlay registration", () => {
 
 // Enter/exit motion lives in the primitive so every call site gets it. Exits are keyed on
 // Radix's `data-state="closed"` (Presence waits for animationend); jsdom runs no animations,
-// so assert the classes, and that the reduced-motion override zeroes the same tokens.
+// so assert the classes. The reduced-motion override is covered in motion-tokens.test.ts.
 describe("DialogContent motion", () => {
   it("fades the scrim and pops the centered card in and out", () => {
     render(
