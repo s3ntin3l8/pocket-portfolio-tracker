@@ -21,6 +21,7 @@ export type TrConnectClient = Pick<
   ApiClient,
   | "connectTr"
   | "renewTr"
+  | "cancelTrPairing"
   | "verifyTr"
   | "syncTr"
   | "disconnectTr"
@@ -85,6 +86,8 @@ export function TrConnectFlow({
   const [error, setError] = useState<string | null>(null);
   const [confirmingReimport, setConfirmingReimport] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  // True while the pairing in flight is a renew: backing out must keep the saved credentials.
+  const [renewing, setRenewing] = useState(false);
 
   const expired = initial.status === "expired";
   // A connection that stopped working keeps its stored credentials: offer the one-tap renew
@@ -138,6 +141,7 @@ export function TrConnectFlow({
         ...(showAdvanced && wafToken ? { wafToken } : {}),
       });
       setPin("");
+      setRenewing(false);
       enterPairing(res.method);
     });
   };
@@ -147,9 +151,27 @@ export function TrConnectFlow({
     if (busy) return;
     void run(async () => {
       const res = await client.renewTr();
+      setRenewing(true);
       enterPairing(res.method);
     });
   };
+
+  // Backing out of the waiting phase. A first pairing is simply discarded; a renew only stops
+  // the login, so the Renew button (and the stored phone + PIN behind it) is still there.
+  const cancelPairing = () =>
+    void run(async () => {
+      if (renewing) {
+        await client.cancelTrPairing();
+        setRenewing(false);
+        setPhase("form");
+        onChanged?.();
+      } else {
+        await client.disconnectTr();
+        setConfirmingDisconnect(false);
+        setPhase("form");
+        onChanged?.();
+      }
+    });
 
   // Authenticator-app pairing: send the code, then wait for the login to be confirmed in the
   // TR app. A refused code (code_invalid) brings the user back here to try again; any other
@@ -353,7 +375,7 @@ export function TrConnectFlow({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={disconnect} disabled={busy}>
+            <Button type="button" variant="outline" onClick={cancelPairing} disabled={busy}>
               {t("cancel")}
             </Button>
             <Button type="submit" disabled={code.length !== 6}>
@@ -377,7 +399,7 @@ export function TrConnectFlow({
             {t("approveWaiting")}
           </div>
           <div className="flex justify-end">
-            <Button variant="outline" onClick={disconnect} disabled={busy}>
+            <Button variant="outline" onClick={cancelPairing} disabled={busy}>
               {t("cancel")}
             </Button>
           </div>

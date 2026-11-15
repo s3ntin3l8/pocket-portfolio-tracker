@@ -749,6 +749,56 @@ describe("Trade Republic connection (encryption enabled)", () => {
       const after = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
       expect(after.json()).toMatchObject({ status: "expired" });
     });
+
+    it("502s tr_pairing_failed when the login cannot start, leaving the connection expired", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-502", "+4915100000006");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      const prev = fake.startResult;
+      fake.startResult = new PytrError("boom");
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/tr/connection/renew",
+          headers: auth(t),
+        });
+        expect(res.statusCode).toBe(502);
+        expect(res.json()).toEqual({ error: "tr_pairing_failed" });
+      } finally {
+        fake.startResult = prev;
+      }
+      const after = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(after.json()).toMatchObject({ status: "expired" });
+    });
+
+    it("cancel aborts the pairing but keeps the saved credentials, so renew works again", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-cancel", "+4915100000007");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      await app.inject({ method: "POST", url: "/tr/connection/renew", headers: auth(t) });
+      expect(fake.pending.size).toBeGreaterThan(0);
+
+      const cancel = await app.inject({
+        method: "POST",
+        url: "/tr/connection/cancel",
+        headers: auth(t),
+      });
+      expect(cancel.statusCode).toBe(204);
+      const after = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(after.json()).toMatchObject({ status: "expired", portfolioId });
+
+      const again = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(again.statusCode).toBe(202);
+      expect(fake.lastStart).toMatchObject({ phone: "+4915100000007", pin: "4321" });
+    });
   });
 
   it("disconnects: DELETE wipes the connection", async () => {
@@ -791,6 +841,13 @@ describe("Trade Republic connection (encryption disabled)", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: "encryption_required" });
+    const renew = await app.inject({
+      method: "POST",
+      url: "/tr/connection/renew",
+      headers: auth(t),
+    });
+    expect(renew.statusCode).toBe(503);
+    expect(renew.json()).toEqual({ error: "encryption_required" });
     await app.close();
     await closeDb();
     delete process.env.AUTHENTIK_ISSUER;

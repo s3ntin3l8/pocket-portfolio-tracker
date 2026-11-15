@@ -29,9 +29,19 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
   const [open, setOpen] = useState(false);
 
   if (!connection || !connection.portfolioId) return null;
-  if (connection.status !== "expired" && connection.status !== "error") return null;
+  // A renew the user walked away from leaves `awaiting_2fa` with no pairing behind it. The
+  // server reaps that to `expired` within the hour; until then treat it as expired here so the
+  // prompt never disappears. A connection that never synced is a first setup, not a renew.
+  const abandoned =
+    connection.status === "awaiting_2fa" &&
+    connection.pairingMethod === null &&
+    connection.lastSyncAt !== null;
+  if (connection.status !== "expired" && connection.status !== "error" && !abandoned) return null;
+  const flowConnection: TrConnection = abandoned
+    ? { ...connection, status: "expired" }
+    : connection;
 
-  const expired = connection.status === "expired";
+  const expired = connection.status !== "error";
 
   // The flow calls this once the approval lands; a sync pulls what was missed meanwhile.
   const renewed = () => {
@@ -61,13 +71,15 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
         <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>{t("banner.dialogTitle")}</DialogTitle>
-            <DialogDescription>{t("renewHint")}</DialogDescription>
+            <DialogDescription>
+              {expired ? t("renewHint") : t("banner.dialogHintError")}
+            </DialogDescription>
           </DialogHeader>
           <TrConnectFlow
             client={api}
             portfolioId={connection.portfolioId}
             cashCounted
-            initial={connection}
+            initial={flowConnection}
             compact
             onChanged={renewed}
           />

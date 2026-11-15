@@ -1126,12 +1126,13 @@ _AUTH_MARKERS = ("AUTHENTICATION", "UNAUTHORIZED", "UNAUTHENTICATED", "SESSION_E
 def is_auth_failure(exc: BaseException) -> bool:
     """True when `exc` means Trade Republic rejected our session (not a transient failure).
 
-    Covers an HTTP 401/403 from the REST calls, a websocket subscription error whose payload
+    Covers an HTTP 401 from the REST calls (403 is deliberately NOT one: it is also how a WAF/bot
+    block shows up, and that must not flip a healthy login to expired), a websocket subscription error whose payload
     names an authentication problem, and the websocket connect refusal pytr raises as
     ``ValueError("Connection Error: ...")`` when the cookies no longer authenticate.
     """
     response = getattr(exc, "response", None)
-    if getattr(response, "status_code", None) in (401, 403):
+    if getattr(response, "status_code", None) == 401:
         return True
     payload = getattr(exc, "error", None)
     if payload is not None:

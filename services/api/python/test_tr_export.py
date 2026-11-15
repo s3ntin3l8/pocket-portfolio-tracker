@@ -1542,14 +1542,14 @@ class _TrErr(ValueError):
         self.error = error
 
 
-def test_http_401_and_403_are_auth_failures():
+def test_http_401_is_an_auth_failure():
     assert tx.is_auth_failure(_HttpErr(401))
-    assert tx.is_auth_failure(_HttpErr(403))
 
 
 def test_other_http_errors_are_not_auth_failures():
-    assert not tx.is_auth_failure(_HttpErr(500))
-    assert not tx.is_auth_failure(_HttpErr(429))
+    # 403 is also how a WAF/bot block shows up, so it must not flip a healthy login to expired.
+    for status in (403, 429, 500):
+        assert not tx.is_auth_failure(_HttpErr(status)), status
 
 
 def test_subscription_error_naming_authentication_is_an_auth_failure():
@@ -1564,3 +1564,42 @@ def test_unrelated_subscription_error_is_not_an_auth_failure():
 def test_websocket_connect_refusal_is_an_auth_failure():
     assert tx.is_auth_failure(ValueError("Connection Error: ..."))
     assert not tx.is_auth_failure(ValueError("something else"))
+
+
+# --- main() wiring: a mid-export auth rejection is "session expired" (exit 2) ---------
+
+
+def _run_main(monkeypatch, tmp_path, run_error):
+    import sys
+    import types
+
+    class FakeApi:
+        def __init__(self, **kwargs):
+            pass
+
+        def resume_websession(self):
+            return True
+
+    fake_pytr = types.ModuleType("pytr")
+    fake_api = types.ModuleType("pytr.api")
+    fake_api.TradeRepublicApi = FakeApi
+    monkeypatch.setitem(sys.modules, "pytr", fake_pytr)
+    monkeypatch.setitem(sys.modules, "pytr.api", fake_api)
+    monkeypatch.setenv("TR_PHONE", "+490000000000")
+    monkeypatch.setenv("TR_PIN", "0000")
+    monkeypatch.setattr(sys, "argv", ["tr_export.py", "--cookies-file", str(tmp_path / "c.txt")])
+
+    async def boom(_tr):
+        raise run_error
+
+    monkeypatch.setattr(tx, "_run", boom)
+    return tx.main()
+
+
+def test_main_exits_2_when_trade_republic_rejects_the_session_mid_export(monkeypatch, tmp_path):
+    assert _run_main(monkeypatch, tmp_path, _HttpErr(401)) == 2
+
+
+def test_main_exits_1_for_an_ordinary_export_failure(monkeypatch, tmp_path):
+    assert _run_main(monkeypatch, tmp_path, RuntimeError("parse blew up")) == 1
+    assert _run_main(monkeypatch, tmp_path, _HttpErr(403)) == 1

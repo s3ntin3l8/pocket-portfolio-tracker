@@ -138,6 +138,22 @@ export function registerPairingRoutes(app: FastifyInstance) {
     return { status: "awaiting_2fa", method: started.method };
   });
 
+  // Abort an in-flight pairing WITHOUT forgetting the saved credentials (DELETE
+  // /tr/connection wipes them). A connection that had a working session before goes back to
+  // `expired` so the Renew prompt returns; one that never worked is left to be re-paired.
+  app.post("/tr/connection/cancel", { preHandler: app.authenticate }, async (request, reply) => {
+    const id = request.userId;
+    app.pytr.cancelPairing(id);
+    const conn = await getConnection(app, id);
+    if (conn && conn.status === "awaiting_2fa" && conn.sessionEnc) {
+      await app.db
+        .update(trConnections)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(eq(trConnections.userId, id));
+    }
+    return reply.code(204).send();
+  });
+
   app.post("/tr/connection/verify", { preHandler: app.authenticate }, async (request, reply) => {
     const id = request.userId;
 

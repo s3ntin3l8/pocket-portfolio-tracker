@@ -23,6 +23,7 @@ export function AddDataTrConnect({
     ApiClient,
     | "connectTr"
     | "renewTr"
+    | "cancelTrPairing"
     | "verifyTr"
     | "syncTr"
     | "disconnectTr"

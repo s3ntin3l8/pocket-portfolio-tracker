@@ -1985,6 +1985,7 @@
     "expiredHint": "Sesi Anda kedaluwarsa. Hubungkan kembali untuk melanjutkan sinkronisasi.",
     "banner": {
       "action": "Perbarui",
+      "dialogHintError": "Sinkronisasi Trade Republic terakhir gagal. Memperbarui memakai nomor telepon dan PIN yang tersimpan, jadi Anda hanya perlu konfirmasi di aplikasi Trade Republic.",
       "dialogTitle": "Perbarui login Trade Republic",
       "expired": {
         "title": "Login Trade Republic kedaluwarsa.",

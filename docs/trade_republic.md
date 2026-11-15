@@ -67,8 +67,9 @@ does not.
 
 Trade Republic ends a web session after a while. The app finds out when a sync cannot resume
 the stored cookies (`tr_export.py` exits 2) or when Trade Republic rejects them part-way through
-an export (HTTP 401/403, an authentication error on a subscription, or a refused websocket
-connect; `is_auth_failure`). Either way the connection flips to `expired` with a sanitized
+an export (HTTP 401, an authentication error on a subscription, or a refused websocket
+connect; `is_auth_failure`). A 403 is deliberately not one: it is also how a WAF block shows
+up, and that must not flip a healthy login to `expired`. Either way the connection flips to `expired` with a sanitized
 `lastError`, and the hourly sync skips it. A failure that is not an auth failure leaves it in
 `error`.
 
@@ -80,6 +81,12 @@ which the banner triggers a sync. Renew answers `409 not_connected` with nothing
 `409 already_connected` for a working connection (its session is only replaced by a login that
 succeeds) and `409 sync_in_progress` while a sync runs. The full form stays available for
 different credentials.
+
+Backing out of a renew (`POST /tr/connection/cancel`) only stops the login and keeps the saved
+credentials, unlike Disconnect. A renew that is simply abandoned leaves `awaiting_2fa` with no
+pairing behind it: the banner still prompts for it (a connection that has synced before), and
+`reapAbandonedPairings` returns such rows to `expired` on every hourly sweep (and at boot, since
+pending pairings live in process memory). A first setup that never synced is left alone.
 
 ## How sync works
 

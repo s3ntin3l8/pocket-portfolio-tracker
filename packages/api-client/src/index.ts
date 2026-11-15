@@ -3831,6 +3831,8 @@ export function createApiClient(config: ApiClientConfig) {
         "POST",
         "/tr/connection/renew",
       ),
+    // Abort an in-flight pairing but keep the saved credentials (unlike disconnectTr).
+    cancelTrPairing: () => request<void>("POST", "/tr/connection/cancel"),
     // Push accounts send no code: this long-polls until the user approves the login in the TR
     // mobile app (or it is declined / the window expires). Authenticator-app accounts pass
     // the 6-digit `code`; a refused code fails with `code_invalid` and can be retried.

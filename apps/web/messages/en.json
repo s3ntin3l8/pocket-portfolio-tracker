@@ -1985,6 +1985,7 @@
     "expiredHint": "Your session expired. Reconnect to resume syncing.",
     "banner": {
       "action": "Renew",
+      "dialogHintError": "The last Trade Republic sync failed. Renewing reuses your saved phone number and PIN, so you only confirm in the Trade Republic app.",
       "dialogTitle": "Renew Trade Republic login",
       "expired": {
         "title": "Trade Republic login expired.",

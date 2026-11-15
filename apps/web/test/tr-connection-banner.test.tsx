@@ -7,6 +7,7 @@ import messages from "../messages/en.json";
 const refresh = vi.fn();
 const api = {
   connectTr: vi.fn(),
+  cancelTrPairing: vi.fn(),
   renewTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
   verifyTr: vi.fn(async () => ({ status: "connected" as const })),
   syncTr: vi.fn(async () => ({ queued: true })),
@@ -67,6 +68,43 @@ describe("TrConnectionBanner", () => {
     await waitFor(() => expect(api.renewTr).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(api.syncTr).toHaveBeenCalled(), { timeout: 5000 });
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("keeps prompting after a renew was abandoned (awaiting_2fa with no pairing behind it)", () => {
+    renderBanner({
+      ...base,
+      status: "awaiting_2fa",
+      pairingMethod: null,
+      lastSyncAt: "2026-11-15T10:00:00.000Z" as unknown as TrConnection["lastSyncAt"],
+    });
+    expect(screen.getByText(/Trade Republic login expired/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Renew" })).toBeTruthy();
+  });
+
+  it("does not nag about a first setup that never synced", () => {
+    const { container } = renderBanner({
+      ...base,
+      status: "awaiting_2fa",
+      pairingMethod: null,
+      lastSyncAt: null,
+    });
+    expect(container.textContent).toBe("");
+  });
+
+  it("does not prompt while a pairing is genuinely in flight", () => {
+    const { container } = renderBanner({
+      ...base,
+      status: "awaiting_2fa",
+      pairingMethod: "push",
+      lastSyncAt: "2026-11-15T10:00:00.000Z" as unknown as TrConnection["lastSyncAt"],
+    });
+    expect(container.textContent).toBe("");
+  });
+
+  it("explains a failed sync in the dialog, not an expired login", async () => {
+    renderBanner({ ...base, status: "error" });
+    fireEvent.click(screen.getByRole("button", { name: "Renew" }));
+    expect(await screen.findByText(/last Trade Republic sync failed/)).toBeTruthy();
   });
 
   it("flags a failed sync with its own wording", () => {

@@ -33,7 +33,7 @@ export {
   INSTRUMENT_META_SINGLETON_SECONDS,
 } from "./scheduler/config.js";
 
-export { resetStaleSyncFlags } from "./scheduler/cleanup.js";
+export { resetStaleSyncFlags, reapAbandonedPairings } from "./scheduler/cleanup.js";
 
 export {
   activeBoss,
@@ -83,7 +83,11 @@ import {
 } from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 import { purgeExpiredConversations } from "./assistant-history.js";
-import { resetStaleSyncFlags } from "./scheduler/cleanup.js";
+import {
+  ABANDONED_PAIRING_MS,
+  resetStaleSyncFlags,
+  reapAbandonedPairings,
+} from "./scheduler/cleanup.js";
 import {
   setActiveBoss,
   usesPglite,
@@ -154,6 +158,16 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
     app.log.warn(stale, "cleared stale syncing flags on startup");
   }
 
+  // Pending pairings live in process memory, so at boot every `awaiting_2fa` row is orphaned
+  // whatever its age (an age of 0 = reap them all).
+  const orphaned = await reapAbandonedPairings(
+    getDb(),
+    new Date(Date.now() + ABANDONED_PAIRING_MS),
+  );
+  if (orphaned.trConnections > 0) {
+    app.log.warn(orphaned, "reset abandoned Trade Republic pairings on startup");
+  }
+
   await boss.createQueue(QUEUE);
 
   await boss.work(QUEUE, async () => {
@@ -218,6 +232,8 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
         : undefined;
     const targetId = typeof connectionId === "string" ? connectionId : undefined;
     try {
+      // The hourly sweep also turns an abandoned renew back into `expired` (see the helper).
+      if (!targetId) await reapAbandonedPairings(getDb());
       const conns = await getDb()
         .select()
         .from(trConnections)
