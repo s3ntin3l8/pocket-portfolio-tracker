@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import { eq } from "drizzle-orm";
 import { fxRates, instruments, users } from "@portfolio/db";
@@ -916,7 +916,19 @@ describe("tax routes", () => {
     const currentYear = new Date().getUTCFullYear();
     const lastYear = currentYear - 1;
 
-    // A date in last year's rest-of-year window (Nov 15 of last year ensures it is strictly after pastStart and before lastYearEnd).
+    // Pin "now" to mid-June of the current year. projectDividends reads the source window
+    // (now - 1yr, Dec 31 last year], so a fixed seed date only stays inside it while the
+    // real clock is early enough (a Nov 15 seed fell out of the window from Nov 15 on, and a
+    // derived date still has no room on Dec 31). With the clock frozen the window is fixed:
+    // (Jun 15 last year, Dec 31 last year], and the Nov 15 seed projects to a future date.
+    // Only `Date` is faked, as elsewhere in this suite; tokens are minted and verified
+    // under the same frozen clock.
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"], now: new Date(Date.UTC(currentYear, 5, 15, 12)) });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
     const lastYearDivDate = `${lastYear}-11-15T00:00:00.000Z`;
     // A buy date well before the dividend.
     const buyDate = `${lastYear}-01-01T00:00:00.000Z`;
