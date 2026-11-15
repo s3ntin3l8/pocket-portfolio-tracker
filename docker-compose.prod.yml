@@ -89,6 +89,10 @@ services:
       NODE_ENV: production
       DATABASE_URL: ${DATABASE_URL}
       DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      # Web Push (optional; all three unset = notifications off). See docs/notifications.md.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       AUTHENTIK_ISSUER: ${AUTHENTIK_ISSUER}
       AUTHENTIK_AUDIENCE: ${AUTHENTIK_AUDIENCE}
       AUTHENTIK_ADMIN_GROUP: ${AUTHENTIK_ADMIN_GROUP}

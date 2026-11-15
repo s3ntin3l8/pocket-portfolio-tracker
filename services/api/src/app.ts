@@ -20,6 +20,9 @@ import { healthRoute } from "./routes/health.js";
 import { meRoute } from "./routes/me.js";
 import { integrityRoute } from "./routes/integrity.js";
 import { meJobsRoute } from "./routes/me-jobs.js";
+import { pushRoute } from "./routes/push.js";
+import { defaultSender } from "./services/notifications/push.js";
+import type { PushSender } from "./services/notifications/push.js";
 import { portfoliosRoute } from "./routes/portfolios.js";
 import { accountHoldersRoute } from "./routes/account-holders.js";
 import { transactionsRoute } from "./routes/transactions.js";
@@ -64,6 +67,8 @@ export type BuildAppOptions = AuthPluginOptions & {
   pytr?: PytrRunner;
   // Injectable so tests can mock the IBKR Flex client without real HTTP.
   ibkrFlex?: IbkrFlexClient;
+  // Injectable so tests never POST to a real push service.
+  pushSender?: PushSender;
   // Injectable so tests can supply a fake storage driver without hitting MinIO/S3.
   storage?: StorageProvider;
   /**
@@ -349,6 +354,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   }
 
   app.decorate("pytr", opts.pytr ?? getPytrRunner(app.config, app.log));
+  app.decorate("pushSender", opts.pushSender ?? defaultSender);
   app.decorate(
     "ibkrFlex",
     opts.ibkrFlex ?? createFlexClient({ baseUrl: app.config.IBKR_FLEX_BASE_URL }),
@@ -368,6 +374,7 @@ export async function buildApp(opts: BuildAppOptions = {}) {
   await app.register(meRoute);
   await app.register(integrityRoute);
   await app.register(meJobsRoute);
+  await app.register(pushRoute);
   await app.register(portfoliosRoute);
   await app.register(accountHoldersRoute);
   await app.register(transactionsRoute);
@@ -401,6 +408,7 @@ declare module "fastify" {
     /** Resolves the assistant's chat provider per request; `null` when none is configured. */
     resolveChatProvider: () => Promise<ChatProvider | null>;
     pytr: PytrRunner;
+    pushSender: PushSender;
     ibkrFlex: IbkrFlexClient;
     storage: StorageProvider;
   }

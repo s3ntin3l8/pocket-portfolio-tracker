@@ -2827,6 +2827,15 @@ export function createApiClient(config: ApiClientConfig) {
       request<ApiTokenWithSecret>("POST", "/me/tokens", input),
     deleteApiToken: (id: string) => request<void>("DELETE", `/me/tokens/${encodeURIComponent(id)}`),
 
+    // Web Push for the installed PWA: `enabled` is false when the server has no VAPID keys.
+    getPushConfig: () =>
+      request<{ enabled: boolean; publicKey: string | null }>("GET", "/me/push/config"),
+    subscribePush: (input: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+      request<{ ok: true }>("POST", "/me/push/subscriptions", input),
+    unsubscribePush: (endpoint: string) =>
+      request<void>("DELETE", `/me/push/subscriptions?endpoint=${encodeURIComponent(endpoint)}`),
+    testPush: () => request<{ sent: number }>("POST", "/me/push/test"),
+
     // Local password auth — 503s (auth_not_configured) when AUTH_LOCAL_SECRET isn't
     // set. Both require an interactive session; a PAT gets 403 interactive_session_required.
     // Revokes the user's personal access tokens unless `keepTokens: true`.

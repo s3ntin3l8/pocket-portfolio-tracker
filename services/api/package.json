@@ -53,11 +53,13 @@
     "pino-roll": "^4.0.0",
     "postgres": "^4.0.0",
     "unpdf": "^2.1.0",
+    "web-push": "^4.0.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.15",
     "@types/node": "^26.6.6",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^5.1.0",
     "aws-sdk-client-mock": "^4.1.0",
     "aws-sdk-client-mock-vitest": "^8.0.0",

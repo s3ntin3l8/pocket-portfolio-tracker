@@ -5,6 +5,7 @@ export * from "./portfolios.js";
 export * from "./instruments.js";
 export * from "./screenshot-imports.js";
 export * from "./connections.js";
+export * from "./notifications.js";
 export * from "./admin.js";
 export * from "./assistant.js";
 export * from "./documents.js";

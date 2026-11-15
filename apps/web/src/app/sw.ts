@@ -74,6 +74,45 @@ self.addEventListener("fetch", (event: FetchEvent) => {
   );
 });
 
+// Web Push (see docs/notifications.md). The payload is JSON the API built; `url` is a
+// same-origin path it already validated, re-checked here because a click navigates to it.
+self.addEventListener("push", (event: PushEvent) => {
+  let data: { title?: string; body?: string; url?: string; tag?: string } = {};
+  try {
+    data = event.data?.json() ?? {};
+  } catch {
+    // A non-JSON payload still gets a generic notification below.
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Pocket", {
+      body: data.body,
+      tag: data.tag,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event: NotificationEvent) => {
+  event.notification.close();
+  const raw = (event.notification.data as { url?: string } | undefined)?.url;
+  const path = raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  const target = new URL(path, self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      const open = windows.find((w) => "focus" in w);
+      if (open) {
+        await open.focus();
+        if ("navigate" in open) await (open as WindowClient).navigate(target).catch(() => null);
+        return;
+      }
+      await self.clients.openWindow(target);
+    })(),
+  );
+});
+
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   // A new SW parks in "waiting" instead of activating immediately, so PwaUpdater can

@@ -30,6 +30,7 @@ export * from "./schema/portfolios.js";
 export * from "./schema/instruments.js";
 export * from "./schema/screenshot-imports.js";
 export * from "./schema/connections.js";
+export * from "./schema/notifications.js";
 export * from "./schema/admin.js";
 export * from "./schema/assistant.js";
 export * from "./schema/documents.js";
