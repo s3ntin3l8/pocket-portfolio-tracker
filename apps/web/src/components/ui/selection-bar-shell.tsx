@@ -40,7 +40,7 @@ export function SelectionBarShell({
   return (
     <div
       className={cn(
-        "flex min-h-12 items-center justify-between gap-3 border-border bg-card/60 px-4 py-2 text-sm",
+        "material-chrome flex min-h-12 items-center justify-between gap-3 border-border bg-card/60 px-4 py-2 text-sm",
         "max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:mb-0 max-md:z-30 max-md:min-h-14 max-md:rounded-none max-md:border-t max-md:bg-background/95 max-md:px-4 max-md:py-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:shadow-lg max-md:backdrop-blur-sm",
         // Inline on md+, but stuck under the top bar (`--topbar-h`) so a long list can scroll past
         // without losing the batch actions.

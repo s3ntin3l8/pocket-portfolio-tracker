@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useRef } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { ChevronLeft } from "lucide-react";
 import type { Portfolio, AccountHolder } from "@portfolio/api-client";
@@ -28,6 +28,7 @@ import { MAIN_NAV, ADMIN_NAV, navActiveKey } from "@/components/nav-items";
 import { NavProgressProvider, LinkPendingSignal } from "@/components/nav-progress";
 import { FullScreenOverlayProvider } from "@/components/full-screen-overlay";
 import { RouteTransition } from "@/components/route-transition";
+import { useRepaintOnResume } from "@/lib/use-repaint-on-resume";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PageHeaderProvider, usePageHeader } from "@/components/page-header";
 
@@ -89,6 +90,27 @@ export function AppShell({
   const pathname = usePathname();
   const activeKey = navActiveKey(pathname);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLElement>(null);
+  // The header is a translucent `backdrop-filter` layer like the bottom nav, so it needs the
+  // same teardown/recreate on resume (#451: taps die on a thawed backdrop-filter layer).
+  useRepaintOnResume(headerRef);
+  // Scroll-edge hairline: the header's bottom border only exists once content has scrolled
+  // under it (a permanent rule is just a divider; the blur already separates it from content).
+  // A data attribute, not state, so scrolling never re-renders the shell.
+  useEffect(() => {
+    const scroller = scrollContainerRef.current;
+    const header = headerRef.current;
+    if (!scroller || !header) return;
+    const update = () => {
+      // Only touch the DOM when the value flips: a write re-invalidates the [data-scrolled]
+      // rule, and almost every scroll event leaves it unchanged.
+      const next = String(scroller.scrollTop > 0);
+      if (header.dataset.scrolled !== next) header.dataset.scrolled = next;
+    };
+    update();
+    scroller.addEventListener("scroll", update, { passive: true });
+    return () => scroller.removeEventListener("scroll", update);
+  }, []);
 
   const navItems = isAdmin ? [...MAIN_NAV, ADMIN_NAV] : MAIN_NAV;
 
@@ -222,8 +244,10 @@ export function AppShell({
                   {/* Reference top bar: 62px, card surface, 24px side padding, 12px gaps.
               Padding lives on the INNER wrapper (not the outer bar) so its cap/center
               matches <main>'s content edges exactly — see the widescreen note on <main>.
-              The outer bar stays edge-to-edge (bg-card, sticky, safe-area-top only) so it
-              still reads as one continuous surface across the full width. */}
+              The outer bar stays edge-to-edge (translucent bg-card/80 + backdrop-blur-lg,
+              sticky, safe-area-top only; its bottom border shows only once content has
+              scrolled under it) so it still reads as one continuous surface across the
+              full width. */}
                   {/* w-full + will-change-transform: workaround for an iOS Safari compositor
                 bug where `sticky` element backgrounds paint only ~60% across the scroll
                 container's content width instead of the element's full width (#472).
@@ -237,7 +261,10 @@ export function AppShell({
                 overflowing past it — on a page that fits one screen (Profile/Settings),
                 no shrinking occurred and it rendered correctly. Same bug class `shrink-0`
                 already fixes for the Sheet's drag handle/footer (`ui/sheet.tsx`, #472). */}
-                  <header className="sticky top-0 z-30 flex w-full min-h-[62px] shrink-0 items-center border-b border-border bg-card pt-[env(safe-area-inset-top)] will-change-transform">
+                  <header
+                    ref={headerRef}
+                    className="material-chrome sticky top-0 z-30 flex w-full min-h-[62px] shrink-0 items-center border-b border-transparent bg-card/80 pt-[env(safe-area-inset-top)] backdrop-blur-lg transition-colors will-change-transform data-[scrolled=true]:border-border"
+                  >
                     <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:pl-6 md:pr-6">
                       {/* Mobile brand (desktop shows it in the sidebar). */}
                       <ScopeLink href="/holdings" className="md:hidden" aria-label="Pocket">

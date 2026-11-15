@@ -1,5 +1,6 @@
 "use client";
 
+import { haptics } from "@/lib/haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import type {
@@ -685,6 +686,7 @@ export function useTransactionForm({
         await client.createTransaction(portfolioId, payload);
       }
       clearFieldErrors();
+      haptics.success();
       onSuccess?.();
     } catch (err) {
       // The API's loan-link rejections (a race with the installment job) get their own message.

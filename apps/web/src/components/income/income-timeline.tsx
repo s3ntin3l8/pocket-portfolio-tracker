@@ -415,7 +415,7 @@ export function IncomeTimeline({
                     toggle(g.year);
                     if (!hasRows && !lazyRows && loadingYear !== g.year) loadYear(g.year);
                   }}
-                  className="sticky top-0 z-[2] flex w-full items-baseline justify-between border-b border-border bg-card/95 py-2 backdrop-blur-sm text-left hover:bg-muted/30"
+                  className="sticky top-0 z-[2] flex w-full items-baseline justify-between material-chrome border-b border-border bg-card/95 py-2 backdrop-blur-sm text-left hover:bg-muted/30"
                 >
                   <div className="flex items-baseline gap-2.5 min-w-0">
                     {loadingYear === g.year && !lazyRows ? (

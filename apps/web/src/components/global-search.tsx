@@ -1,5 +1,6 @@
 "use client";
 
+import { setThemeWithTransition } from "@/lib/use-theme-mode";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
@@ -236,7 +237,7 @@ export function GlobalSearch({
     if (id === "add-transaction") navigate(entryHref("transaction"));
     else if (id === "import") navigate(entryHref("import"));
     else if (id === "toggle-theme") {
-      setTheme(resolvedTheme === "dark" ? "light" : "dark");
+      setThemeWithTransition(setTheme, resolvedTheme === "dark" ? "light" : "dark");
       handleOpenChange(false);
     } else if (id === "shortcuts") {
       handleOpenChange(false);

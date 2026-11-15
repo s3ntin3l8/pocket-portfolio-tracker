@@ -1,5 +1,6 @@
 "use client";
 
+import { haptics } from "@/lib/haptics";
 import { toast } from "sonner";
 import { classifyImportError, importErrorDetail } from "@/lib/import-errors";
 import type { GroupMap } from "../types";
@@ -33,6 +34,7 @@ export function notifyMaterialized(
   t: TFunction,
 ) {
   router.refresh();
+  haptics.success();
   toast.success(t("toast.success", { count }), {
     action: {
       label: t("toast.viewTransactions"),
