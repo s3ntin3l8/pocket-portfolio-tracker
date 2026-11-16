@@ -6,6 +6,7 @@ import { Lock } from "lucide-react";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { LocaleSwitcher } from "@/components/locale-switcher";
 import { ShortcutsToggle } from "@/components/shortcuts-toggle";
+import { PushNotificationsToggle } from "@/components/settings-sections/push-notifications-toggle";
 import { DisplayCurrency } from "@/components/display-currency";
 import { UpdateProfile } from "@/components/update-profile";
 import { ChangePassword } from "@/components/change-password";
@@ -52,6 +53,7 @@ export async function AccountSection({
           <div className="p-4">
             <ShortcutsToggle />
           </div>
+          <PushNotificationsToggle />
         </Card>
       </div>
 

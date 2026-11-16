@@ -34,6 +34,21 @@ const schema = {
       type: "string",
       default: "",
     },
+    // Web Push (installed-PWA notifications). All three unset = push is off and every send is
+    // a no-op. Generate a pair with `make vapid-keys`. The private key is a secret.
+    VAPID_PUBLIC_KEY: {
+      type: "string",
+      default: "",
+    },
+    VAPID_PRIVATE_KEY: {
+      type: "string",
+      default: "",
+    },
+    // A `mailto:` or https URL the push service can contact the operator at.
+    VAPID_SUBJECT: {
+      type: "string",
+      default: "",
+    },
     // Migration aid only: accept stored values lacking the `enc:` prefix (rows written
     // before encryption was enabled). Leave false once existing rows are re-encrypted.
     DB_ENCRYPTION_ALLOW_PLAINTEXT: {
@@ -240,7 +255,12 @@ const schema = {
  * up but authenticates with the wrong key (or no key at all).
  */
 export function resolveFileSecrets(
-  prefixes: readonly string[] = ["DB_ENCRYPTION_KEY", "STORAGE_SECRET_KEY", "AUTH_LOCAL_SECRET"],
+  prefixes: readonly string[] = [
+    "DB_ENCRYPTION_KEY",
+    "STORAGE_SECRET_KEY",
+    "AUTH_LOCAL_SECRET",
+    "VAPID_PRIVATE_KEY",
+  ],
 ) {
   for (const prefix of prefixes) {
     const filePath = process.env[`${prefix}_FILE`];
@@ -308,6 +328,9 @@ declare module "fastify" {
       DATABASE_URL: string;
       DB_ENCRYPTION_KEY: string;
       DB_ENCRYPTION_ALLOW_PLAINTEXT: boolean;
+      VAPID_PUBLIC_KEY: string;
+      VAPID_PRIVATE_KEY: string;
+      VAPID_SUBJECT: string;
       AUTHENTIK_ISSUER: string;
       AUTHENTIK_AUDIENCE: string;
       AUTHENTIK_JWKS_URL: string;

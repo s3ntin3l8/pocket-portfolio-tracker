@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help install install-hooks web-env pytr-venv services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing screenshots-audit visual-check integrity dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
+.PHONY: help install install-hooks web-env pytr-venv vapid-keys services services-down dev dev-web dev-setup seed-demo seed-demo-login demo screenshots screenshots-landing screenshots-audit visual-check integrity dev-reset test test-coverage lint typecheck format build clean prod prod-build prod-down prod-logs prod-ps dev-clean-legacy-volumes
 
 # Both compose files now pin an explicit `name:` (docker-compose.yml -> pocket-dev,
 # docker-compose.prod.yml -> pocket-portfolio-tracker) so the dev and prod stacks never
@@ -46,6 +46,9 @@ pytr-venv: ## Create local pytr venv for Trade Republic sync (then set PYTR_PYTH
 	.venv-pytr/bin/pip install --upgrade pip
 	.venv-pytr/bin/pip install -r services/api/python/requirements.txt
 	@echo "Add to .env:  PYTR_PYTHON_BIN=$(CURDIR)/.venv-pytr/bin/python"
+
+vapid-keys: ## Print a VAPID key pair for Web Push notifications (add to .env)
+	@cd services/api && node --input-type=module -e "import { generateVAPIDKeys } from 'web-push'; const k = generateVAPIDKeys(); console.log('VAPID_PUBLIC_KEY=' + k.publicKey); console.log('VAPID_PRIVATE_KEY=' + k.privateKey); console.log('VAPID_SUBJECT=mailto:you@example.com')"
 
 services: ## Start local Postgres + MinIO (optional — dev defaults to PGlite + local folder storage; use for Postgres-parity dev)
 	$(COMPOSE_DEV) up -d postgres minio
