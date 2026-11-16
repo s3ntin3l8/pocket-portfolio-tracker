@@ -212,6 +212,17 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   at price 0 with `attention: ["needs_cost_basis"]`; both confirm paths
   (`/imports/:id/confirm`, `…/transactions/resolve-drafts`) refuse a price-0 `transfer_in` with 400
   `transfer_cost_basis_required` until the user enters it (#818).
+- **The TWR chain's single-day guard drops a day beyond ±`SINGLE_DAY_MAX_PCT` (50%) — and neutralizes a V-pair.**
+  The cap is asymmetric in effect: an artifact removing 33–50% in one day is accepted, the
+  rebound that undoes it (+50…+100%) is dropped, so the artifact step stayed in the index.
+  `neutralizeVPairs` (`packages/core/src/twr.ts`, shared by `chainIndex` and `aggregateValueFlows`)
+  treats two ADJACENT days as neutral (both growths = 1) when the first passes the guard, the
+  second fails it on size, and `|g1 × g2 − 1| ≤ V_PAIR_TOLERANCE` (1%, `sanity-gates.ts`). Anything
+  else is unchanged: a lone large move, or one with an unrelated move days later, is accepted or
+  dropped as before, and the cap is not made symmetric (single-asset books have real −33…−50%
+  days). The growths already net out each day's `effectiveFlow`, so a transfer day is g = 1 and a
+  large flow on the artifact day simply stops the pair cancelling (not paired). Multi-day
+  artifacts are out of scope. Guard: `twr.test.ts`, `ledgers/twr-v-pair.ts`.
 - **A missing FX rate is never 1:1 and never a failed request — it is a flagged exclusion.**
   `getFxRates`/`getFxRatesForDates` carry the latest cached rate forward (`getFxRates` only within
   `FX_MAX_CARRY_FORWARD_DAYS` = 14, `packages/core/src/sanity-gates.ts` — an older rate counts as

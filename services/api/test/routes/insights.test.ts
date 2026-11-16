@@ -111,6 +111,42 @@ describe("GET /insights", () => {
     expect(Number(body.drawdown.maxDrawdownPct)).toBeCloseTo(0, 6);
   });
 
+  it("GET /portfolios/:id/history keeps a V-shaped artifact pair flat (#1263)", async () => {
+    const t = await token("history-vpair-user");
+    const created = await app.inject({
+      method: "POST",
+      url: "/portfolios",
+      headers: auth(t),
+      payload: { name: "V", baseCurrency: "IDR" },
+    });
+    const portfolioId = created.json().id as string;
+    // 1,000,000 → 650,000 (−35%, under the guard) → 1,000,000 (+53.8%, over it): a bad
+    // snapshot for one day. The pair cancels, so the percentage never leaves 0.
+    const rows = [
+      ["2026-01-01", "1000000"],
+      ["2026-01-02", "650000"],
+      ["2026-01-03", "1000000"],
+    ] as const;
+    await app.db.insert(portfolioSnapshots).values(
+      rows.map(([date, v]) => ({
+        portfolioId,
+        date,
+        netWorth: v,
+        marketValue: v,
+        effectiveFlow: "0",
+        currency: "IDR",
+      })),
+    );
+    const res = await app.inject({
+      method: "GET",
+      url: `/portfolios/${portfolioId}/history?range=all`,
+      headers: auth(t),
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json() as { date: string; pct: string }[];
+    expect(body.map((p) => Number(p.pct))).toEqual([0, 0, 0]);
+  });
+
   // Regression guard for the portfolio selector not reacting (#insights scope bug):
   // /insights must accept ?portfolioId= and scope every metric to that one portfolio,
   // not always aggregate across the user's whole account.

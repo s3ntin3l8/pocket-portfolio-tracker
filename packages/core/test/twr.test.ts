@@ -1182,3 +1182,120 @@ describe("twrFields", () => {
     expect(twrFields(new Map(), "2026-01-02")).toEqual({});
   });
 });
+
+// ---------------------------------------------------------------------------
+// 10. V-pair rule: a single-day artifact and its rebound cancel (#1263)
+// ---------------------------------------------------------------------------
+
+describe("TWR: V-shaped single-day artifact pair is neutral", () => {
+  const row = (date: string, marketValue: string, effectiveFlow = "0"): DailyValueFlow => ({
+    date,
+    marketValue,
+    effectiveFlow,
+  });
+
+  it("chainIndex: −35% then +53.8% stays flat", () => {
+    // 1000 → 650 (g = 0.65, under the 50% cap: accepted today) → 1000 (g ≈ 1.5385, over the
+    // cap: dropped today). g1 × g2 = 1.0 → the pair is neutral.
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "650"),
+      row("2026-01-03", "1000"),
+      row("2026-01-04", "1010"), // +1% afterwards still chains normally
+    ]);
+    expect(index.map((p) => Number(p.index))).toEqual([100, 100, 100, expect.closeTo(101, 6)]);
+  });
+
+  it("chainIndex: a small flow on the artifact day does not break the cancellation", () => {
+    // Day 2: 5 deposited, value 650 (artifact). g1 = (650−5)/1000 = 0.645;
+    // g2 = 1005/650 ≈ 1.5462 (over cap). Product ≈ 0.9973 → within 1%.
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "650", "5"),
+      row("2026-01-03", "1005"),
+    ]);
+    expect(Number(index[2]!.index)).toBeCloseTo(100, 6);
+  });
+
+  it("chainIndex: a large flow that stops the growths cancelling is not paired", () => {
+    // Day 2: 100 deposited, artifact value 715: g1 = 0.615; g2 = 1100/715 ≈ 1.538;
+    // product ≈ 0.946 → outside tolerance → today's behaviour (step stays, rebound dropped).
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "715", "100"),
+      row("2026-01-03", "1100"),
+    ]);
+    expect(Number(index[1]!.index)).toBeCloseTo(61.5, 6);
+    expect(Number(index[2]!.index)).toBeCloseTo(61.5, 6);
+  });
+
+  it("chainIndex: a genuine −40% day stays, and a +60% many days later is not paired with it", () => {
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "600"), // −40%: accepted
+      row("2026-01-03", "600"),
+      row("2026-01-04", "600"),
+      row("2026-01-05", "960"), // +60%: over the cap, dropped as before
+    ]);
+    expect(Number(index[1]!.index)).toBeCloseTo(60, 6);
+    expect(Number(index[4]!.index)).toBeCloseTo(60, 6);
+  });
+
+  it("chainIndex: a lone genuine +60% day is dropped as today", () => {
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "1600"),
+      row("2026-01-03", "1616"),
+    ]);
+    expect(Number(index[1]!.index)).toBeCloseTo(100, 6);
+    expect(Number(index[2]!.index)).toBeCloseTo(101, 6);
+  });
+
+  it("chainIndex: a rebound that does not cancel (−35% then +80%) is not paired", () => {
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "650"),
+      row("2026-01-03", "1170"), // +80%: over the cap, product 1.44
+    ]);
+    expect(Number(index[2]!.index)).toBeCloseTo(65, 6);
+  });
+
+  it("chainIndex: a transfer-neutral day next to a pair does not fake or break it", () => {
+    // Day 2 is a transfer-in at market value (flow = value added, return-neutral);
+    // days 3/4 are the V. The transfer day itself is g = 1 and never pairs.
+    const index = chainIndex([
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "1500", "500"),
+      row("2026-01-03", "975"), // −35%
+      row("2026-01-04", "1500"), // +53.8%
+    ]);
+    expect(index.map((p) => Number(p.index))).toEqual([100, 100, 100, 100]);
+  });
+
+  it("aggregateValueFlows: a leg's V-pair is neutral in the aggregate", () => {
+    const a = [
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "650"),
+      row("2026-01-03", "1000"),
+    ];
+    const b = [
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "1000"),
+      row("2026-01-03", "1000"),
+    ];
+    const agg = aggregateValueFlows([a, b]);
+    expect(agg.map((p) => Number(p.marketValue))).toEqual([2000, 2000, 2000]);
+    const index = chainIndex(agg);
+    expect(Number(index[2]!.index)).toBeCloseTo(100, 6);
+  });
+
+  it("aggregateValueFlows: a lone large leg move keeps today's behaviour", () => {
+    const a = [
+      row("2026-01-01", "1000", "1000"),
+      row("2026-01-02", "600"),
+      row("2026-01-03", "600"),
+    ];
+    const agg = aggregateValueFlows([a]);
+    expect(agg.map((p) => Number(p.marketValue))).toEqual([1000, 600, 600]);
+  });
+});

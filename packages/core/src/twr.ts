@@ -26,7 +26,7 @@ import { D, ZERO } from "./decimal.js";
 import { isTradeType } from "./categorization.js";
 import { computeHoldings, createHoldingsCursor, marketValue } from "./holdings.js";
 import { cashFlow } from "./cash.js";
-import { SINGLE_DAY_MAX_PCT } from "./sanity-gates.js";
+import { SINGLE_DAY_MAX_PCT, V_PAIR_TOLERANCE } from "./sanity-gates.js";
 import { convert, type FxRateFn } from "./networth.js";
 import { toDateKey } from "./date-utils.js";
 import type { CoreTransaction, CorporateAction, Holding } from "./types.js";
@@ -331,18 +331,32 @@ export function chainIndex(
   base = BASE,
   maxSingleDayReturn: number = SINGLE_DAY_MAX_PCT / 100,
 ): IndexPoint[] {
+  // Daily growth 1 + r_t, or null where there is no usable previous value (first point,
+  // previous value zero): the index just carries there.
+  const rawGrowths: (Decimal | null)[] = series.map((point, i) => {
+    if (i === 0) return null;
+    const prevMv = D(series[i - 1]!.marketValue);
+    if (prevMv.isZero()) return null;
+    return D(point.marketValue).sub(D(point.effectiveFlow)).div(prevMv);
+  });
+  const { growths, pairs } = neutralizeVPairs(rawGrowths, maxSingleDayReturn);
+  logVPairs(
+    pairs.map((i) => ({
+      dates: [series[i]!.date, series[i + 1]!.date],
+      growths: [rawGrowths[i]!, rawGrowths[i + 1]!],
+    })),
+  );
+
   const result: IndexPoint[] = [];
   let index = D(base);
-  let prevMv: Decimal | null = null;
 
-  for (const point of series) {
-    const mv = D(point.marketValue);
-    const flow = D(point.effectiveFlow);
+  for (let i = 0; i < series.length; i++) {
+    const point = series[i]!;
+    const growth = growths[i];
 
-    if (prevMv !== null && !prevMv.isZero()) {
+    if (growth) {
       // r_t = (V_t − flow_t) / V_{t-1} − 1
-      const rt = mv.sub(flow).div(prevMv).sub(1);
-      const growth = D(1).add(rt);
+      const rt = growth.sub(1);
       // Guard: growth ≤ 0 (≥100% loss) or |rt| > threshold (suspect single-day move).
       // Both indicate data artifacts (stale/missing prices), not real returns.
       if (growth.gt(0) && rt.abs().lte(maxSingleDayReturn)) {
@@ -361,14 +375,64 @@ export function chainIndex(
         );
       }
     }
-    // prevMv === null: first point, index stays at base.
-    // prevMv.isZero(): reset-proof carry-forward (index unchanged).
+    // growth === null: first point or previous value zero — index carries forward.
 
     const pct = index.div(base).sub(1).mul(100);
     result.push({ date: point.date, index: index.toString(), pct: pct.toString() });
-    prevMv = mv;
   }
   return result;
+}
+
+/**
+ * Find V-pairs in a series of daily growths (`1 + r`, `null` = no growth that day) and
+ * neutralize them (both growths → 1).  A V-pair is two ADJACENT days (i, i+1) where day i
+ * passes the single-day guard (`growth > 0 && |r| ≤ cap`), day i+1 fails it on size
+ * (`|r| > cap`), and the two growths cancel: `|g_i × g_{i+1} − 1| ≤ V_PAIR_TOLERANCE`.
+ *
+ * Why: the guard is asymmetric in effect — an artifact that removes 33–50 % in one day is
+ * accepted, while the rebound that undoes it (+50 % … +100 %) is dropped, leaving the
+ * artifact step in the index forever.  Only a pair that cancels is neutralized; a lone large
+ * move, or a large move followed by an unrelated one, behaves exactly as before.  The cap
+ * itself is deliberately NOT made symmetric (single-asset books have real −33 %…−50 % days).
+ *
+ * Shared by `chainIndex` and `aggregateValueFlows` — keep the rule in this one place.
+ * Returns the (copied) growths and the index `i` of each pair's first day.
+ */
+export function neutralizeVPairs(
+  growths: readonly (Decimal | null)[],
+  maxSingleDayReturn: number = SINGLE_DAY_MAX_PCT / 100,
+): { growths: (Decimal | null)[]; pairs: number[] } {
+  const out = [...growths];
+  const pairs: number[] = [];
+  for (let i = 0; i + 1 < growths.length; i++) {
+    const g1 = growths[i];
+    const g2 = growths[i + 1];
+    if (!g1 || !g2) continue;
+    const passes = g1.gt(0) && g1.sub(1).abs().lte(maxSingleDayReturn);
+    const fails = g2.gt(0) && g2.sub(1).abs().gt(maxSingleDayReturn);
+    if (!passes || !fails) continue;
+    if (g1.mul(g2).sub(1).abs().lte(V_PAIR_TOLERANCE)) {
+      out[i] = D(1);
+      out[i + 1] = D(1);
+      pairs.push(i);
+      i++; // day i+1 is spent; it cannot start another pair
+    }
+  }
+  return { growths: out, pairs };
+}
+
+function logVPairs(found: { dates: [string, string]; growths: [Decimal, Decimal] }[]): void {
+  if (typeof process === "undefined" || !process.stderr) return;
+  for (const p of found) {
+    process.stderr.write(
+      JSON.stringify({
+        level: "warn",
+        msg: "[twr] neutralized V-shaped artifact pair",
+        dates: p.dates,
+        growths: p.growths.map((g) => g.toString()),
+      }) + "\n",
+    );
+  }
 }
 
 /**
@@ -431,6 +495,23 @@ export function aggregateValueFlows(
     let lastGoodMv: Decimal | null = null;
     let implausibleStreak = 0;
 
+    // V-pairs within this leg (same shared rule as chainIndex), keyed by the artifact day.
+    const rows = [...series].sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+    const rawGrowths = rows.map((p, i) => {
+      if (i === 0) return null;
+      const prev = D(rows[i - 1]!.marketValue);
+      if (prev.isZero()) return null;
+      return D(p.marketValue).sub(D(p.effectiveFlow)).div(prev);
+    });
+    const vPairs = neutralizeVPairs(rawGrowths, maxSingleDayReturn).pairs;
+    logVPairs(
+      vPairs.map((i) => ({
+        dates: [rows[i]!.date, rows[i + 1]!.date],
+        growths: [rawGrowths[i]!, rawGrowths[i + 1]!],
+      })),
+    );
+    const artifactDays = new Set(vPairs.map((i) => rows[i]!.date));
+
     for (const date of dates) {
       const raw = byRawDate.get(date);
       const entry = byDate.get(date)!;
@@ -459,7 +540,16 @@ export function aggregateValueFlows(
       const growth = D(1).add(rt);
       const plausible = growth.gt(0) && rt.abs().lte(maxSingleDayReturn);
 
-      if (plausible) {
+      if (plausible && artifactDays.has(date)) {
+        // First day of a V-pair: book it neutral (value = prior anchor + this row's own flow,
+        // so growth = 1) and keep the flow; the rebound day is then judged against that
+        // corrected anchor instead of the artifact value.
+        const neutralMv = lastGoodMv.add(flow);
+        entry.mv = entry.mv.add(neutralMv);
+        entry.flow = entry.flow.add(flow);
+        lastGoodMv = neutralMv;
+        implausibleStreak = 0;
+      } else if (plausible) {
         entry.mv = entry.mv.add(mv);
         entry.flow = entry.flow.add(flow);
         lastGoodMv = mv;
