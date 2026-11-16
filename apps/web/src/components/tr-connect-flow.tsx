@@ -150,7 +150,19 @@ export function TrConnectFlow({
   const renew = () => {
     if (busy) return;
     void run(async () => {
-      const res = await client.renewTr();
+      let res: Awaited<ReturnType<typeof client.renewTr>>;
+      try {
+        res = await client.renewTr();
+      } catch (err) {
+        // The stored phone + PIN can't start a login on their own (an account that only gets
+        // through with a pasted WAF token): retrying Renew never helps, so point at the form.
+        if (apiErrorCode(err) === "tr_pairing_failed") {
+          setShowAdvanced(true);
+          setError(t("renewNeedsWafToken"));
+          return;
+        }
+        throw err;
+      }
       setRenewing(true);
       enterPairing(res.method);
     });

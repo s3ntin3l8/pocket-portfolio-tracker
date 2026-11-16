@@ -2006,6 +2006,7 @@
     "renewHint": "Your Trade Republic login expired. Renewing reuses your saved phone number and PIN, so you only confirm in the Trade Republic app.",
     "renew": "Renew login",
     "useOtherCredentials": "Or enter different credentials below.",
+    "renewNeedsWafToken": "Renewing with the saved login didn't work. Enter your phone and PIN below and paste an aws-waf-token under Advanced.",
     "error": "Something went wrong. Please try again.",
     "boundElsewhere": "This Trade Republic account is connected to another portfolio. Connecting here will move it to this portfolio.",
     "errors": {
