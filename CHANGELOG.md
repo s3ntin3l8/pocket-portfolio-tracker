@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.2.10](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.9...v0.2.10) (2026-11-16)
+
+
+### Features
+
+* **ai-tools:** give the assistant and MCP trades, prices, loans, plans, imports and data warnings ([#1251](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1251)) ([496e5de](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/496e5defffcf9fa1aceba10d45a329f2d1b939f8))
+* **ai:** configurable OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp) ([#1249](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1249)) ([66a3955](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/66a39552cb0644b838941dfdeb6692524d40712f))
+* **insights:** put max drawdown into perspective ([#1269](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1269)) ([9cfb3eb](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9cfb3eb55c04e778e02626b9c4e5665d966b94ca))
+* **notifications:** Web Push for the installed PWA ([#1262](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1262)) ([fac0803](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/fac08038cf49503b839b6b6dc33790bc4112d8b6))
+* **tr:** flag an expired Trade Republic login on Holdings and renew it in one tap ([#1260](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1260)) ([3aed78b](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3aed78bf09e64614e0260eefd2e869f49eb33d27))
+* **tr:** map CARD_OCT cashback credits to deposit drafts ([ba8a6ca](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ba8a6caa78603cbe3f826869815ecd83d3b648ad))
+* **tr:** map dividend reinvestment and corporate-action cash events, and show unmapped types in Settings ([#1272](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1272)) ([f0f5b04](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/f0f5b048263d301143855e576e925bc4940e468c))
+* **tr:** push notification when the Trade Republic login expires ([#1274](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1274)) ([cd90c0d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/cd90c0df26a3b066bfc4e06692a9f557a1551347))
+* **tr:** report unmapped broker events as a portfolio anomaly ([75296c1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/75296c11bf7b836732f9362899a5776772eeb263))
+* **web:** banner for unmapped broker events ([7023426](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/70234265967be7a3a879b1043c8d6bc330d9dd6b))
+* **web:** enter/exit motion for overlays and optical tracking on large figures ([#1257](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1257)) ([4495493](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/4495493c77e7213f4dfb0c00745e28f393b063a4))
+* **web:** tell the user when a one-tap Trade Republic renew needs a WAF token ([3e519e1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3e519e1b5729a86bbb0c34f5b0a602cabf3078ae))
+* **web:** translucent header, reduced-transparency support, press feedback and theme cross-fade ([#1259](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1259)) ([d6477ce](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d6477cef919df048856b3b2deef8d5556835d008))
+
+
+### Bug Fixes
+
+* **api:** derive tax forecast test dates from the projection window ([#1255](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1255)) ([d68d89d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/d68d89d4da3d4fc3ecdc150221f30fcee649c803))
+* **assistant:** show Claude's progress while it works, align the panel header, make history findable ([#1247](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1247)) ([ec4fdbc](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ec4fdbc43dd4275b4189100aa8583123e035f2e0))
+* **core:** treat a V-shaped single-day artifact pair as neutral in the TWR chain ([7d87a4f](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/7d87a4f107416acb2926b5c31cfef2db82584a4d))
+* **demo:** retry the hard-stop scratch delete instead of crashing on it ([#1279](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1279)) ([3e81ece](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/3e81ece00970985da5a7671044b8829d211650e5))
+* **history:** seed tail backfills with the last known price so a weekend start isn't valued at cost ([#1268](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1268)) ([0c9f303](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0c9f3036fe0a1488626b96d28cbcdbb30a6c29aa))
+* **transactions:** reset the draft filter when no drafts remain and order source badges consistently ([#1261](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1261)) ([9d6f130](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/9d6f130b23c58af95d8f5a14610e0fcff0e3c081))
+* **visual:** holdings (desktop, dark) never draws its charts, so visual-check fails on the base ([3158391](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/31583918a0833fcf2215584f706f96d4971b0b94))
+* **web:** keep the demo's session cookie alive under a frozen clock ([#1275](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1275)) ([e2f3542](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/e2f35425c49d8a648095c2fd823a7c3dac2f52fc))
+
 ## [0.2.9](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.8...v0.2.9) (2026-11-13)
 
 
