@@ -205,7 +205,7 @@ export async function importsRoute(app: FastifyInstance) {
 
   // Safety net: aggregate event types that reached the importer but have no mapping yet
   // (TR `unmapped_event_type` / `unparseable_event`), so a future gap is self-announcing on
-  // the dashboard + admin panel instead of buried in a single import's errors JSON. Grouped
+  // the Settings › Data & connections page and the admin panel instead of buried in a single import's errors JSON. Grouped
   // by event type (falling back to the message for the null-eventType / unparseable case),
   // scoped to the user's non-discarded imports, most-frequent first.
   app.get("/imports/unmapped-types", { preHandler: app.authenticate }, async (request) => {

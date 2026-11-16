@@ -508,6 +508,146 @@ describe("mapTrEventToDraft", () => {
     }
   });
 
+  it("maps DIVIDEND_REINVESTMENT_TRADE_EXECUTED to a reinvestment buy of the shares it bought", () => {
+    const draft = draftOf({
+      ...base,
+      eventType: "DIVIDEND_REINVESTMENT_TRADE_EXECUTED",
+      isin: "US7561091049",
+      shares: 0.2,
+      amount: -10,
+      title: "Realty Income",
+    });
+    expect(draft).toMatchObject({
+      action: "buy",
+      kind: "reinvestment",
+      quantity: "0.2",
+      price: "50",
+      total: "10",
+      isin: "US7561091049",
+      externalId: base.id,
+    });
+    expect(categoryForEventType("DIVIDEND_REINVESTMENT_TRADE_EXECUTED")).toBe("trade");
+  });
+
+  it("books DIVIDEND_REINVESTMENT_TRADE_EXECUTED only as a paid buy; zero or positive amounts stay a gap", () => {
+    const common = {
+      ...base,
+      eventType: "DIVIDEND_REINVESTMENT_TRADE_EXECUTED",
+      isin: "US7561091049",
+      shares: 0.2,
+    };
+    expect(draftOf({ ...common, amount: -10 })).toMatchObject({ action: "buy", price: "50" });
+    // A zero amount must neither fall through to a sign-derived sell nor land a zero-basis buy, and a
+    // positive amount is cash received, not paid: both stay an attention gap.
+    for (const amount of [0, 10]) {
+      expect(mapTrEventToDraft({ ...common, amount })).toMatchObject({
+        skip: true,
+        severity: "attention",
+        code: "unmapped_event_type",
+      });
+    }
+  });
+
+  it("does not turn cash RECEIVED alongside shares (SSP_CORPORATE_ACTION_CASH_AND_STOCK) into a buy", () => {
+    expect(
+      mapTrEventToDraft({
+        ...base,
+        eventType: "SSP_CORPORATE_ACTION_CASH_AND_STOCK",
+        isin: "US56035L1044",
+        shares: 0.25,
+        amount: 5,
+      }),
+    ).toMatchObject({ skip: true, severity: "attention", code: "unmapped_event_type" });
+  });
+
+  it("maps SSP_CORPORATE_ACTION_CASH_AND_STOCK (cash paid for new shares) to a reinvestment buy", () => {
+    const draft = draftOf({
+      ...base,
+      eventType: "SSP_CORPORATE_ACTION_CASH_AND_STOCK",
+      isin: "US56035L1044",
+      shares: 0.25,
+      amount: -5,
+      title: "Main Street Capital",
+    });
+    expect(draft).toMatchObject({
+      action: "buy",
+      kind: "reinvestment",
+      quantity: "0.25",
+      total: "5",
+    });
+    // With no cash consideration it is a free issue, like SSP_CORPORATE_ACTION_INSTRUMENT.
+    expect(
+      draftOf({
+        ...base,
+        eventType: "SSP_CORPORATE_ACTION_CASH_AND_STOCK",
+        isin: "US56035L1044",
+        shares: 0.25,
+        amount: 0,
+      }).action,
+    ).toBe("bonus");
+    expect(categoryForEventType("SSP_CORPORATE_ACTION_CASH_AND_STOCK")).toBe("income");
+  });
+
+  it("maps SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND to a dividend (or a deposit without an ISIN)", () => {
+    expect(
+      draftOf({
+        ...base,
+        eventType: "SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND",
+        amount: 4.5,
+        isin: "US56035L1044",
+      }),
+    ).toMatchObject({ action: "dividend", quantity: "0", price: "4.5" });
+    expect(
+      draftOf({ ...base, eventType: "SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND", amount: 4.5 }).action,
+    ).toBe("deposit");
+    expect(categoryForEventType("SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND")).toBe("income");
+  });
+
+  it("skips CARD_OCT cashback credits as info, so they are neither booked nor an unmapped gap", () => {
+    const result = mapTrEventToDraft({
+      ...base,
+      eventType: "CARD_OCT",
+      amount: 0.35,
+      title: "VisaBonus-Cashback",
+    });
+    expect(result).toMatchObject({ skip: true, severity: "info" });
+    if ("skip" in result) {
+      expect(result.code).toBeUndefined();
+      expect(result.reason).toMatch(/cashback/);
+    }
+  });
+
+  it("no longer reports any of these four types as unmapped when a batch is mapped", () => {
+    const { drafts, errors } = mapTrEvents([
+      {
+        ...base,
+        id: "e1",
+        eventType: "DIVIDEND_REINVESTMENT_TRADE_EXECUTED",
+        isin: "US7561091049",
+        shares: 0.2,
+        amount: -10,
+      },
+      {
+        ...base,
+        id: "e2",
+        eventType: "SSP_CORPORATE_ACTION_CASH_AND_STOCK",
+        isin: "US56035L1044",
+        shares: 0.25,
+        amount: -5,
+      },
+      {
+        ...base,
+        id: "e3",
+        eventType: "SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND",
+        isin: "US56035L1044",
+        amount: 4.5,
+      },
+      { ...base, id: "e4", eventType: "CARD_OCT", amount: 0.35 },
+    ]);
+    expect(drafts.map((d) => d.action)).toEqual(["buy", "buy", "dividend"]);
+    expect(errors.filter((e) => e.code === "unmapped_event_type")).toEqual([]);
+  });
+
   it("maps SSP_CORPORATE_ACTION_INSTRUMENT to a bonus draft when shares are known", () => {
     // Stock dividend: company issues shares with no cash consideration.
     const result = mapTrEventToDraft({

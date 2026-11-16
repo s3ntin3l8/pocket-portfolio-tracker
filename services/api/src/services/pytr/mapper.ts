@@ -18,6 +18,9 @@ import {
   TRADE_EVENTS,
   CASH_BY_SIGN,
   CASH_CORPORATE_ACTION,
+  CASH_NON_DIVIDEND_CORPORATE_ACTION,
+  CASH_AND_STOCK_CORPORATE_ACTION,
+  DIVIDEND_REINVESTMENT_TRADE,
   SHARE_CORPORATE_ACTION,
   NO_CASH_CORPORATE_ACTION,
   SKIP_EVENTS,
@@ -62,6 +65,15 @@ function skip(
   };
 }
 
+/** Event types that book a distribution being put straight back into shares. */
+function isReinvestment(eventType: string): boolean {
+  return (
+    eventType === SHARE_CORPORATE_ACTION ||
+    eventType === CASH_AND_STOCK_CORPORATE_ACTION ||
+    eventType === DIVIDEND_REINVESTMENT_TRADE
+  );
+}
+
 export function mapTrEventToDraft(raw: unknown): MapResult {
   const parsed = trEventSchema.safeParse(raw);
   if (!parsed.success) {
@@ -90,17 +102,38 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
   if (!action && CASH_BY_SIGN.has(ev.eventType)) {
     action = ev.amount < 0 ? "withdrawal" : "deposit";
   }
-  if (!action && ev.eventType === CASH_CORPORATE_ACTION) {
+  if (
+    !action &&
+    (ev.eventType === CASH_CORPORATE_ACTION || ev.eventType === CASH_NON_DIVIDEND_CORPORATE_ACTION)
+  ) {
     action = ev.isin ? "dividend" : "deposit";
   }
   if (!action && ev.eventType === SHARE_CORPORATE_ACTION) {
     action = ev.amount !== 0 ? "buy" : "bonus";
+  }
+  if (!action && ev.eventType === CASH_AND_STOCK_CORPORATE_ACTION) {
+    // Cash paid for the new shares (a buy) or none (a free issue). Cash RECEIVED alongside shares
+    // (e.g. a mixed-consideration merger) is neither, so it stays an unmapped gap rather than being
+    // booked as an outflow the broker never made.
+    action = ev.amount < 0 ? "buy" : ev.amount === 0 ? "bonus" : undefined;
   }
   if (!action && ev.eventType === NO_CASH_CORPORATE_ACTION && ev.kind === "vorabpauschale") {
     action = "tax";
   }
   if (!action) {
     return skip(`unmapped event type: ${ev.eventType}`, "attention", ev, "unmapped_event_type");
+  }
+
+  if (ev.eventType === DIVIDEND_REINVESTMENT_TRADE && ev.amount >= 0) {
+    // Pinned to a buy, whose cost is the cash paid. A positive amount would book cash paid that was
+    // in fact received; a zero amount would land the shares at a silent zero cost basis (a fully
+    // taxable later sale). Neither is a trustworthy booking, so both stay a gap to look at.
+    return skip(
+      `${ev.eventType} without cash paid (amount ${ev.amount}) — check the event details`,
+      "attention",
+      ev,
+      "unmapped_event_type",
+    );
   }
 
   const amount = Math.abs(ev.amount);
@@ -217,7 +250,7 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     exchangeCode: null,
     kind:
       ev.kind ??
-      (ev.eventType === SHARE_CORPORATE_ACTION && action === "buy"
+      (isReinvestment(ev.eventType) && action === "buy"
         ? "reinvestment"
         : (EVENT_KIND[ev.eventType] ?? null)),
     tax:
