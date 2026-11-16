@@ -549,6 +549,10 @@ export async function startDemo({
       AUTH_SECRET: authSecret,
       // Sets the unprefixed (http) session-cookie name mint-session.mjs targets.
       AUTH_URL: `http://localhost:${DEMO_WEB_PORT}`,
+      // The web server's clock may be frozen far behind the browser's (DEMO_NOW). Auth.js sets the
+      // session cookie's Expires from that clock, so with the default 30 days the cookie is already
+      // expired once the real date passes DEMO_NOW + 30 days and the browser drops it.
+      ...(demoNow && { AUTH_SESSION_MAX_AGE: String(10 * 365 * 24 * 60 * 60) }),
       AUTHENTIK_ISSUER: ISSUER,
       AUTHENTIK_CLIENT_ID: "demo",
       AUTHENTIK_CLIENT_SECRET: "demo", // pragma: allowlist secret
