@@ -124,10 +124,12 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     return skip(`unmapped event type: ${ev.eventType}`, "attention", ev, "unmapped_event_type");
   }
 
-  if (ev.eventType === DIVIDEND_REINVESTMENT_TRADE && ev.amount > 0) {
-    // Pinned to a buy: a positive amount would book cash paid that was in fact received.
+  if (ev.eventType === DIVIDEND_REINVESTMENT_TRADE && ev.amount >= 0) {
+    // Pinned to a buy, whose cost is the cash paid. A positive amount would book cash paid that was
+    // in fact received; a zero amount would land the shares at a silent zero cost basis (a fully
+    // taxable later sale). Neither is a trustworthy booking, so both stay a gap to look at.
     return skip(
-      `${ev.eventType} with a positive amount (cash received, not paid) — check the event details`,
+      `${ev.eventType} without cash paid (amount ${ev.amount}) — check the event details`,
       "attention",
       ev,
       "unmapped_event_type",
