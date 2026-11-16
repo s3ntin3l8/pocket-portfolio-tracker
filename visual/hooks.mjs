@@ -68,8 +68,10 @@ export async function beforeScene({ context, page, scene, cfg, host }) {
 }
 
 /** What is still pending on the page, as short reasons (empty when it is ready). */
-function pending(min) {
+function pending(min, path) {
   const reasons = [];
+  // A dropped session cookie redirects every route to sign-in; say so instead of "0/2 charts drawn".
+  if (location.pathname !== path) reasons.push(`redirected to ${location.pathname}, not ${path}`);
   if (document.querySelector('[aria-busy="true"], [data-chart-loading]'))
     reasons.push("chart or data still loading");
   const drawn = [...document.querySelectorAll(".recharts-wrapper")].filter((c) =>
@@ -85,9 +87,12 @@ function pending(min) {
 export async function settle({ page, scene }) {
   const min = MIN_CHARTS[scene.name] ?? 0;
   await page
-    .waitForFunction(`(${pending})(${min}).length === 0`, null, { timeout: 60_000, polling: 250 })
+    .waitForFunction(`(${pending})(${min}, ${JSON.stringify(scene.path)}).length === 0`, null, {
+      timeout: 60_000,
+      polling: 250,
+    })
     .catch(async () => {
-      const left = await page.evaluate(`(${pending})(${min})`);
+      const left = await page.evaluate(`(${pending})(${min}, ${JSON.stringify(scene.path)})`);
       throw new Error(`${scene.name}: not ready after 60s (${left.join(", ")})`);
     });
   // Recharts' entrance animation, late font swaps and client refetches are not covered by reduced motion
