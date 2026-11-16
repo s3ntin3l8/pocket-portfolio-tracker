@@ -466,7 +466,7 @@ export async function startDemo({
         // A dying process can still write into the dir mid-delete (ENOTEMPTY/EBUSY). Left
         // uncaught that exits 1 instead of 130, so retry here and let the loop below repeat.
         try {
-          rmSync(demoDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+          rmSync(demoDir, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
         } catch (err) {
           console.warn(`[demo] hard stop cleanup attempt failed: ${err}`);
         }

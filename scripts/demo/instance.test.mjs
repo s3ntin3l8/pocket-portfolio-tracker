@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -406,6 +407,37 @@ describe("startDemo stop during a build step whose subprocess has its own group"
       rmSync(noPs, { recursive: true, force: true });
     }
   }, 60_000);
+
+  // A delete that fails (here EACCES, which is not retried) must not crash the hard stop:
+  // uncaught, it exited 1 instead of 130. Root bypasses the mode bits, so skip there.
+  it.skipIf(process.getuid?.() === 0)(
+    "a failing scratch delete still ends the hard stop with exit 130",
+    async () => {
+      const { proc, exited, ready } = bootWithLongStep({ ignoreTerm: "both" });
+      let pids = [];
+      let locked;
+      let demoDir;
+      try {
+        const started = await ready();
+        ({ pids, demoDir } = started);
+        locked = path.join(demoDir, "locked");
+        mkdirSync(locked);
+        writeFileSync(path.join(locked, "file"), "x");
+        chmodSync(locked, 0o555);
+        proc.kill("SIGTERM");
+        await new Promise((r) => setTimeout(r, 300));
+        proc.kill("SIGINT");
+        expect(await exited).toBe(130);
+        expect(pids.some(pidAlive)).toBe(false);
+      } finally {
+        proc.kill("SIGKILL");
+        for (const pid of pids) if (pidAlive(pid)) process.kill(pid, "SIGKILL");
+        if (locked && existsSync(locked)) chmodSync(locked, 0o755);
+        if (demoDir) rmSync(demoDir, { recursive: true, force: true });
+      }
+    },
+    60_000,
+  );
 
   // The other half of the fail-soft contract: without `ps` there is no tree to walk,
   // so a task group of its own is left behind by design (the old behaviour), and
