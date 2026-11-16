@@ -15,6 +15,7 @@ import {
   allocationTargets,
   corporateActions,
   benchmarkPrices,
+  trConnections,
 } from "@portfolio/db";
 import { cashFlow, toDateKey } from "@portfolio/core";
 import type { MarketDataService } from "@portfolio/market-data";
@@ -412,6 +413,18 @@ export async function seedDemo(patOutPath?: string): Promise<void> {
       },
     ])
     .returning();
+
+  // An expired Trade Republic login bound to the TR depot, so Holdings shows the renew banner
+  // (visual scene `holdings-tr-expired`). The credentials are placeholders: nothing decrypts
+  // them in the demo, and the Renew button is never pressed.
+  await db.insert(trConnections).values({
+    userId: user.id,
+    portfolioId: trPortfolio.id,
+    phoneEnc: "demo-placeholder",
+    pinEnc: "demo-placeholder",
+    status: "expired",
+    lastSyncAt: daysAgo(2),
+  });
 
   // --- Instruments (global reference data) ----------------------------------
 

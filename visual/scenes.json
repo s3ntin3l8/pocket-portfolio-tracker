@@ -40,6 +40,11 @@
       "tags": ["presentation", "check", "audit"]
     },
     {
+      "name": "holdings-tr-expired",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"]
+    },
+    {
       "name": "holdings-range",
       "path": "/en/holdings",
       "tags": ["presentation"],
