@@ -8,6 +8,10 @@ import type { DB } from "../../db/client.js";
 import { BUYBACK_GOLD_MARKETS, isBuybackGoldMarket } from "../scrapers/store.js";
 import {
   loadBackfillContext,
+  type BackfillContext,
+  loadEarliestPriceDates,
+  earliestPriceDate,
+  loadSeedPrices,
   firstHeldDateFrom,
   isManualPriceBond,
   laterDateKey,
@@ -65,6 +69,30 @@ function warnIfMixedCurrencies(
   }
 }
 
+/**
+ * Add each held instrument's last pre-`startDate` price (see `loadSeedPrices`) to its raw
+ * prices, so a tail run's first days carry the price the instrument ended the previous
+ * period on instead of dropping to cost. Manual-price bonds are skipped like everywhere
+ * else in this file, and a date the run already has is never overwritten.
+ */
+async function mergeSeedPrices(
+  db: DB,
+  instrRows: BackfillContext["instrRows"],
+  instrIds: string[],
+  startDate: string,
+  inceptionDate: string,
+  rawPrices: RawPriceMap,
+): Promise<void> {
+  const seeds = await loadSeedPrices(db, instrIds, startDate, inceptionDate);
+  for (const instr of instrRows) {
+    if (instr.assetClass === "bond" && isManualPriceBond(instr)) continue;
+    const seed = seeds.get(instr.id);
+    const instrPrices = rawPrices.get(instr.id);
+    if (!seed || !instrPrices || instrPrices.has(seed.date)) continue;
+    instrPrices.set(seed.date, { close: seed.close, currency: seed.currency });
+  }
+}
+
 export async function backfillPortfolioHistory(
   db: DB,
   marketData: MarketDataService,
@@ -74,7 +102,7 @@ export async function backfillPortfolioHistory(
 ): Promise<BackfillResult> {
   const ctx = await loadBackfillContext(db, portfolioId, opts);
   if (!ctx) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
-  const { txRows, startDate, today, instrIds, instrRows } = ctx;
+  const { txRows, startDate, inceptionDate, today, instrIds, instrRows } = ctx;
 
   const truncated: string[] = [];
   const unpriced: string[] = [];
@@ -127,6 +155,8 @@ export async function backfillPortfolioHistory(
       xauSpotHistory = new Map(xauCandles.map((c) => [c.date, c.close]));
     }
   }
+
+  const earliestStored = await loadEarliestPriceDates(db, instrRows, inceptionDate);
 
   for (const instr of instrRows) {
     const firstHeldDate = firstHeldDateFrom(txRows, instr.id) ?? startDate;
@@ -251,7 +281,11 @@ export async function backfillPortfolioHistory(
         `[backfill] provider error for instrument ${instr.id} (${instr.symbol}/${instr.market}): ${fetchError.message}; skipping`,
       );
     } else {
-      const earliest = candles[0]!.date;
+      // A tail fetch starts at `fetchFrom`, so its first candle says nothing about when pricing
+      // began — compare with the earliest price already stored too.
+      const storedEarliest = earliestPriceDate(earliestStored, instr.id);
+      const earliest =
+        storedEarliest && storedEarliest < candles[0]!.date ? storedEarliest : candles[0]!.date;
       if (earliest > firstHeldDate) {
         truncated.push(instr.id);
       }
@@ -363,8 +397,10 @@ export async function backfillPortfolioHistory(
     warnIfMixedCurrencies(instr, instrPrices);
   }
 
+  await mergeSeedPrices(db, instrRows, instrIds, startDate, inceptionDate, rawPrices);
+
   const flowDateOf = await buildFlowDateFn(db, instrIds);
-  const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf);
+  const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf, earliestStored);
 
   return { instruments: instrRows.length, days, truncated, unpriced, skippedDeadFeeds };
 }
@@ -386,11 +422,12 @@ export async function computeBackfillSnapshots(
 ): Promise<BackfillResult> {
   const ctx = await loadBackfillContext(db, portfolioId, opts);
   if (!ctx) return { instruments: 0, days: 0, truncated: [], unpriced: [] };
-  const { txRows, startDate, instrIds, instrRows } = ctx;
+  const { txRows, startDate, inceptionDate, instrIds, instrRows } = ctx;
 
   const truncated: string[] = [];
   const unpriced: string[] = [];
   const rawPrices: RawPriceMap = new Map();
+  const earliestStored = await loadEarliestPriceDates(db, instrRows, inceptionDate);
 
   // Read prices from DB (already written by sub-jobs or inline backfill)
   for (const instr of instrRows) {
@@ -405,7 +442,10 @@ export async function computeBackfillSnapshots(
     // basis for dates with no price, same as any other never-priced holding.
     const manualBond = isManualPriceBond(instr);
 
-    let firstPricedDate: string | null = null;
+    // The true first price over the whole history, not the run's window (see loadEarliestPriceDates).
+    const firstPricedDate: string | null = manualBond
+      ? null
+      : (earliestPriceDate(earliestStored, instr.id) ?? null);
     if (!manualBond) {
       // Window query (audit D6): only rows from the run's start date are ever merged below.
       const priceRows = await db
@@ -415,9 +455,6 @@ export async function computeBackfillSnapshots(
       for (const row of priceRows) {
         if (row.date >= startDate) {
           instrPrices.set(row.date, { close: row.close, currency: row.currency });
-        }
-        if (!firstPricedDate || row.date < firstPricedDate) {
-          firstPricedDate = row.date;
         }
       }
     }
@@ -444,8 +481,10 @@ export async function computeBackfillSnapshots(
     }
   }
 
+  await mergeSeedPrices(db, instrRows, instrIds, startDate, inceptionDate, rawPrices);
+
   const flowDateOf = await buildFlowDateFn(db, instrIds);
-  const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf);
+  const days = await writeSnapshotSeries(db, ctx, rawPrices, flowDateOf, earliestStored);
 
   return { instruments: instrRows.length, days, truncated, unpriced };
 }

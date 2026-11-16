@@ -110,6 +110,11 @@ refusing a price-0 `transfer_in` with 400 `transfer_cost_basis_required` (#818).
   - Priced before, but this gap exceeds the window → stays excluded.
   - Collapsing the two injects fake one-day returns into TWR. The live path deliberately
     doesn't make this distinction.
+  - `hasEverPriced` must come from the same price rows valuation reads: not a manual-price bond's
+    stored manual row, not a row dropped for a missing FX rate (#1179), and from the portfolio's
+    inception on only (`prices` is shared across portfolios). A tail run (`fromDate`) must also seed
+    its first days with the last earlier price (`loadSeedPrices`), or a weekend start values every
+    holding at cost.
 - One staleness threshold for everything, `MAX_PRICE_CARRY_FORWARD_DAYS`
   (`packages/core/src/sanity-gates.ts`), also used for live quotes via `isStaleQuote`. A
   second, local constant is the pre-#744 bug.

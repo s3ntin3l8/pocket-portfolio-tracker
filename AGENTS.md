@@ -269,6 +269,17 @@ React component` from `ThemeProvider`. This is an upstream bug in `next-themes`
   portfolio first held it) with a bounded `fromDate`/`tailOnly` re-fetch, and a fetch that
   returns candles but leaves such a hole open counts as a dead-feed miss (`priceGapRemains`),
   so the cooldown stops re-fetching an unfillable gap every night.
+  A tail run (`fromDate`) only rewrites snapshots from that date on, yet must value its first days
+  exactly as the full run does: `loadSeedPrices` (`backfill/shared.ts`) hands it the last price before
+  `fromDate` within the carry-forward window (a weekend start has no candle of its own — without the
+  seed every holding fell to cost, and the TWR chain booked that step as a real loss), and
+  `hasEverPriced`/"truncated" read the earliest price from the portfolio's inception on
+  (`loadEarliestPriceDates`), never the run's window. `hasEverPriced` also reads only the rows
+  valuation really reads: not a manual-price bond's stored manual row and not a row dropped for a
+  missing FX rate (#1179); neither read counts anything older than inception (`prices` is shared
+  across portfolios). Seed and earliest date are
+  both bounded at inception so a tail run matches the full run. A full run also deletes snapshots
+  dated before the first transaction.
   A feed in that cooldown (`isDeadFeedCoolingDown`, `DEAD_FEED_MISS_THRESHOLD` misses, last one within as many
   days) is skipped by every backfill fetch, `force` included, unless `retryDeadFeeds` is set — valuation reads the
   stored prices, so skipping changes no number.

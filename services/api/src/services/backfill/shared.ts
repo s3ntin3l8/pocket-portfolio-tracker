@@ -1,4 +1,4 @@
-import { eq, and, inArray, isNull, or, sql } from "drizzle-orm";
+import { eq, and, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { corporateActions, instruments, portfolios, prices, transactions } from "@portfolio/db";
 import { DEAD_FEED_MISS_THRESHOLD, MAX_PRICE_CARRY_FORWARD_DAYS, toDateKey } from "@portfolio/core";
 import type { DB } from "../../db/client.js";
@@ -71,6 +71,7 @@ export async function loadBackfillContext(
     txRows,
     cashCounted,
     startDate,
+    inceptionDate,
     today,
     instrIds,
     instrRows,
@@ -214,4 +215,106 @@ export function isDeadFeedCoolingDown(
       Date.parse(`${toDateKey(health.priceFeedLastMissAt)}T00:00:00Z`)) /
     86_400_000;
   return days < DEAD_FEED_MISS_THRESHOLD;
+}
+
+/**
+ * The last stored price per instrument just BEFORE a tail run's `startDate`, within the
+ * carry-forward window. A tail backfill (`fromDate`) only rewrites snapshots from `startDate`
+ * on, but valuing its first days needs the price an instrument carried into them: with a
+ * weekend `startDate` there is no candle on the first grid days, and without this seed every
+ * holding fell through to cost basis, writing a one-off step down that the TWR chain then
+ * booked as a real loss.
+ *
+ * The seed never reaches back past the portfolio's `inceptionDate` and never further than
+ * `MAX_PRICE_CARRY_FORWARD_DAYS`: the full run reads prices from inception on and carries them
+ * only that far, so a tail run seeded from anything older would value its first days
+ * differently from the run it is meant to match.
+ */
+export async function loadSeedPrices(
+  db: DB,
+  instrIds: string[],
+  startDate: string,
+  inceptionDate: string,
+): Promise<Map<string, { date: string; close: string; currency: string }>> {
+  const out = new Map<string, { date: string; close: string; currency: string }>();
+  if (instrIds.length === 0) return out;
+  const from = new Date(`${startDate}T00:00:00.000Z`);
+  from.setUTCDate(from.getUTCDate() - MAX_PRICE_CARRY_FORWARD_DAYS);
+  const lower = toDateKey(from) > inceptionDate ? toDateKey(from) : inceptionDate;
+  const rows = await db
+    .select()
+    .from(prices)
+    .where(
+      and(
+        inArray(prices.instrumentId, instrIds),
+        gte(prices.date, lower),
+        lt(prices.date, startDate),
+      ),
+    );
+  for (const r of rows) {
+    const cur = out.get(r.instrumentId);
+    if (!cur || r.date > cur.date) {
+      out.set(r.instrumentId, { date: r.date, close: r.close, currency: r.currency });
+    }
+  }
+  return out;
+}
+
+/** instrumentId → (price currency → earliest stored price date). */
+export type EarliestPriceDates = Map<string, Map<string, string>>;
+
+/**
+ * Each instrument's earliest stored price date per price currency, from the portfolio's
+ * `inceptionDate` on — the same lower bound a full run reads prices from.
+ *
+ * `hasEverPriced` and the "truncated" check ask "was this ever priced / when did pricing
+ * start". A read windowed to a tail run answers that wrongly (every older holding looks
+ * first-priced at `startDate`, so it reads as truncated; one whose last candle predates the
+ * window looks never-priced, so it bounces to cost where the full run excludes it). The lower
+ * bound at inception — not the start of all history — keeps the answer identical to the full
+ * run's, whose window starts there (the `prices` table is shared across portfolios, so an older
+ * row from another holder's history must not count).
+ *
+ * Kept per currency because a price row in a currency with no FX rate is dropped before
+ * valuation (#1179) and must not make the instrument look priced. Manual-price bonds are left
+ * out: their stored manual row is never read as a price stream, so the instrument stays at cost.
+ */
+export async function loadEarliestPriceDates(
+  db: DB,
+  instrRows: Pick<BackfillContext["instrRows"][number], "id" | "assetClass" | "manualPrice">[],
+  inceptionDate: string,
+): Promise<EarliestPriceDates> {
+  const out: EarliestPriceDates = new Map();
+  const ids = instrRows.filter((i) => !isManualPriceBond(i)).map((i) => i.id);
+  if (ids.length === 0) return out;
+  const rows = await db
+    .select({
+      instrumentId: prices.instrumentId,
+      currency: prices.currency,
+      first: sql<string>`min(${prices.date})`,
+    })
+    .from(prices)
+    .where(and(inArray(prices.instrumentId, ids), gte(prices.date, inceptionDate)))
+    .groupBy(prices.instrumentId, prices.currency);
+  for (const r of rows) {
+    if (!r.first) continue;
+    const byCcy = out.get(r.instrumentId) ?? new Map<string, string>();
+    byCcy.set(r.currency, r.first);
+    out.set(r.instrumentId, byCcy);
+  }
+  return out;
+}
+
+/** The earliest of an instrument's per-currency dates, skipping `excluded` currencies. */
+export function earliestPriceDate(
+  dates: EarliestPriceDates | undefined,
+  instrumentId: string,
+  excluded?: Set<string>,
+): string | undefined {
+  let best: string | undefined;
+  for (const [ccy, d] of dates?.get(instrumentId) ?? []) {
+    if (excluded?.has(ccy)) continue;
+    if (best === undefined || d < best) best = d;
+  }
+  return best;
 }

@@ -319,6 +319,33 @@ describe("summarizePortfolio", () => {
     };
   }
 
+  it("does not flag a fully sold, unpriced position as valued at cost", () => {
+    const txs: CoreTransaction[] = [
+      mk({ type: "deposit", instrumentId: null, price: "5000000" }),
+      mk({
+        type: "buy",
+        instrumentId: I2,
+        quantity: "10",
+        price: "100",
+        executedAt: new Date("2026-01-05"),
+      }),
+      mk({
+        type: "sell",
+        instrumentId: I2,
+        quantity: "10",
+        price: "120",
+        executedAt: new Date("2026-01-06"),
+      }),
+    ];
+    const summary = summarizePortfolio({ transactions: txs, prices: {}, displayCurrency: "IDR" });
+    const h = summary.holdings.find((x) => x.instrumentId === I2)!;
+    expect(h.quantity).toBe("0");
+    // Nothing is held, so there is nothing "at cost" to disclose, and it adds no value.
+    expect(h.valuedAtCost).toBe(false);
+    expect(h.marketValueDisplay).toBe("0");
+    expect(summary.totalMarketValue).toBe("0");
+  });
+
   it("values holdings, cash, P&L and net worth", () => {
     const txs: CoreTransaction[] = [
       mk({ type: "deposit", instrumentId: null, price: "5000000" }),
@@ -918,6 +945,57 @@ describe("aggregatePortfolios", () => {
     const out = aggregatePortfolios([], "IDR");
     expect(out.netWorth).toBe("0");
     expect(out.holdings).toEqual([]);
+  });
+
+  it("a closed depot does not turn an all-at-cost merged row into a partial one (#1193)", () => {
+    const baseHolding = {
+      instrumentId: "i1",
+      avgCost: "100",
+      realizedPnL: "0",
+      price: null,
+      currency: null,
+      marketValue: null,
+      unrealizedPnL: null,
+      previousClose: null,
+      dayChange: null,
+      dayChangePct: null,
+    };
+    // Depot A transferred the whole position out (nothing held, no quote), depot B holds it at cost.
+    const closed = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          quantity: "0",
+          costBasis: "0",
+          costBasisDisplay: "0",
+          marketValueDisplay: "0",
+          unrealizedPnLDisplay: "0",
+        },
+      ],
+    });
+    const open = mk({
+      holdings: [
+        {
+          ...baseHolding,
+          quantity: "10",
+          costBasis: "1000",
+          costBasisDisplay: "1000",
+          marketValueDisplay: "1000",
+          unrealizedPnLDisplay: "0",
+          valuedAtCost: true,
+        },
+      ],
+    });
+    for (const order of [
+      [closed, open],
+      [open, closed],
+    ]) {
+      const merged = aggregatePortfolios(order, "IDR").holdings.find(
+        (h) => h.instrumentId === "i1",
+      )!;
+      expect(merged.valuedAtCost).toBe(true);
+      expect(merged.valuedAtCostPartial).toBeUndefined();
+    }
   });
 
   it("flags a merged holding valuedAtCost only when EVERY valued leg is, else partial (#744, #1193)", () => {
