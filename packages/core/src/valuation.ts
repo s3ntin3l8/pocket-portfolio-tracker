@@ -316,7 +316,9 @@ export function summarizePortfolio(input: SummarizeInput): PortfolioSummary {
           previousClose: null,
           dayChange: null,
           dayChangePct: null,
-          valuedAtCost: true,
+          // A closed position has nothing left to value, so "valued at cost" would only be noise:
+          // it would raise the at-cost banner for a holding that no longer exists.
+          valuedAtCost: !new Decimal(h.quantity).isZero(),
         };
       }
       // No price AND no cost currency at all (e.g. a pure-dividend row, or a zero-price
@@ -503,7 +505,9 @@ export function aggregatePortfolios(
   const atCostTally = new Map<string, { valued: number; atCost: number }>();
   const tally = (h: HoldingValuation) => {
     const t = atCostTally.get(h.instrumentId) ?? { valued: 0, atCost: 0 };
-    if (h.marketValueDisplay !== null) {
+    // A closed depot (nothing held) has no value to be at cost or not: counting it as "valued"
+    // would turn an all-at-cost merged row into a "partial" one (#1193).
+    if (h.marketValueDisplay !== null && !new Decimal(h.quantity).isZero()) {
       t.valued++;
       if (h.valuedAtCost) t.atCost++;
     }

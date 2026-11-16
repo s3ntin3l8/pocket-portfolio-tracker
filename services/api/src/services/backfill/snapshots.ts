@@ -1,4 +1,4 @@
-import { eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import { dividendEvents, portfolios, portfolioSnapshots } from "@portfolio/db";
 import {
@@ -16,7 +16,7 @@ import type { DB } from "../../db/client.js";
 import { chunk } from "../../lib/chunk.js";
 import { toCoreTxns } from "../tx-core.js";
 import { getFxRatesForDates, makeFxRateFn } from "../fx.js";
-import type { BackfillContext } from "./shared.js";
+import { earliestPriceDate, type BackfillContext, type EarliestPriceDates } from "./shared.js";
 
 export type RawPriceMap = Map<string, Map<string, { close: string; currency: string }>>;
 
@@ -89,8 +89,23 @@ export async function writeSnapshotSeries(
   ctx: BackfillContext,
   allRawPrices: RawPriceMap,
   flowDateOf: FlowDateFn,
+  /** Each instrument's earliest stored price date (per price currency) from the portfolio's
+   *  inception on. `allRawPrices` is windowed to the run, so on a tail run it can't tell "first
+   *  priced at `startDate`" from "priced for years" — `hasEverPriced` needs the latter. Omitted →
+   *  derived from `allRawPrices`. */
+  earliestPriceDates?: EarliestPriceDates,
 ): Promise<number> {
-  const { portfolioId, txRows, cashCounted, startDate, today, instrRows, instrById, coreCas } = ctx;
+  const {
+    portfolioId,
+    txRows,
+    cashCounted,
+    startDate,
+    inceptionDate,
+    today,
+    instrRows,
+    instrById,
+    coreCas,
+  } = ctx;
 
   const dateGrid: string[] = [];
   const d = new Date(startDate);
@@ -199,11 +214,28 @@ export async function writeSnapshotSeries(
   const earliestPricedDate = new Map<string, string>();
   for (const [instrId, dateMap] of rawPrices) {
     const sortedRawDates = [...dateMap.keys()].sort();
-    if (sortedRawDates.length > 0) earliestPricedDate.set(instrId, sortedRawDates[0]!);
+    // Price rows in an unconvertible currency were dropped above, so they can't make the instrument
+    // "ever priced" either (#1179: it stays at cost until its first convertible price).
+    const knownEarliest = earliestPriceDate(earliestPriceDates, instrId, unconvertible);
+    const earliestRaw = sortedRawDates[0];
+    const earliest =
+      knownEarliest && (!earliestRaw || knownEarliest < earliestRaw) ? knownEarliest : earliestRaw;
+    if (earliest !== undefined) earliestPricedDate.set(instrId, earliest);
 
     const filled = new Map<string, { close: string; currency: string }>();
     let last: { close: string; currency: string } | null = null;
     let lastMs = 0;
+    // A tail run's raw prices carry the last candle(s) before the grid (loadSeedPrices): start
+    // from the latest one so the first grid days inherit it, the same carry the full run applies.
+    // The carry bound below still applies, so a seed older than the window lapses immediately.
+    const gridStart = dateGrid[0];
+    if (gridStart !== undefined) {
+      const seedDate = sortedRawDates.filter((d) => d < gridStart).pop();
+      if (seedDate !== undefined) {
+        last = dateMap.get(seedDate)!;
+        lastMs = new Date(`${seedDate}T00:00:00.000Z`).getTime();
+      }
+    }
     for (const date of dateGrid) {
       const candle = dateMap.get(date);
       if (candle) {
@@ -309,6 +341,20 @@ export async function writeSnapshotSeries(
       effectiveFlow: flow.effectiveFlow,
       currency: baseCurrency,
     });
+  }
+
+  // A full run (it starts at the first transaction) rewrites the whole series, so snapshots dated
+  // before that are orphans: their value comes from an earlier, since-removed ledger, and the
+  // first real day then reads as a -100% single-day return in the TWR chain.
+  if (startDate === inceptionDate) {
+    await db
+      .delete(portfolioSnapshots)
+      .where(
+        and(
+          eq(portfolioSnapshots.portfolioId, portfolioId),
+          lt(portfolioSnapshots.date, startDate),
+        ),
+      );
   }
 
   // Chunked multi-row upsert (audit D6): ~500 rows/statement instead of one per day.
