@@ -140,6 +140,9 @@ export default async function TransactionsPage({
       total = txResult.total;
       txSummary = null;
       txYears = txResult.years;
+      // The holder loader returns the complete filtered set, so counting drafts over it is exact
+      // (and lets the table drop an empty `?status=draft` once the last draft is resolved).
+      draftCount = txResult.rows.filter((r) => r.status === "draft").length;
     }
     anomalies = anomalyResult;
   } else {

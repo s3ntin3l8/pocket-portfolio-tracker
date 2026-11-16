@@ -507,6 +507,52 @@ describe("sourcesForTransactions", () => {
     expect((map.get(tx.id) ?? []).map((r) => r.sourceType)).toEqual(["pytr", "pdf"]);
   });
 
+  it("breaks an attach-time tie by source rank, not by random id (PDF after the broker feed)", async () => {
+    const db = getDb();
+    const s = nextSuffix();
+    const { portfolio } = await makeUserAndPortfolio(db, s);
+    const tx = await makeTx(db, portfolio.id);
+
+    // One statement → identical created_at. The detail sheet merges tax components last-wins, so
+    // the PDF must deterministically come after the pytr row whatever the uuids turn out to be.
+    const sameInstant = new Date("2026-01-01T00:00:00Z");
+    await db.insert(transactionSources).values([
+      {
+        transactionId: tx.id,
+        sourceType: "pdf",
+        externalId: "tr:exec:tie-002",
+        createdAt: sameInstant,
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "pytr",
+        externalId: "pytr:tie-001",
+        createdAt: sameInstant,
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "manual",
+        externalId: "manual:tie-003",
+        createdAt: sameInstant,
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "csv",
+        externalId: "csv:tie-004",
+        createdAt: sameInstant,
+      },
+    ]);
+
+    const app = { db, log: { warn: vi.fn(), info: vi.fn() } };
+    const map = await sourcesForTransactions(app as never, [tx.id], portfolio.id);
+    expect((map.get(tx.id) ?? []).map((r) => r.sourceType)).toEqual([
+      "pytr",
+      "csv",
+      "pdf",
+      "manual",
+    ]);
+  });
+
   it("returns empty map for empty input", async () => {
     const app = { db: getDb(), log: { warn: vi.fn(), info: vi.fn() } };
     // portfolioId is unused on the empty-input early-return path.

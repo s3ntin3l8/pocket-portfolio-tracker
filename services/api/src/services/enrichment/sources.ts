@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { transactionSources, documents } from "@portfolio/db";
 import type { TaxComponents } from "@portfolio/schema";
 import { dbHelper, type AppLike } from "./core.js";
@@ -24,6 +24,22 @@ export interface SourceSummary {
   hasDocument: boolean;
 }
 
+/**
+ * The order a transaction's source rows are read in, everywhere: attach time first, then a fixed
+ * source rank, then id. `created_at` defaults to `now()`, so rows written in one statement tie, and
+ * a bare id tiebreak (uuid v4) would make the order random. The order is load-bearing: the detail
+ * sheet merges `taxComponents` last-wins (`mergeTaxComponents`), so on a tie the PDF — the richest
+ * tax detail — must come after the broker feed or csv, deterministically. Mirrors the badge rank in
+ * the web's `sourceTypesFor`.
+ */
+export const SOURCE_ROW_ORDER = [
+  asc(transactionSources.createdAt),
+  asc(sql`case ${transactionSources.sourceType}
+    when 'pytr' then 0 when 'ibkr' then 0 when 'csv' then 1
+    when 'screenshot' then 2 when 'pdf' then 3 when 'manual' then 9 else 5 end`),
+  asc(transactionSources.id),
+];
+
 export async function sourcesForTransactions(
   app: AppLike,
   txIds: string[],
@@ -45,7 +61,7 @@ export async function sourcesForTransactions(
     })
     .from(transactionSources)
     .where(inArray(transactionSources.transactionId, txIds))
-    .orderBy(asc(transactionSources.createdAt), asc(transactionSources.id));
+    .orderBy(...SOURCE_ROW_ORDER);
 
   const fallbackRows = rows.filter((r) => !r.documentId && r.sourceType !== "pytr");
   const docIds = [...new Set(rows.map((r) => r.documentId).filter((d): d is string => !!d))];

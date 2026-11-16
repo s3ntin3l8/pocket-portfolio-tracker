@@ -1,12 +1,16 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { Decimal } from "decimal.js";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { documents, transactionSources, transactions } from "@portfolio/db";
 import { buildShareTimelines, sharesHeldAt, toDateKey } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
 import { getFxRatesForDates, recordFxMissing } from "../../services/fx.js";
 import { toCoreTxns } from "../../services/tx-core.js";
-import { sourcesFromPreFetched, txFlagsFromSourcesRows } from "../../services/enrichment.js";
+import {
+  SOURCE_ROW_ORDER,
+  sourcesFromPreFetched,
+  txFlagsFromSourcesRows,
+} from "../../services/enrichment.js";
 import { corporateActionsFor, instrumentMeta } from "./shared.js";
 
 export async function deriveIncomeShares(
@@ -117,7 +121,7 @@ export async function enrichRows(
         })
         .from(transactionSources)
         .where(inArray(transactionSources.transactionId, allTxIds))
-        .orderBy(asc(transactionSources.createdAt), asc(transactionSources.id));
+        .orderBy(...SOURCE_ROW_ORDER);
       sourcesMs = performance.now() - s;
       return r;
     })(),
@@ -282,7 +286,7 @@ export async function enrichAggregateRows(
       })
       .from(transactionSources)
       .where(inArray(transactionSources.transactionId, allTxIds))
-      .orderBy(asc(transactionSources.createdAt), asc(transactionSources.id)),
+      .orderBy(...SOURCE_ROW_ORDER),
     app.db
       .select()
       .from(documents)
