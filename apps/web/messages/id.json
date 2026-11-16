@@ -2446,6 +2446,7 @@
       "reconciliation_gap": "Selisih rekonsiliasi kas vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
       "reconciliation_drift": "Selisih rekonsiliasi kas baru vs. broker ({currency}: dilaporkan {reported}, dihitung {derived})",
       "position_gap": "Selisih rekonsiliasi posisi vs. broker ({instrument}: dilaporkan {reported}, dihitung {derived})",
+      "unmapped_broker_events": "{count} event Trade Republic bertipe {eventType} tidak dapat dipetakan dan tidak termasuk dalam saldo Anda",
       "unknown": "Masalah data tidak dikenal"
     },
     "dismiss": "Tutup peringatan",
@@ -2453,6 +2454,8 @@
     "reconciliationPositionTitle": "Posisi tidak sesuai",
     "viewHolding": "Lihat kepemilikan",
     "openConnection": "Buka koneksi",
+    "unmappedTitle": "Event broker tidak diimpor",
+    "openConnections": "Buka koneksi",
     "dismissForNow": "Sembunyikan sementara",
     "portfolioTag": "Portofolio"
   },

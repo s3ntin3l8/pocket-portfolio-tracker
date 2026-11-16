@@ -2446,6 +2446,7 @@
       "reconciliation_gap": "Cash reconciliation gap vs. broker ({currency}: reported {reported}, derived {derived})",
       "reconciliation_drift": "New cash reconciliation drift vs. broker ({currency}: reported {reported}, derived {derived})",
       "position_gap": "Position reconciliation gap vs. broker ({instrument}: reported {reported}, derived {derived})",
+      "unmapped_broker_events": "{count} Trade Republic event(s) of type {eventType} could not be mapped and are missing from your balances",
       "unknown": "Unknown data issue"
     },
     "dismiss": "Dismiss warning",
@@ -2453,6 +2454,8 @@
     "reconciliationPositionTitle": "Position doesn't reconcile",
     "viewHolding": "View holding",
     "openConnection": "Open connection",
+    "unmappedTitle": "Broker events not imported",
+    "openConnections": "Open connections",
     "dismissForNow": "Hide for now",
     "portfolioTag": "Portfolio"
   },
