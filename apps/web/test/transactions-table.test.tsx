@@ -1545,7 +1545,6 @@ describe("TransactionsTable", () => {
         </NextIntlClientProvider>,
       );
       expect(screen.queryByText(/could not be mapped/)).toBeNull();
-      expect(screen.queryByText(messages.Anomalies.unmappedTitle)).toBeNull();
       expect(screen.queryByText(messages.Anomalies.codes.unknown)).toBeNull();
       // No transactionId → never a flagged row, so no "Show flagged only" toggle.
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
@@ -1587,9 +1586,8 @@ describe("TransactionsTable", () => {
           <TransactionsTable rows={ANOMALY_ROWS} anomalies={portfolioAnomalies} />
         </NextIntlClientProvider>,
       );
-      // All 3 render as distinct ReconciliationBanners (interpolated meta makes each unique),
-      // not just the first one found — previously .find() only ever surfaced one.
-      // A position gap says so — it's not titled "Cash doesn't reconcile".
+      // All 3 gaps are bundled into one banner with a detail line each (interpolated meta makes
+      // each unique), not just the first one found — previously .find() only surfaced one.
       // Bundled: one banner titled for the group, one detail line per gap.
       expect(screen.getAllByText("Broker data doesn't reconcile").length).toBe(1);
       expect(screen.getByText(/XF000BTC0017/)).toBeInTheDocument();

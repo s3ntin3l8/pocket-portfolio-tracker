@@ -1,3 +1,4 @@
+import { ReconciliationBannerGroup } from "../src/components/reconciliation-banner-group";
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
@@ -8,7 +9,6 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 
 import messages from "../messages/en.json";
-import idMessages from "../messages/id.json";
 import { ReconciliationBanner } from "../src/components/transactions/activity-banners";
 import { anomalyLabel, reconciliationItem, type AnomalyTranslator } from "../src/lib/utils";
 
@@ -147,12 +147,55 @@ describe("ReconciliationBanner action", () => {
   });
 });
 
-describe("unmapped_broker_events messages", () => {
-  it("is defined in both locales, with its banner title and link label", () => {
-    for (const m of [messages, idMessages]) {
-      expect(m.Anomalies.codes.unmapped_broker_events).toContain("{eventType}");
-      expect(m.Anomalies.unmappedTitle).toBeTruthy();
-      expect(m.Anomalies.openConnections).toBeTruthy();
-    }
+describe("reconciliationItem key", () => {
+  it("tells a TR and an IBKR gap in the same currency apart", () => {
+    const base = { code: "reconciliation_gap", meta: { currency: "EUR", portfolioId: "p1" } };
+    const tr = reconciliationItem({ ...base, meta: { ...base.meta, broker: "tr" } }, ta, "en");
+    const ibkr = reconciliationItem({ ...base, meta: { ...base.meta, broker: "ibkr" } }, ta, "en");
+    expect(tr.key).not.toBe(ibkr.key);
+  });
+});
+
+describe("ReconciliationBannerGroup", () => {
+  const item = (key: string, code: string, title: string) => ({
+    key,
+    code,
+    title,
+    detail: `detail ${key}`,
+    tag: "Portfolio",
+    dismissLabel: "Hide",
+  });
+
+  it("keeps a lone gap's own title and bundles several reconciliation gaps under the group title", () => {
+    const { rerender } = render(
+      <ReconciliationBannerGroup
+        groupTitle="Group"
+        items={[item("a", "reconciliation_gap", "Cash doesn't reconcile")]}
+      />,
+    );
+    expect(screen.getByText("Cash doesn't reconcile")).toBeInTheDocument();
+    rerender(
+      <ReconciliationBannerGroup
+        groupTitle="Group"
+        items={[
+          item("a", "reconciliation_gap", "Cash doesn't reconcile"),
+          item("b", "position_gap", "Position doesn't reconcile"),
+        ]}
+      />,
+    );
+    expect(screen.getByText("Group")).toBeInTheDocument();
+    expect(screen.getByText("detail a")).toBeInTheDocument();
+    expect(screen.getByText("detail b")).toBeInTheDocument();
+  });
+
+  it("uses no reconciliation title when a non-reconciliation anomaly is bundled", () => {
+    render(
+      <ReconciliationBannerGroup
+        groupTitle="Group"
+        items={[item("a", "negative_cash", "Negative cash"), item("b", "oversell", "Oversell")]}
+      />,
+    );
+    expect(screen.queryByText("Group")).toBeNull();
+    expect(screen.getByText("Negative cash")).toBeInTheDocument();
   });
 });

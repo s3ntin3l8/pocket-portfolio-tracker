@@ -380,6 +380,7 @@ export function formatRatio(value: number, locale = "en") {
 
 export interface ReconciliationItem {
   key: string;
+  code: string;
   title: string;
   detail: string;
   tag: string;
@@ -404,10 +405,13 @@ export function reconciliationItem(
   const meta = a.meta ?? {};
   const isPosition = a.code === "position_gap";
   const portfolioId = typeof meta.portfolioId === "string" ? meta.portfolioId : fallbackPortfolioId;
-  // Same code+subject can occur once per portfolio in the aggregate view.
-  const key = [a.code, meta.currency ?? meta.isin ?? meta.eventType ?? "", portfolioId ?? ""].join(
-    ":",
-  );
+  // Same code+subject can occur once per portfolio (aggregate view) and once per broker.
+  const key = [
+    a.code,
+    meta.currency ?? meta.isin ?? meta.eventType ?? "",
+    portfolioId ?? "",
+    ...(typeof meta.broker === "string" ? [meta.broker] : []),
+  ].join(":");
   let action: ReconciliationItem["action"];
   if (isPosition && typeof meta.instrumentId === "string") {
     action = { href: `/instruments/${meta.instrumentId}`, label: ta("viewHolding") };
@@ -416,6 +420,7 @@ export function reconciliationItem(
   }
   return {
     key,
+    code: a.code,
     title: ta(isPosition ? "reconciliationPositionTitle" : "reconciliationTitle"),
     detail: anomalyLabel(a, ta, locale),
     tag: ta("portfolioTag"),

@@ -8,10 +8,15 @@ export interface BannerItem {
   title: string;
   detail: string;
   tag: string;
+  /** Anomaly code — the group title only applies when every item is a broker reconciliation gap. */
+  code?: string;
   /** `Anomalies.dismiss` — pre-resolved server-side, same reason as the other fields. */
   dismissLabel: string;
   action?: { href: string; label: string };
 }
+
+const isReconciliationCode = (c?: string) =>
+  c === "reconciliation_gap" || c === "reconciliation_drift" || c === "position_gap";
 
 export function ReconciliationBannerGroup({
   items,
@@ -35,7 +40,11 @@ export function ReconciliationBannerGroup({
   // confirmed, a missing booking), so they are one thing to look at, not N cards.
   return (
     <ReconciliationBanner
-      title={rest.length > 0 ? groupTitle : first.title}
+      title={
+        rest.length > 0 && visible.every((v) => isReconciliationCode(v.code))
+          ? groupTitle
+          : first.title
+      }
       detail={first.detail}
       tag={first.tag}
       dismissLabel={first.dismissLabel}

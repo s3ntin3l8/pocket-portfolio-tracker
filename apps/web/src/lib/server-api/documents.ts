@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type {
   InboxDocument,
   DocumentCategory,
@@ -66,7 +67,7 @@ export async function loadImports(): Promise<ImportRecord[]> {
   }
 }
 
-export async function loadUnmappedEventTypes(): Promise<UnmappedEventType[]> {
+export const loadUnmappedEventTypes = cache(async (): Promise<UnmappedEventType[]> => {
   const api = await getServerApi();
   if (!api) return [];
   try {
@@ -74,7 +75,7 @@ export async function loadUnmappedEventTypes(): Promise<UnmappedEventType[]> {
   } catch {
     return [];
   }
-}
+});
 
 export async function loadImport(importId: string): Promise<ImportDetail | null> {
   const api = await getServerApi();
