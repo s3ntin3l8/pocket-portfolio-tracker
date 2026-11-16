@@ -61,8 +61,7 @@ function wrap(ui: React.ReactElement) {
   );
 }
 
-// Radix opens its dropdown on keyboard events, not a synthetic click (see
-// portfolio-card-menu.test.tsx).
+// Radix opens its dropdown on keyboard events, not a synthetic click.
 function openMenu() {
   fireEvent.keyDown(screen.getByRole("button", { name: "More options" }), { key: "Enter" });
 }
