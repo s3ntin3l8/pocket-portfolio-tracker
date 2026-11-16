@@ -84,9 +84,11 @@ different credentials.
 
 Backing out of a renew (`POST /tr/connection/cancel`) only stops the login and keeps the saved
 credentials, unlike Disconnect. A renew that is simply abandoned leaves `awaiting_2fa` with no
-pairing behind it: the banner still prompts for it (a connection that has synced before), and
-`reapAbandonedPairings` returns such rows to `expired` on every hourly sweep (and at boot, since
-pending pairings live in process memory). A first setup that never synced is left alone.
+pairing behind it. The banner still prompts for it, and `reapAbandonedPairings` returns such
+rows to `expired` on every hourly sweep (and at boot, where every pending pairing is gone since
+they live in process memory). A row counts as "was a connection" when it has a session or carries
+the error a failed sync or login left behind (`wasConnectedBefore`); renew deliberately keeps that
+error for this reason. A first setup that never worked has neither and is left alone.
 
 ## How sync works
 

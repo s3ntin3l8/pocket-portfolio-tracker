@@ -9,7 +9,7 @@ import {
   PytrUnavailableError,
 } from "../../services/pytr/runner.js";
 import { sanitizeConnectionError } from "../../lib/sanitize-error.js";
-import { getConnection, lookupPortfolio } from "./_shared.js";
+import { getConnection, lookupPortfolio, wasConnectedBefore } from "./_shared.js";
 
 const connectBodySchema = z.object({
   phone: z.string().min(3),
@@ -131,7 +131,9 @@ export function registerPairingRoutes(app: FastifyInstance) {
 
     await app.db
       .update(trConnections)
-      .set({ status: "awaiting_2fa", lastError: null, updatedAt: new Date() })
+      // `lastError` is kept on purpose: with `sessionEnc` it marks a connection that existed
+      // before this pairing (see `wasConnectedBefore`), so an abandoned renew can be recovered.
+      .set({ status: "awaiting_2fa", updatedAt: new Date() })
       .where(eq(trConnections.userId, id));
 
     reply.code(202);
@@ -145,7 +147,7 @@ export function registerPairingRoutes(app: FastifyInstance) {
     const id = request.userId;
     app.pytr.cancelPairing(id);
     const conn = await getConnection(app, id);
-    if (conn && conn.status === "awaiting_2fa" && conn.sessionEnc) {
+    if (conn && conn.status === "awaiting_2fa" && wasConnectedBefore(conn)) {
       await app.db
         .update(trConnections)
         .set({ status: "expired", updatedAt: new Date() })

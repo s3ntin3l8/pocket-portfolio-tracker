@@ -102,12 +102,24 @@ describe("TrConnectionBanner", () => {
     expect(screen.getByRole("button", { name: "Renew" })).toBeTruthy();
   });
 
-  it("does not nag about a first setup that never synced", () => {
+  it("also recovers a renew abandoned from an errored first login (no sync, an error left)", () => {
+    renderBanner({
+      ...base,
+      status: "awaiting_2fa",
+      pairingMethod: null,
+      lastSyncAt: null,
+      lastError: "approval failed",
+    });
+    expect(screen.getByRole("button", { name: "Renew" })).toBeTruthy();
+  });
+
+  it("does not nag about a first setup (no sync, no error left behind)", () => {
     const { container } = renderBanner({
       ...base,
       status: "awaiting_2fa",
       pairingMethod: null,
       lastSyncAt: null,
+      lastError: null,
     });
     expect(container.textContent).toBe("");
   });

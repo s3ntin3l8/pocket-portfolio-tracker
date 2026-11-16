@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, lt } from "drizzle-orm";
+import { and, eq, isNotNull, lt, or } from "drizzle-orm";
 import { ibkrConnections, trConnections } from "@portfolio/db";
 import type { DB } from "../../db/client.js";
 
@@ -36,22 +36,28 @@ export const ABANDONED_PAIRING_MS = 10 * 60 * 1000;
 /**
  * A renew the user walked away from (dialog dismissed, tab closed, process restarted) leaves the
  * row in `awaiting_2fa` with no pairing behind it, and the hourly sweep only syncs `connected`
- * rows — so sync would stop silently. A connection that had a working session before goes back
- * to `expired`, which is what raises the Renew prompt. A never-connected row (no session) is
- * left alone: it is a first setup, not something to nag about.
+ * rows, so sync would stop silently. A row that was a connection before (it had a session, or
+ * carries the error a failed sync/login left; see `wasConnectedBefore` in routes/tr/_shared.ts)
+ * goes back to `expired`, which is what raises the Renew prompt. A first setup that never worked
+ * has neither marker and is left alone.
+ *
+ * `olderThanMs` is how long a pairing may have been pending (0 at boot, when every in-memory
+ * pairing is gone); `updatedAt` is always stamped with the real `now`.
  */
 export async function reapAbandonedPairings(
   db: DB,
-  now: Date = new Date(),
+  opts: { olderThanMs?: number; now?: Date } = {},
 ): Promise<{ trConnections: number }> {
+  const now = opts.now ?? new Date();
+  const olderThanMs = opts.olderThanMs ?? ABANDONED_PAIRING_MS;
   const reaped = await db
     .update(trConnections)
     .set({ status: "expired", updatedAt: now })
     .where(
       and(
         eq(trConnections.status, "awaiting_2fa"),
-        isNotNull(trConnections.sessionEnc),
-        lt(trConnections.updatedAt, new Date(now.getTime() - ABANDONED_PAIRING_MS)),
+        or(isNotNull(trConnections.sessionEnc), isNotNull(trConnections.lastError)),
+        lt(trConnections.updatedAt, new Date(now.getTime() - olderThanMs)),
       ),
     )
     .returning({ id: trConnections.id });

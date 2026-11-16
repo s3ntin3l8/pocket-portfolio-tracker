@@ -83,11 +83,7 @@ import {
 } from "./backfill.js";
 import { gcStagedReceipts } from "../storage/receipts.js";
 import { purgeExpiredConversations } from "./assistant-history.js";
-import {
-  ABANDONED_PAIRING_MS,
-  resetStaleSyncFlags,
-  reapAbandonedPairings,
-} from "./scheduler/cleanup.js";
+import { resetStaleSyncFlags, reapAbandonedPairings } from "./scheduler/cleanup.js";
 import {
   setActiveBoss,
   usesPglite,
@@ -160,10 +156,7 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
 
   // Pending pairings live in process memory, so at boot every `awaiting_2fa` row is orphaned
   // whatever its age (an age of 0 = reap them all).
-  const orphaned = await reapAbandonedPairings(
-    getDb(),
-    new Date(Date.now() + ABANDONED_PAIRING_MS),
-  );
+  const orphaned = await reapAbandonedPairings(getDb(), { olderThanMs: 0 });
   if (orphaned.trConnections > 0) {
     app.log.warn(orphaned, "reset abandoned Trade Republic pairings on startup");
   }

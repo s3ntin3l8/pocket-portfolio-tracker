@@ -186,9 +186,29 @@ describe("reapAbandonedPairings", () => {
     expect(await statusOf(err)).toBe("error");
   });
 
-  it("at boot (cutoff moved forward) reaps even a fresh orphan", async () => {
-    const id = await seed("boot", { sessionEnc: "enc-session", updatedAt: new Date() });
-    await reapAbandonedPairings(await ensureDb(), new Date(Date.now() + ABANDONED_PAIRING_MS));
+  it("recovers a renew started from an errored connection that never had a session", async () => {
+    // first pairing declined (error, no session) -> user tapped Renew -> abandoned
+    const id = await seed("error-renew", {
+      sessionEnc: null,
+      lastError: "approval failed",
+      updatedAt: old(),
+    });
+    await reapAbandonedPairings(await ensureDb());
     expect(await statusOf(id)).toBe("expired");
+  });
+
+  it("at boot (olderThanMs 0) reaps even a fresh orphan, stamped with the real time", async () => {
+    const id = await seed("boot", { sessionEnc: "enc-session", updatedAt: new Date() });
+    const before = Date.now();
+    await reapAbandonedPairings(await ensureDb(), { olderThanMs: 0 });
+    expect(await statusOf(id)).toBe("expired");
+    const [row] = await (
+      await ensureDb()
+    )
+      .select()
+      .from(trConnections)
+      .where(eq(trConnections.id, id));
+    expect(row.updatedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(row.updatedAt.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 });

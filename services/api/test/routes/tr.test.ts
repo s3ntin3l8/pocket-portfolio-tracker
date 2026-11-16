@@ -666,7 +666,11 @@ describe("Trade Republic connection (encryption enabled)", () => {
       expect(fake.lastStart).toMatchObject({ phone: "+4915100000001", pin: "4321" });
 
       const pending = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
-      expect(pending.json()).toMatchObject({ status: "awaiting_2fa", lastError: null });
+      // The prior error stays: it marks this pairing as a renew, so an abandoned one is recovered.
+      expect(pending.json()).toMatchObject({
+        status: "awaiting_2fa",
+        lastError: "Trade Republic session expired",
+      });
 
       const verify = await app.inject({
         method: "POST",

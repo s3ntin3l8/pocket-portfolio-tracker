@@ -42,3 +42,13 @@ export async function lookupPortfolio(app: FastifyInstance, userId: string, port
   if (!p) return null;
   return { id: p.id, isChild: p.holderType === "child" };
 }
+
+/**
+ * True for a row that was a real connection before the pairing now in flight: it had a session,
+ * or it carries the error a failed sync/login left behind. A first setup has neither (the first
+ * pairing clears both), so an abandoned one is not something to nag about. The one predicate
+ * behind `POST /tr/connection/cancel`, `reapAbandonedPairings` and the Holdings banner.
+ */
+export function wasConnectedBefore(conn: Pick<TrConnection, "sessionEnc" | "lastError">): boolean {
+  return conn.sessionEnc !== null || conn.lastError !== null;
+}

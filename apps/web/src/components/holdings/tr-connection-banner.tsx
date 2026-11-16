@@ -31,17 +31,17 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
   if (!connection || !connection.portfolioId) return null;
   // A renew the user walked away from leaves `awaiting_2fa` with no pairing behind it. The
   // server reaps that to `expired` within the hour; until then treat it as expired here so the
-  // prompt never disappears. A connection that never synced is a first setup, not a renew.
+  // prompt never disappears. A first setup (no sync and no error left behind) is not a renew.
   const abandoned =
     connection.status === "awaiting_2fa" &&
     connection.pairingMethod === null &&
-    connection.lastSyncAt !== null;
+    (connection.lastSyncAt !== null || connection.lastError !== null);
   if (connection.status !== "expired" && connection.status !== "error" && !abandoned) return null;
   const flowConnection: TrConnection = abandoned
     ? { ...connection, status: "expired" }
     : connection;
 
-  const expired = connection.status !== "error";
+  const showExpiredCopy = connection.status !== "error";
 
   // The flow reports every change: an approval, but also a cancelled renew. Only a connection
   // that is actually `connected` again closes the dialog and syncs; anything else just
@@ -68,9 +68,9 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
         <AlertTriangle className="size-4 shrink-0" aria-hidden />
         <span className="min-w-0 flex-1">
           <span className="font-semibold">
-            {expired ? t("banner.expired.title") : t("banner.error.title")}
+            {showExpiredCopy ? t("banner.expired.title") : t("banner.error.title")}
           </span>{" "}
-          {expired ? t("banner.expired.body") : t("banner.error.body")}
+          {showExpiredCopy ? t("banner.expired.body") : t("banner.error.body")}
         </span>
         <Button type="button" size="sm" onClick={() => setOpen(true)}>
           {t("banner.action")}
@@ -81,7 +81,7 @@ export function TrConnectionBanner({ connection }: { connection: TrConnection | 
           <DialogHeader>
             <DialogTitle>{t("banner.dialogTitle")}</DialogTitle>
             <DialogDescription>
-              {expired ? t("renewHint") : t("banner.dialogHintError")}
+              {showExpiredCopy ? t("renewHint") : t("banner.dialogHintError")}
             </DialogDescription>
           </DialogHeader>
           <TrConnectFlow
