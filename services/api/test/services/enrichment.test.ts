@@ -16,6 +16,7 @@ import {
   documents,
   screenshotImports,
   instruments,
+  txSourceTypeEnum,
 } from "@portfolio/db";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
@@ -25,6 +26,7 @@ import {
   sourcesForTransactions,
 } from "../../src/services/enrichment.js";
 import { buildDocumentName, slug } from "../../src/storage/naming.js";
+import { SOURCE_RANK } from "@portfolio/schema";
 import type { ParsedTransaction } from "@portfolio/schema";
 
 /**
@@ -477,6 +479,84 @@ describe("sourcesForTransactions", () => {
     expect(rows).toHaveLength(2);
     const types = rows.map((r) => r.sourceType).sort();
     expect(types).toEqual(["csv", "pdf"]);
+  });
+
+  it("returns a transaction's sources in the order they were attached", async () => {
+    const db = getDb();
+    const s = nextSuffix();
+    const { portfolio } = await makeUserAndPortfolio(db, s);
+    const tx = await makeTx(db, portfolio.id);
+
+    // Inserted in the reverse of their createdAt order, so a plain heap-order read
+    // (no ORDER BY) would hand them back as pdf, pytr.
+    await db.insert(transactionSources).values([
+      {
+        transactionId: tx.id,
+        sourceType: "pdf",
+        externalId: "tr:exec:ord-002",
+        createdAt: new Date("2026-01-02T00:00:00Z"),
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "pytr",
+        externalId: "pytr:ord-001",
+        createdAt: new Date("2026-01-01T00:00:00Z"),
+      },
+    ]);
+
+    const app = { db, log: { warn: vi.fn(), info: vi.fn() } };
+    const map = await sourcesForTransactions(app as never, [tx.id], portfolio.id);
+    expect((map.get(tx.id) ?? []).map((r) => r.sourceType)).toEqual(["pytr", "pdf"]);
+  });
+
+  it("breaks an attach-time tie by source rank, not by random id (PDF after the broker feed)", async () => {
+    const db = getDb();
+    const s = nextSuffix();
+    const { portfolio } = await makeUserAndPortfolio(db, s);
+    const tx = await makeTx(db, portfolio.id);
+
+    // One statement → identical created_at. The detail sheet merges tax components last-wins, so
+    // the PDF must deterministically come after the pytr row whatever the uuids turn out to be.
+    const sameInstant = new Date("2026-01-01T00:00:00Z");
+    await db.insert(transactionSources).values([
+      {
+        transactionId: tx.id,
+        sourceType: "pdf",
+        externalId: "tr:exec:tie-002",
+        createdAt: sameInstant,
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "pytr",
+        externalId: "pytr:tie-001",
+        createdAt: sameInstant,
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "manual",
+        externalId: "manual:tie-003",
+        createdAt: sameInstant,
+      },
+      {
+        transactionId: tx.id,
+        sourceType: "csv",
+        externalId: "csv:tie-004",
+        createdAt: sameInstant,
+      },
+    ]);
+
+    const app = { db, log: { warn: vi.fn(), info: vi.fn() } };
+    const map = await sourcesForTransactions(app as never, [tx.id], portfolio.id);
+    expect((map.get(tx.id) ?? []).map((r) => r.sourceType)).toEqual([
+      "pytr",
+      "csv",
+      "pdf",
+      "manual",
+    ]);
+  });
+
+  it("ranks every stored source type, so a new tx_source_type cannot slip into the default rank", () => {
+    expect(Object.keys(SOURCE_RANK).sort()).toEqual([...txSourceTypeEnum.enumValues].sort());
   });
 
   it("returns empty map for empty input", async () => {

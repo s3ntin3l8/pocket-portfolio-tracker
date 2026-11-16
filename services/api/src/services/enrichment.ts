@@ -7,6 +7,7 @@ export {
 } from "./enrichment/core.js";
 
 export {
+  SOURCE_ROW_ORDER,
   sourcesForTransactions,
   sourcesFromPreFetched,
   type SourceSummary,

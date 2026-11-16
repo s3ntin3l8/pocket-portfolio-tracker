@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { transactionSources, documents } from "@portfolio/db";
-import type { TaxComponents } from "@portfolio/schema";
+import { SOURCE_RANK, SOURCE_RANK_DEFAULT, type TaxComponents } from "@portfolio/schema";
 import { dbHelper, type AppLike } from "./core.js";
 import {
   gatherDocumentMetadata,
@@ -24,6 +24,27 @@ export interface SourceSummary {
   hasDocument: boolean;
 }
 
+/**
+ * The order a transaction's source rows are read in, everywhere: attach time first, then a fixed
+ * source rank, then id. `created_at` defaults to `now()`, so rows written in one statement tie, and
+ * a bare id tiebreak (uuid v4) would make the order random. The order is load-bearing: the detail
+ * sheet merges `taxComponents` last-wins (`mergeTaxComponents`), so on a tie the PDF — the richest
+ * tax detail — must come after the broker feed or csv, deterministically. The rank table is shared
+ * with the web's badge order (`SOURCE_RANK` in `@portfolio/schema`).
+ */
+export const SOURCE_ROW_ORDER = [
+  asc(transactionSources.createdAt),
+  asc(
+    sql`case ${transactionSources.sourceType} ${sql.join(
+      Object.entries(SOURCE_RANK).map(
+        ([type, rank]) => sql`when ${type} then ${sql.raw(String(rank))}`,
+      ),
+      sql` `,
+    )} else ${sql.raw(String(SOURCE_RANK_DEFAULT))} end`,
+  ),
+  asc(transactionSources.id),
+];
+
 export async function sourcesForTransactions(
   app: AppLike,
   txIds: string[],
@@ -44,7 +65,8 @@ export async function sourcesForTransactions(
       createdAt: transactionSources.createdAt,
     })
     .from(transactionSources)
-    .where(inArray(transactionSources.transactionId, txIds));
+    .where(inArray(transactionSources.transactionId, txIds))
+    .orderBy(...SOURCE_ROW_ORDER);
 
   const fallbackRows = rows.filter((r) => !r.documentId && r.sourceType !== "pytr");
   const docIds = [...new Set(rows.map((r) => r.documentId).filter((d): d is string => !!d))];

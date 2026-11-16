@@ -6,7 +6,11 @@ import { buildShareTimelines, sharesHeldAt, toDateKey } from "@portfolio/core";
 import { logTiming } from "../../lib/timing.js";
 import { getFxRatesForDates, recordFxMissing } from "../../services/fx.js";
 import { toCoreTxns } from "../../services/tx-core.js";
-import { sourcesFromPreFetched, txFlagsFromSourcesRows } from "../../services/enrichment.js";
+import {
+  SOURCE_ROW_ORDER,
+  sourcesFromPreFetched,
+  txFlagsFromSourcesRows,
+} from "../../services/enrichment.js";
 import { corporateActionsFor, instrumentMeta } from "./shared.js";
 
 export async function deriveIncomeShares(
@@ -116,7 +120,8 @@ export async function enrichRows(
           confidence: transactionSources.confidence,
         })
         .from(transactionSources)
-        .where(inArray(transactionSources.transactionId, allTxIds));
+        .where(inArray(transactionSources.transactionId, allTxIds))
+        .orderBy(...SOURCE_ROW_ORDER);
       sourcesMs = performance.now() - s;
       return r;
     })(),
@@ -280,7 +285,8 @@ export async function enrichAggregateRows(
         confidence: transactionSources.confidence,
       })
       .from(transactionSources)
-      .where(inArray(transactionSources.transactionId, allTxIds)),
+      .where(inArray(transactionSources.transactionId, allTxIds))
+      .orderBy(...SOURCE_ROW_ORDER),
     app.db
       .select()
       .from(documents)

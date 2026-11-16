@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter, usePathname } from "@/i18n/navigation";
 import { useSearchParams } from "next/navigation";
@@ -175,6 +175,16 @@ export function TransactionsTable({
   );
   const draftCount = serverDraftCount ?? loadedDraftCount;
   const draftFilter: "all" | "drafts" = statusFilter === "draft" ? "drafts" : "all";
+
+  // Confirming/discarding the last draft under the drafts filter would leave an empty list behind
+  // `?status=draft`. The server's count (drafts matching the other filters) is the trigger, so
+  // this covers batch, single and detail-sheet resolves as well as a deep link with no drafts.
+  // `replace`, not `push`: the empty view shouldn't be a back-button stop.
+  useEffect(() => {
+    if (statusFilter === "draft" && serverDraftCount === 0) {
+      router.replace(buildTransactionHref(pathname, searchParams.toString(), "status"));
+    }
+  }, [statusFilter, serverDraftCount, router, pathname, searchParams]);
 
   if (showFlagged && flaggedCount === 0) {
     setShowFlagged(false);

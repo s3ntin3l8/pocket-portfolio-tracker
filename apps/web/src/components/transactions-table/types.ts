@@ -21,6 +21,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { sourceRank } from "@portfolio/schema";
 import type { SourceSummary, TransactionStatus } from "@portfolio/api-client";
 
 export const SOURCE_ICON: Record<string, LucideIcon> = {
@@ -87,7 +88,9 @@ export const SRC_TONES: Record<string, React.CSSProperties> = {
 
 export function sourceTypesFor(tx: TxRow): string[] {
   const types = (tx.sources ?? []).map((s) => s.sourceType).filter(Boolean);
-  return types.length > 0 ? [...new Set(types)] : [tx.source];
+  if (types.length === 0) return [tx.source];
+  // Array.prototype.sort is stable, so equal ranks keep the API's attach order.
+  return [...new Set(types)].sort((a, b) => sourceRank(a) - sourceRank(b));
 }
 
 export interface TxRow {
