@@ -1528,6 +1528,32 @@ describe("TransactionsTable", () => {
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
     });
 
+    it("renders an unmapped_broker_events anomaly as a banner, not a flagged row", () => {
+      render(
+        <NextIntlClientProvider locale="en" messages={messages}>
+          <TransactionsTable
+            rows={ANOMALY_ROWS}
+            anomalies={[
+              {
+                code: "unmapped_broker_events" as const,
+                severity: "warning" as const,
+                scope: "portfolio" as const,
+                meta: { eventType: "foo.bar", count: 3, portfolioId: "p1" },
+              },
+            ]}
+          />
+        </NextIntlClientProvider>,
+      );
+      expect(
+        screen.getByText(
+          "3 Trade Republic event(s) of type foo.bar could not be mapped and are missing from your balances",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText(messages.Anomalies.codes.unknown)).toBeNull();
+      // No transactionId → never a flagged row, so no "Show flagged only" toggle.
+      expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
+    });
+
     it("renders every portfolio-scoped anomaly, not just the first (regression: reconciliation_gap + 2x position_gap all showed as only 1 banner)", () => {
       const portfolioAnomalies = [
         {

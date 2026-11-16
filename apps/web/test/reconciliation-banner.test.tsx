@@ -8,6 +8,7 @@ vi.mock("@/i18n/navigation", () => ({
 }));
 
 import messages from "../messages/en.json";
+import idMessages from "../messages/id.json";
 import { ReconciliationBanner } from "../src/components/transactions/activity-banners";
 import { anomalyLabel, reconciliationItem, type AnomalyTranslator } from "../src/lib/utils";
 
@@ -117,6 +118,21 @@ describe("reconciliationItem", () => {
     expect(item.action).toEqual({ href: "/settings/portfolios/p9", label: "Open connection" });
   });
 
+  it("titles unmapped broker events, keys per type, links to Data & connections", () => {
+    const a = {
+      code: "unmapped_broker_events",
+      meta: { eventType: "foo.bar", count: 2, portfolioId: "p1" },
+    };
+    const item = reconciliationItem(a, ta, "en");
+    expect(item.title).toBe("Broker events not imported");
+    expect(item.detail).toBe(
+      "2 Trade Republic event(s) of type foo.bar could not be mapped and are missing from your balances",
+    );
+    expect(item.action).toEqual({ href: "/settings/connections", label: "Open connections" });
+    const other = reconciliationItem({ ...a, meta: { ...a.meta, eventType: "baz" } }, ta, "en");
+    expect(other.key).not.toBe(item.key);
+  });
+
   it("offers no link when the target isn't known", () => {
     const item = reconciliationItem(
       { code: "position_gap", meta: { isin: "US1", reported: "2", derived: "1" } },
@@ -143,5 +159,15 @@ describe("ReconciliationBanner action", () => {
       "href",
       "/instruments/i1",
     );
+  });
+});
+
+describe("unmapped_broker_events messages", () => {
+  it("is defined in both locales, with its banner title and link label", () => {
+    for (const m of [messages, idMessages]) {
+      expect(m.Anomalies.codes.unmapped_broker_events).toContain("{eventType}");
+      expect(m.Anomalies.unmappedTitle).toBeTruthy();
+      expect(m.Anomalies.openConnections).toBeTruthy();
+    }
   });
 });

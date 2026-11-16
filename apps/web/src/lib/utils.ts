@@ -399,18 +399,30 @@ export function reconciliationItem(
 ): ReconciliationItem {
   const meta = a.meta ?? {};
   const isPosition = a.code === "position_gap";
+  const isUnmapped = a.code === "unmapped_broker_events";
   const portfolioId = typeof meta.portfolioId === "string" ? meta.portfolioId : fallbackPortfolioId;
   // Same code+subject can occur once per portfolio in the aggregate view.
-  const key = [a.code, meta.currency ?? meta.isin ?? "", portfolioId ?? ""].join(":");
+  const key = [a.code, meta.currency ?? meta.isin ?? meta.eventType ?? "", portfolioId ?? ""].join(
+    ":",
+  );
   let action: ReconciliationItem["action"];
   if (isPosition && typeof meta.instrumentId === "string") {
     action = { href: `/instruments/${meta.instrumentId}`, label: ta("viewHolding") };
+  } else if (isUnmapped) {
+    // The types are listed in Settings › Data & connections (`UnmappedTypesAlert`).
+    action = { href: "/settings/connections", label: ta("openConnections") };
   } else if (!isPosition && portfolioId) {
     action = { href: `/settings/portfolios/${portfolioId}`, label: ta("openConnection") };
   }
   return {
     key,
-    title: ta(isPosition ? "reconciliationPositionTitle" : "reconciliationTitle"),
+    title: ta(
+      isUnmapped
+        ? "unmappedTitle"
+        : isPosition
+          ? "reconciliationPositionTitle"
+          : "reconciliationTitle",
+    ),
     detail: anomalyLabel(a, ta, locale),
     tag: ta("portfolioTag"),
     // A portfolio-scoped anomaly points at no transaction, so the server-side dismissal
