@@ -39,6 +39,7 @@ export const RECONCILE_TOLERANCE = 0.1;
 export const EVENT_KIND: Record<string, string> = {
   SAVEBACK_AGGREGATE: "saveback",
   SPARE_CHANGE_AGGREGATE: "roundup",
+  CARD_OCT: "cashback",
 };
 
 export const CARD_EVENTS = new Set([
@@ -46,6 +47,7 @@ export const CARD_EVENTS = new Set([
   "CARD_ATM_WITHDRAWAL",
   "CARD_ORDER_FEE",
   "CARD_REFUND",
+  "CARD_OCT",
   "CARD_VERIFICATION",
   "CARD_AFT",
 ]);
@@ -69,6 +71,8 @@ export const FIXED_ACTIONS: Record<string, ParsedAction> = {
   INTEREST_PAYOUT_CREATED: "interest",
   EARNINGS: "tax",
   CARD_REFUND: "deposit",
+  // Cashback ("VisaBonus-Cashback") is a negative spend: it nets against card spend like a refund.
+  CARD_OCT: "deposit",
   PAYMENT_OUTBOUND: "withdrawal",
   OUTGOING_TRANSFER: "withdrawal",
   OUTGOING_TRANSFER_DELEGATION: "withdrawal",
@@ -112,13 +116,6 @@ export const NO_CASH_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_NO_CASH";
 export const SHARE_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_INSTRUMENT";
 
 export const SKIP_EVENTS = new Map<string, string>([
-  [
-    "CARD_OCT",
-    // An original-credit transaction onto the card: here always "VisaBonus-Cashback" (cents). Booking
-    // it as a deposit made the derived cash balance overshoot TR's reported one, so it is left out
-    // until the reconciliation against TR's balance is understood (tracked separately).
-    "card cashback credit (not booked: would break the cash reconciliation)",
-  ],
   ["CARD_VERIFICATION", "card verification (no cash movement)"],
   ["TRADING_SAVINGSPLAN_EXECUTION_FAILED", "failed savings-plan execution"],
   ["ORDER_CREATED", "order created (no fill, no cash)"],

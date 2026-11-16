@@ -256,6 +256,43 @@ describe("syncTrConnection", () => {
     expect(await draftTxIds(conn.portfolioId!)).toEqual(["tr-1", "tr-2", "tr-4"]);
   });
 
+  it("syncs CARD_OCT cashback as a draft deposit and does not duplicate it on re-sync", async () => {
+    const conn = await makeConnection("card-oct");
+    const db = getDb();
+    const events = [
+      {
+        id: "oct-1",
+        timestamp: "2026-03-05T10:00:00.000Z",
+        eventType: "CARD_OCT",
+        amount: 0.35,
+        currency: "EUR",
+        title: "VisaBonus-Cashback",
+      },
+    ];
+    const first = await syncTrConnection(
+      db,
+      enc,
+      runnerWith(async () => ({ events, sessionData: "J1" })),
+      conn,
+    );
+    expect(first.drafts).toBe(1);
+    expect(first.errors).toBe(0);
+    await syncTrConnection(
+      db,
+      enc,
+      runnerWith(async () => ({ events, sessionData: "J2" })),
+      conn,
+    );
+    const rows = await db
+      .select()
+      .from(transactions)
+      .where(
+        and(eq(transactions.portfolioId, conn.portfolioId!), eq(transactions.externalId, "oct-1")),
+      );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: "draft", type: "deposit" });
+  });
+
   it("self-heals a staged error once a transiently-failed detail recovers", async () => {
     const conn = await makeConnection("self-heal");
     const db = getDb();
