@@ -43,6 +43,12 @@ the job that raised it), prunes subscriptions the push service reports gone (404
 only ever lets `url` be a same-origin path. A newer notification with the same `tag` replaces
 the older one instead of stacking.
 
+## Trade Republic login
+
+The first user of this channel: a push when the stored Trade Republic login is about to expire and
+when it has expired (tag `tr-login`, opens `/holdings`). Timing, dedupe and the 24 h session
+lifetime are in `docs/trade_republic.md` › "Session lifetime and early renew".
+
 ## Security notes
 
 - The server POSTs to the subscription endpoint, so `endpoint` must be an `https` URL on a known

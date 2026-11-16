@@ -72,6 +72,8 @@ import {
   refreshUbsBuyback,
 } from "./scrapers/store.js";
 import { syncTrConnection } from "./pytr/sync.js";
+import { notifyTrLoginExpired, notifyTrLoginExpiringById } from "./notifications/tr-session.js";
+import { pushDeps } from "./notifications/push.js";
 import { syncIbkrConnection } from "./ibkr/sync.js";
 import {
   backfillPortfolioHistory,
@@ -268,9 +270,11 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
             conn,
             app.log,
             app.storage,
+            { onExpired: () => notifyTrLoginExpired(pushDeps(app), conn.userId) },
           );
           if (result.status === "connected") {
             app.log.info({ connectionId: conn.id, result }, "tr sync complete");
+            await notifyTrLoginExpiringById(pushDeps(app), conn.id);
           } else {
             app.log.warn({ connectionId: conn.id, result }, "tr sync non-connected");
           }

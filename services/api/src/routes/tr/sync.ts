@@ -8,6 +8,8 @@ import {
   trResolvedEvents,
 } from "@portfolio/db";
 import { syncTrConnection } from "../../services/pytr/sync.js";
+import { notifyTrLoginExpired } from "../../services/notifications/tr-session.js";
+import { pushDeps } from "../../services/notifications/push.js";
 import { enqueueTrSync, SYNC_CLAIM_LEASE_MS } from "../../services/scheduler.js";
 import { deleteStorageObjectsByKey } from "../../storage/receipts.js";
 import { getConnection } from "./_shared.js";
@@ -63,6 +65,7 @@ export function registerSyncRoutes(app: FastifyInstance) {
         conn,
         request.log,
         app.storage,
+        { onExpired: () => notifyTrLoginExpired(pushDeps(app, request.log), id) },
       );
       request.log.info(
         {

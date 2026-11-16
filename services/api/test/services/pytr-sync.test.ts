@@ -1009,6 +1009,95 @@ describe("syncTrConnection", () => {
     expect(updated.lastError).toBeTruthy();
   });
 
+  it("calls the expired hook exactly once when this sync expires the connection", async () => {
+    const conn = await makeConnection("expired-hook");
+    const onExpired = vi.fn();
+    const runner = runnerWith(async () => {
+      throw new PytrAuthError();
+    });
+    await syncTrConnection(getDb(), enc, runner, conn, undefined, undefined, { onExpired });
+    expect(onExpired).toHaveBeenCalledTimes(1);
+
+    // An ordinary failure is `error`, not an expired login: no hook.
+    const other = await makeConnection("error-no-hook");
+    const onExpired2 = vi.fn();
+    await syncTrConnection(
+      getDb(),
+      enc,
+      runnerWith(async () => {
+        throw new Error("boom");
+      }),
+      other,
+      undefined,
+      undefined,
+      { onExpired: onExpired2 },
+    );
+    expect(onExpired2).not.toHaveBeenCalled();
+  });
+
+  it("a hook that throws does not fail the sync", async () => {
+    const conn = await makeConnection("expired-hook-throws");
+    const result = await syncTrConnection(
+      getDb(),
+      enc,
+      runnerWith(async () => {
+        throw new PytrAuthError();
+      }),
+      conn,
+      undefined,
+      undefined,
+      {
+        onExpired: async () => {
+          throw new Error("push down");
+        },
+      },
+    );
+    expect(result.status).toBe("expired");
+  });
+
+  // A renew that completes while an export is running stores a NEWER session; the finishing
+  // sync must not write the older jar back or flip the renewed connection to expired.
+  it("does not overwrite a session renewed while the export was running", async () => {
+    const conn = await makeConnection("renewed-during-success");
+    const renewed = enc.encryptString("RENEWED_JAR");
+    const runner = runnerWith(async () => {
+      await getDb()
+        .update(trConnections)
+        .set({ sessionEnc: renewed })
+        .where(eq(trConnections.id, conn.id));
+      return { events: [], sessionData: "OLD_JAR_ROLLED_FORWARD" };
+    });
+    const result = await syncTrConnection(getDb(), enc, runner, conn);
+    expect(result.status).toBe("connected");
+    const [row] = await getDb().select().from(trConnections).where(eq(trConnections.id, conn.id));
+    expect(row.sessionEnc).toBe(renewed);
+    expect(row.status).toBe("connected");
+    expect(row.syncing).toBe(false);
+  });
+
+  it("does not flip a connection renewed while the failing export was running", async () => {
+    const conn = await makeConnection("renewed-during-failure");
+    const renewed = enc.encryptString("RENEWED_JAR");
+    const onExpired = vi.fn();
+    const runner = runnerWith(async () => {
+      await getDb()
+        .update(trConnections)
+        .set({ sessionEnc: renewed, syncing: true })
+        .where(eq(trConnections.id, conn.id));
+      throw new PytrAuthError();
+    });
+    const result = await syncTrConnection(getDb(), enc, runner, conn, undefined, undefined, {
+      onExpired,
+    });
+    expect(result.status).toBe("connected");
+    expect(onExpired).not.toHaveBeenCalled();
+    const [row] = await getDb().select().from(trConnections).where(eq(trConnections.id, conn.id));
+    expect(row.status).toBe("connected");
+    expect(row.sessionEnc).toBe(renewed);
+    expect(row.lastError).toBeNull();
+    expect(row.syncing).toBe(false);
+  });
+
   // --- document download tests (#243) ---------------------------------------
 
   it("stages postbox documents for new drafts when documentRetention=true", async () => {

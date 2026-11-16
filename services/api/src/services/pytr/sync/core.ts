@@ -55,6 +55,8 @@ export async function syncTrConnection(
   log?: FastifyBaseLogger,
   /** Optional storage provider for document cleanup on cancellation (#231). */
   storage?: StorageProvider,
+  /** Called once when this sync flipped the connection to `expired` (e.g. to send a push). */
+  hooks?: { onExpired?: () => void | Promise<void> },
 ): Promise<SyncResult> {
   if (!connection.sessionEnc || !connection.portfolioId) {
     log?.warn({ connectionId: connection.id }, "tr sync skipped: missing session/portfolio");
@@ -86,7 +88,10 @@ export async function syncTrConnection(
     // stays in the server log at error level.
     const lastError = sanitizeConnectionError(err);
     log?.error({ connectionId, status, err }, "tr connection flipped");
-    await db
+    // Compare-and-set on the session this export ran with: a renew that completed meanwhile
+    // stored a newer one, and this failure belongs to the old session, so it must not flip
+    // the freshly renewed connection.
+    const flipped = await db
       .update(trConnections)
       .set({
         status,
@@ -94,7 +99,28 @@ export async function syncTrConnection(
         syncing: false,
         updatedAt: new Date(),
       })
-      .where(eq(trConnections.id, connection.id));
+      .where(
+        and(
+          eq(trConnections.id, connection.id),
+          eq(trConnections.sessionEnc, connection.sessionEnc),
+        ),
+      )
+      .returning({ id: trConnections.id });
+    if (flipped.length === 0) {
+      log?.warn({ connectionId }, "tr session was renewed during the sync; failure ignored");
+      await db
+        .update(trConnections)
+        .set({ syncing: false, updatedAt: new Date() })
+        .where(eq(trConnections.id, connection.id));
+      return { status: "connected" };
+    }
+    if (status === "expired") {
+      try {
+        await hooks?.onExpired?.();
+      } catch (hookErr) {
+        log?.warn({ connectionId, err: hookErr }, "tr expired hook failed");
+      }
+    }
     return { status };
   }
 
@@ -465,7 +491,6 @@ export async function syncTrConnection(
   await db
     .update(trConnections)
     .set({
-      sessionEnc: encryption.encryptString(result.sessionData),
       status: "connected",
       lastSyncAt: new Date(),
       lastError: null,
@@ -474,6 +499,14 @@ export async function syncTrConnection(
       ...(reconciliation ? { lastReconciliation: reconciliation } : {}),
     })
     .where(eq(trConnections.id, connection.id));
+  // Persist the refreshed cookie jar only if no renew replaced the session while this sync
+  // ran; writing the older jar back would shorten the new login to the old one's expiry.
+  await db
+    .update(trConnections)
+    .set({ sessionEnc: encryption.encryptString(result.sessionData) })
+    .where(
+      and(eq(trConnections.id, connection.id), eq(trConnections.sessionEnc, connection.sessionEnc)),
+    );
 
   log?.info({ connectionId, reconciled: !!reconciliation }, "tr connection synced");
 

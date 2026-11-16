@@ -705,15 +705,155 @@ describe("Trade Republic connection (encryption enabled)", () => {
       expect(res.json()).toEqual({ error: "not_connected" });
     });
 
-    it("409s already_connected rather than replacing a working session", async () => {
-      const { t } = await pairedUser("tr-renew-healthy", "+4915100000003");
-      const res = await app.inject({
-        method: "POST",
-        url: "/tr/connection/renew",
-        headers: auth(t),
+    // A Trade Republic login lasts 24 h and syncing does not extend it, so renewing a still
+    // working connection early is the normal case. It must never put that connection at risk.
+    describe("renewing a working connection early", () => {
+      const sessionOf = async (portfolioId: string) =>
+        (
+          await getDb()
+            .select()
+            .from(trConnections)
+            .where(eq(trConnections.portfolioId, portfolioId))
+        )[0];
+
+      it("keeps it connected on its session while the new login is pending, then swaps the session", async () => {
+        const { t, portfolioId } = await pairedUser("tr-renew-early", "+4915100000008");
+        const before = (await sessionOf(portfolioId)).sessionEnc;
+
+        const res = await app.inject({
+          method: "POST",
+          url: "/tr/connection/renew",
+          headers: auth(t),
+        });
+        expect(res.statusCode).toBe(202);
+        expect(res.json()).toEqual({ status: "connected", method: "push" });
+        const pending = await sessionOf(portfolioId);
+        expect(pending.status).toBe("connected");
+        expect(pending.sessionEnc).toBe(before);
+
+        fake.approvalResult = "RENEWED_COOKIE_JAR";
+        await getDb()
+          .update(trConnections)
+          .set({ expiryNotifiedFor: new Date() })
+          .where(eq(trConnections.portfolioId, portfolioId));
+        try {
+          const verify = await app.inject({
+            method: "POST",
+            url: "/tr/connection/verify",
+            headers: auth(t),
+          });
+          expect(verify.json()).toEqual({ status: "connected" });
+        } finally {
+          fake.approvalResult = "MOZILLA_COOKIE_JAR";
+        }
+        const after = await sessionOf(portfolioId);
+        expect(after.sessionEnc).not.toBe(before);
+        expect(after.expiryNotifiedFor).toBeNull();
+        expect(after.status).toBe("connected");
       });
-      expect(res.statusCode).toBe(409);
-      expect(res.json()).toEqual({ error: "already_connected" });
+
+      it("a declined renew leaves the working connection untouched", async () => {
+        const { t, portfolioId } = await pairedUser("tr-renew-declined", "+4915100000009");
+        const before = await sessionOf(portfolioId);
+        await app.inject({ method: "POST", url: "/tr/connection/renew", headers: auth(t) });
+
+        fake.approvalResult = new PytrApprovalError("declined");
+        try {
+          const verify = await app.inject({
+            method: "POST",
+            url: "/tr/connection/verify",
+            headers: auth(t),
+          });
+          expect(verify.statusCode).toBe(400);
+          expect(verify.json()).toEqual({ error: "not_approved" });
+        } finally {
+          fake.approvalResult = "MOZILLA_COOKIE_JAR";
+        }
+        const after = await sessionOf(portfolioId);
+        expect(after.status).toBe("connected");
+        expect(after.sessionEnc).toBe(before.sessionEnc);
+        expect(after.lastError).toBeNull();
+      });
+
+      it("still completes when a sync flips the row to expired while the user is approving", async () => {
+        const { t, portfolioId } = await pairedUser("tr-renew-flipped", "+4915100000014");
+        await app.inject({ method: "POST", url: "/tr/connection/renew", headers: auth(t) });
+        // the hourly sync found the (about to lapse) login dead while the push was pending
+        await getDb()
+          .update(trConnections)
+          .set({ status: "expired", lastError: "Trade Republic session expired" })
+          .where(eq(trConnections.portfolioId, portfolioId));
+
+        const verify = await app.inject({
+          method: "POST",
+          url: "/tr/connection/verify",
+          headers: auth(t),
+        });
+        expect(verify.statusCode).toBe(200);
+        expect(verify.json()).toEqual({ status: "connected" });
+        const after = await sessionOf(portfolioId);
+        expect(after.status).toBe("connected");
+        expect(after.lastError).toBeNull();
+      });
+
+      it("cancelling it leaves the connection connected", async () => {
+        const { t, portfolioId } = await pairedUser("tr-renew-early-cancel", "+4915100000010");
+        await app.inject({ method: "POST", url: "/tr/connection/renew", headers: auth(t) });
+        const cancel = await app.inject({
+          method: "POST",
+          url: "/tr/connection/cancel",
+          headers: auth(t),
+        });
+        expect(cancel.statusCode).toBe(204);
+        expect((await sessionOf(portfolioId)).status).toBe("connected");
+        const state = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+        expect(state.json()).toMatchObject({ status: "connected", pairingMethod: null });
+      });
+
+      it("verify still refuses a connected connection with no pairing in flight", async () => {
+        const { t } = await pairedUser("tr-renew-nopair", "+4915100000011");
+        const verify = await app.inject({
+          method: "POST",
+          url: "/tr/connection/verify",
+          headers: auth(t),
+        });
+        expect(verify.statusCode).toBe(409);
+        expect(verify.json()).toEqual({ error: "no_pairing_in_progress" });
+      });
+    });
+
+    it("exposes when the stored login expires, derived from the session", async () => {
+      const t = await token("tr-expiry-get");
+      const portfolioId = await portfolioFor(app, t);
+      await app.inject({
+        method: "POST",
+        url: "/tr/connection",
+        headers: auth(t),
+        payload: { phone: "+4915100000012", pin: "4321", portfolioId },
+      });
+      const exp = Math.floor(Date.now() / 1000) + 3 * 3600;
+      const jwt = `${Buffer.from("{}").toString("base64url")}.${Buffer.from(JSON.stringify({ exp })).toString("base64url")}.s`;
+      fake.approvalResult = `api.traderepublic.com\tFALSE\t/api\tTRUE\t0\ttr_refresh\t${jwt}`;
+      try {
+        await app.inject({ method: "POST", url: "/tr/connection/verify", headers: auth(t) });
+      } finally {
+        fake.approvalResult = "MOZILLA_COOKIE_JAR";
+      }
+      const res = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(res.json().sessionExpiresAt).toBe(new Date(exp * 1000).toISOString());
+
+      // An opaque jar has no readable expiry: null, never a guess.
+      const other = await token("tr-expiry-none");
+      const pf2 = await portfolioFor(app, other);
+      await app.inject({
+        method: "POST",
+        url: "/tr/connection",
+        headers: auth(other),
+        payload: { phone: "+4915100000013", pin: "4321", portfolioId: pf2 },
+      });
+      await app.inject({ method: "POST", url: "/tr/connection/verify", headers: auth(other) });
+      const none = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(other) });
+      expect(none.json().sessionExpiresAt).toBeNull();
     });
 
     it("409s sync_in_progress while a sync is running", async () => {

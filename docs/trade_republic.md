@@ -63,6 +63,36 @@ answered the approval poll with a status pytr doesn't treat as pending or confir
 vendored login tolerated a response with no terminal state if it set a session cookie; pytr's
 does not.
 
+## Session lifetime and early renew
+
+A Trade Republic login lasts **24 hours**, and syncing does not extend it. The `tr_refresh` cookie
+is a JWT whose `exp` is its issue time plus 24 h; the cookies in the stored jar carry no cookie
+expiry (they are session cookies), and the hourly sync only refreshes the short-lived `tr_session`
+token. So a pairing stops working exactly a day later, the first sync after that fails and the
+connection flips to `expired`. Renewing is therefore a daily routine, not an exceptional event.
+
+The expiry is derived, never stored: `sessionExpiresAt` (`services/pytr/session-expiry.ts`)
+reads only the `exp` claim of `tr_refresh` from the stored jar, and `GET /tr/connection` returns it
+as `sessionExpiresAt` (null when there is no session or it cannot be read).
+
+- **Banner:** from 6 hours before expiry (`RENEW_BANNER_WINDOW_MS`) Holdings shows a neutral
+  "expires in about N h" banner; its Renew starts straight away.
+- **Push notification** (needs Web Push, `docs/notifications.md`): one push when a sync finds the
+  login within 3 hours of expiring (`RENEW_NOTIFY_WINDOW_MS`, so it lands 2 to 3 hours before,
+  since syncs run hourly), and one when the connection expires. They share a tag, so the second
+  replaces the first. `tr_connections.expiry_notified_for` remembers the expiry already warned
+  about; a renew has a new expiry and re-arms it. A push no device received is not recorded, so
+  enabling notifications later still gets one. Push text is English only (no per-user locale is
+  stored).
+- **Early renew is non-destructive.** `POST /tr/connection/renew` on a `connected` connection
+  leaves the status and session untouched while the new login is pending; a declined, timed-out
+  or cancelled attempt changes nothing (verify only writes `error` when the row was not
+  `connected`). Only an approved login replaces the session. The flow trusts `verify`'s own result
+  there, since the status is `connected` throughout.
+- **A renew that finishes during a sync is not undone.** The sync writes its refreshed cookie jar
+  (and any failure) only if the stored session is still the one it started with
+  (compare-and-set on `session_enc`), so an older jar can never shorten a fresh login.
+
 ## Expired login and one-tap renew
 
 Trade Republic ends a web session after a while. The app finds out when a sync cannot resume
@@ -77,9 +107,8 @@ The Holdings page shows a banner for an `expired` or `error` connection with a *
 `POST /tr/connection/renew` starts a fresh push login from the stored (encrypted) phone and PIN,
 so the user only confirms in the Trade Republic app (an authenticator-app account is asked for
 its 6-digit code). It completes through `POST /tr/connection/verify` like a first pairing, after
-which the banner triggers a sync. Renew answers `409 not_connected` with nothing to renew,
-`409 already_connected` for a working connection (its session is only replaced by a login that
-succeeds) and `409 sync_in_progress` while a sync runs. The full form stays available for
+which the banner triggers a sync. Renew answers `409 not_connected` with nothing to renew and
+`409 sync_in_progress` while a sync runs. The full form stays available for
 different credentials.
 
 Backing out of a renew (`POST /tr/connection/cancel`) only stops the login and keeps the saved

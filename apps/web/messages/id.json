@@ -1992,6 +1992,12 @@
     "expiredHint": "Sesi Anda kedaluwarsa. Hubungkan kembali untuk melanjutkan sinkronisasi.",
     "banner": {
       "action": "Perbarui",
+      "dialogHintExpiring": "Memperbarui sekarang mengganti login Anda sebelum kedaluwarsa. Konfirmasi di aplikasi Trade Republic; sinkronisasi tetap berjalan.",
+      "expiring": {
+        "title": "Login Trade Republic kedaluwarsa sekitar {hours} jam lagi.",
+        "titleNow": "Login Trade Republic segera kedaluwarsa.",
+        "body": "Perbarui sekarang (satu ketukan, lalu konfirmasi di aplikasi) agar sinkronisasi tidak terputus."
+      },
       "dialogHintError": "Sinkronisasi Trade Republic terakhir gagal. Memperbarui memakai nomor telepon dan PIN yang tersimpan, jadi Anda hanya perlu konfirmasi di aplikasi Trade Republic.",
       "dialogTitle": "Perbarui login Trade Republic",
       "expired": {
@@ -2021,7 +2027,6 @@
       "sync_in_progress": "Sinkronisasi sedang berjalan. Coba lagi setelah selesai.",
       "tr_child_account_unsupported": "Akun anak Trade Republic belum didukung.",
       "no_pairing_in_progress": "Tidak ada login yang sedang berlangsung. Mulai lagi.",
-      "already_connected": "Sudah terhubung.",
       "tr_sync_failed": "Sinkronisasi gagal. Silakan coba lagi."
     }
   },

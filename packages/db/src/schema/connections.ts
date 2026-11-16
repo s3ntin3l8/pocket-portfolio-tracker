@@ -20,6 +20,9 @@ export const trConnections = pgTable("tr_connections", {
   lastReconciliation: jsonb("last_reconciliation"),
   lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
   lastError: text("last_error"),
+  // The session expiry (`tr_refresh` exp, derived from `sessionEnc`) the "login expires soon"
+  // push was already sent for: one push per pairing, and a renew (new expiry) re-arms it.
+  expiryNotifiedFor: timestamp("expiry_notified_for", { withTimezone: true }),
   syncing: boolean("syncing").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

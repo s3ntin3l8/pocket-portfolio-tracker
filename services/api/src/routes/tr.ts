@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { eq } from "drizzle-orm";
 import { trConnections } from "@portfolio/db";
-import { serialize, getConnection } from "./tr/_shared.js";
+import { serialize, getConnection, storedSessionExpiry } from "./tr/_shared.js";
 import { registerPairingRoutes } from "./tr/pairing.js";
 import { registerSyncRoutes } from "./tr/sync.js";
 import { registerDocumentRoutes } from "./tr/documents.js";
@@ -10,7 +10,8 @@ export async function trRoute(app: FastifyInstance) {
   // Current connection state (no secrets).
   app.get("/tr/connection", { preHandler: app.authenticate }, async (request) => {
     const id = request.userId;
-    return serialize(await getConnection(app, id), app.pytr.pairingMethod(id));
+    const conn = await getConnection(app, id);
+    return serialize(conn, app.pytr.pairingMethod(id), storedSessionExpiry(app, conn));
   });
 
   registerPairingRoutes(app);

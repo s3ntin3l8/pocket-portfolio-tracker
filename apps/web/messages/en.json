@@ -1992,6 +1992,12 @@
     "expiredHint": "Your session expired. Reconnect to resume syncing.",
     "banner": {
       "action": "Renew",
+      "dialogHintExpiring": "Renewing now replaces your login before it expires. Confirm in the Trade Republic app; syncing keeps working meanwhile.",
+      "expiring": {
+        "title": "Trade Republic login expires in about {hours} h.",
+        "titleNow": "Trade Republic login is about to expire.",
+        "body": "Renew it now (one tap, then confirm in the app) to avoid a gap in syncing."
+      },
       "dialogHintError": "The last Trade Republic sync failed. Renewing reuses your saved phone number and PIN, so you only confirm in the Trade Republic app.",
       "dialogTitle": "Renew Trade Republic login",
       "expired": {
@@ -2021,7 +2027,6 @@
       "sync_in_progress": "A sync is running. Try again when it finishes.",
       "tr_child_account_unsupported": "Trade Republic child accounts aren't supported yet.",
       "no_pairing_in_progress": "No login is in progress. Start again.",
-      "already_connected": "Already connected.",
       "tr_sync_failed": "Sync failed. Please try again."
     }
   },

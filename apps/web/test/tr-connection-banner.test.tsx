@@ -8,7 +8,9 @@ const refresh = vi.fn();
 const api = {
   connectTr: vi.fn(),
   cancelTrPairing: vi.fn(async () => undefined),
-  renewTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
+  renewTr: vi.fn<
+    () => Promise<{ status: TrConnection["status"]; method: "push" | "authenticator" }>
+  >(async () => ({ status: "awaiting_2fa", method: "push" })),
   verifyTr: vi.fn(async () => ({ status: "connected" as const })),
   syncTr: vi.fn(async () => ({ queued: true })),
   disconnectTr: vi.fn(),
@@ -138,6 +140,43 @@ describe("TrConnectionBanner", () => {
     renderBanner({ ...base, status: "error" });
     fireEvent.click(screen.getByRole("button", { name: "Renew" }));
     expect(await screen.findByText(/last Trade Republic sync failed/)).toBeTruthy();
+  });
+
+  describe("a login that is about to expire", () => {
+    const inHours = (h: number) => new Date(Date.now() + h * 3_600_000 - 60_000).toISOString();
+    const working = (sessionExpiresAt: string | null): TrConnection => ({
+      ...base,
+      status: "connected",
+      lastError: null,
+      sessionExpiresAt,
+    });
+
+    it("says how long is left and renews in one tap (starts by itself, no sync needed)", async () => {
+      api.renewTr.mockResolvedValueOnce({ status: "connected", method: "push" });
+      api.syncTr.mockClear();
+      renderBanner(working(inHours(3)));
+      expect(screen.getByText(/expires in about 3 h/)).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Renew" }));
+      await waitFor(() => expect(api.renewTr).toHaveBeenCalled());
+      await waitFor(() => expect(api.verifyTr).toHaveBeenCalled());
+      await waitFor(() => expect(refresh).toHaveBeenCalled());
+      // It never stopped syncing, so there is nothing to catch up on.
+      expect(api.syncTr).not.toHaveBeenCalled();
+    });
+
+    it("says it is about to expire once the time has run out but the sync has not noticed", () => {
+      renderBanner(working(new Date(Date.now() - 60_000).toISOString()));
+      expect(screen.getByText(/about to expire/)).toBeTruthy();
+    });
+
+    it("stays quiet with plenty of time left or an unknown expiry", () => {
+      for (const c of [working(inHours(10)), working(null)]) {
+        const { container, unmount } = renderBanner(c);
+        expect(container.textContent).toBe("");
+        unmount();
+      }
+    });
   });
 
   it("flags a failed sync with its own wording", () => {

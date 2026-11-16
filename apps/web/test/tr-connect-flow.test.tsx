@@ -43,6 +43,7 @@ function renderFlow(
   client: TrConnectClient,
   initial: TrConnection = DISCONNECTED,
   cashCounted = false,
+  extra: { autoRenew?: boolean; compact?: boolean } = {},
 ) {
   const onChanged = vi.fn();
   render(
@@ -53,6 +54,7 @@ function renderFlow(
         cashCounted={cashCounted}
         initial={initial}
         onChanged={onChanged}
+        {...extra}
       />
     </NextIntlClientProvider>,
   );
@@ -67,6 +69,73 @@ const CONNECTED: TrConnection = {
   lastReconciliation: null,
   syncing: false,
 };
+
+// A Trade Republic login lasts 24 h and syncing does not extend it, so renewing a connection
+// that still works is routine. The status stays `connected` throughout, so verify's own result
+// is the outcome and a failure must leave the working connection alone.
+describe("TrConnectFlow early renew of a working connection", () => {
+  const early = (over: Partial<TrConnectClient> = {}) =>
+    makeClient({
+      renewTr: vi.fn(async () => ({ status: "connected" as const, method: "push" as const })),
+      ...over,
+    });
+
+  it("renews on mount, trusts verify (no status poll) and reports the change", async () => {
+    const client = early();
+    const onChanged = renderFlow(client, CONNECTED, false, { autoRenew: true, compact: true });
+
+    await waitFor(() => expect(client.renewTr).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(client.verifyTr).toHaveBeenCalledWith());
+    await waitFor(() => expect(onChanged).toHaveBeenCalledTimes(1));
+    expect(client.getTrConnection).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: /Sync now/ })).toBeTruthy();
+  });
+
+  it("a declined renew shows why and leaves the connected view, not the login form", async () => {
+    const client = early({
+      verifyTr: vi.fn(async () => {
+        throw new ApiError(400, JSON.stringify({ error: "not_approved" }));
+      }),
+    });
+    const onChanged = renderFlow(client, CONNECTED, false, { autoRenew: true, compact: true });
+
+    expect(await screen.findByText(/wasn't approved in the Trade Republic app/)).toBeTruthy();
+    expect(await screen.findByRole("button", { name: /Sync now/ })).toBeTruthy();
+    expect(screen.queryByLabelText("Phone number")).toBeNull();
+    expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it("cancelling keeps the connection and ignores the attempt's late result", async () => {
+    let rejectVerify: (e: unknown) => void = () => undefined;
+    const client = early({
+      verifyTr: vi.fn(
+        () =>
+          new Promise<{ status: "connected" }>((_resolve, reject) => {
+            rejectVerify = reject;
+          }),
+      ),
+    });
+    const onChanged = renderFlow(client, CONNECTED, false, { autoRenew: true, compact: true });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(client.cancelTrPairing).toHaveBeenCalledTimes(1));
+    expect(client.disconnectTr).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: /Sync now/ })).toBeTruthy();
+    // The host (the banner) re-reads the connection on every change, including a cancel.
+    expect(onChanged).toHaveBeenCalledTimes(1);
+
+    // The abandoned long-poll finally fails: it must not surface an error for a cancelled try.
+    rejectVerify(new ApiError(400, JSON.stringify({ error: "not_approved" })));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByText(/wasn't approved/)).toBeNull();
+  });
+
+  it("does not start a renew by itself without autoRenew", () => {
+    const client = early();
+    renderFlow(client, CONNECTED, false, { compact: true });
+    expect(client.renewTr).not.toHaveBeenCalled();
+  });
+});
 
 describe("TrConnectFlow", () => {
   it("walks connect → awaiting approval → connected (auto-polls, no code)", async () => {
