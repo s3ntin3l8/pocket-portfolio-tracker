@@ -82,17 +82,38 @@ export const FIXED_ACTIONS: Record<string, ParsedAction> = {
   SSP_SECURITIES_TRANSFER_INCOMING: "transfer_in",
 };
 
-export const TRADE_EVENTS = new Set(["ORDER_EXECUTED", "TRADE_INVOICE", "TRADING_TRADE_EXECUTED"]);
+export const TRADE_EVENTS = new Set([
+  "ORDER_EXECUTED",
+  "TRADE_INVOICE",
+  "TRADING_TRADE_EXECUTED",
+  // A distribution reinvested into more shares: a buy of the shares it bought (negative cash).
+  "DIVIDEND_REINVESTMENT_TRADE_EXECUTED",
+]);
 
 export const CASH_BY_SIGN = new Set(["JUNIOR_P2P_TRANSFER", "SSP_TAX_CORRECTION", "CARD_AFT"]);
 
 export const CASH_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_CASH";
+
+/** A cash distribution TR files as "non-dividend" (e.g. a BDC's supplemental/special distribution):
+ *  still income, so it maps like `SSP_CORPORATE_ACTION_CASH`. */
+export const CASH_NON_DIVIDEND_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND";
+
+/** Cash paid for new shares in a corporate action (a scrip/reinvestment): maps like
+ *  `SSP_CORPORATE_ACTION_INSTRUMENT` with a booked amount — a buy of the shares received. */
+export const CASH_AND_STOCK_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_CASH_AND_STOCK";
 
 export const NO_CASH_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_NO_CASH";
 
 export const SHARE_CORPORATE_ACTION = "SSP_CORPORATE_ACTION_INSTRUMENT";
 
 export const SKIP_EVENTS = new Map<string, string>([
+  [
+    "CARD_OCT",
+    // An original-credit transaction onto the card: here always "VisaBonus-Cashback" (cents). Booking
+    // it as a deposit made the derived cash balance overshoot TR's reported one, so it is left out
+    // until the reconciliation against TR's balance is understood (tracked separately).
+    "card cashback credit (not booked: would break the cash reconciliation)",
+  ],
   ["CARD_VERIFICATION", "card verification (no cash movement)"],
   ["TRADING_SAVINGSPLAN_EXECUTION_FAILED", "failed savings-plan execution"],
   ["ORDER_CREATED", "order created (no fill, no cash)"],

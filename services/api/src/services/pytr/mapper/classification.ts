@@ -4,6 +4,8 @@ import {
   TRADE_EVENTS,
   CARD_EVENTS,
   CASH_CORPORATE_ACTION,
+  CASH_NON_DIVIDEND_CORPORATE_ACTION,
+  CASH_AND_STOCK_CORPORATE_ACTION,
   SHARE_CORPORATE_ACTION,
   NO_CASH_CORPORATE_ACTION,
 } from "./taxonomy.js";
@@ -26,7 +28,9 @@ export function categoryForEventType(eventType: string): ImportCategory {
   if (CARD_EVENTS.has(eventType)) return "card";
   if (TRADE_EVENTS.has(eventType)) return "trade";
   if (eventType === CASH_CORPORATE_ACTION) return "income";
+  if (eventType === CASH_NON_DIVIDEND_CORPORATE_ACTION) return "income";
   if (eventType === SHARE_CORPORATE_ACTION) return "income";
+  if (eventType === CASH_AND_STOCK_CORPORATE_ACTION) return "income";
   if (eventType === NO_CASH_CORPORATE_ACTION) return "income";
   const action = FIXED_ACTIONS[eventType];
   if (
