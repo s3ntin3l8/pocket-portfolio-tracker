@@ -603,21 +603,41 @@ describe("mapTrEventToDraft", () => {
     expect(categoryForEventType("SSP_CORPORATE_ACTION_CASH_NON_DIVIDEND")).toBe("income");
   });
 
-  it("skips CARD_OCT cashback credits as info, so they are neither booked nor an unmapped gap", () => {
+  it("maps CARD_OCT cashback credits to a deposit draft tagged kind=cashback", () => {
     const result = mapTrEventToDraft({
       ...base,
       eventType: "CARD_OCT",
       amount: 0.35,
       title: "VisaBonus-Cashback",
     });
-    expect(result).toMatchObject({ skip: true, severity: "info" });
-    if ("skip" in result) {
-      expect(result.code).toBeUndefined();
-      expect(result.reason).toMatch(/cashback/);
-    }
+    expect(result).toMatchObject({
+      draft: {
+        action: "deposit",
+        kind: "cashback",
+        quantity: "0",
+        price: "0.35",
+        total: "0.35",
+        externalId: base.id,
+      },
+    });
+    expect(categoryForEventType("CARD_OCT")).toBe("card");
   });
 
-  it("no longer reports any of these four types as unmapped when a batch is mapped", () => {
+  it("maps a batch of CARD_OCT events to one deposit each, none reported as unmapped", () => {
+    const { drafts, errors } = mapTrEvents([
+      { ...base, id: "c1", eventType: "CARD_OCT", amount: 0.35 },
+      { ...base, id: "c2", eventType: "CARD_OCT", amount: 0.8 },
+      { ...base, id: "c3", eventType: "CARD_OCT", amount: 1.02 },
+    ]);
+    expect(drafts.map((d) => [d.action, d.externalId])).toEqual([
+      ["deposit", "c1"],
+      ["deposit", "c2"],
+      ["deposit", "c3"],
+    ]);
+    expect(errors).toEqual([]);
+  });
+
+  it("no longer reports any of these three types as unmapped when a batch is mapped", () => {
     const { drafts, errors } = mapTrEvents([
       {
         ...base,
@@ -642,7 +662,6 @@ describe("mapTrEventToDraft", () => {
         isin: "US56035L1044",
         amount: 4.5,
       },
-      { ...base, id: "e4", eventType: "CARD_OCT", amount: 0.35 },
     ]);
     expect(drafts.map((d) => d.action)).toEqual(["buy", "buy", "dividend"]);
     expect(errors.filter((e) => e.code === "unmapped_event_type")).toEqual([]);
