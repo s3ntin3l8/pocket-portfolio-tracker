@@ -295,6 +295,29 @@ describe("TrConnectFlow", () => {
     expect(onChanged).toHaveBeenCalled();
   });
 
+  it("points a failed renew at the WAF token field and expands it", async () => {
+    const client = makeClient({
+      renewTr: vi.fn(async () => {
+        throw new ApiError(502, JSON.stringify({ error: "tr_pairing_failed" }));
+      }),
+    });
+    renderFlow(client, {
+      status: "expired",
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: "Trade Republic session expired",
+      lastReconciliation: null,
+      syncing: false,
+    });
+    expect(screen.queryByLabelText(/aws-waf-token/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Renew login/ }));
+
+    expect(await screen.findByText(/paste an aws-waf-token/)).toBeTruthy();
+    expect(screen.getByLabelText(/aws-waf-token/)).toBeTruthy();
+    expect(client.connectTr).not.toHaveBeenCalled();
+  });
+
   it("cancelling a renew keeps the saved credentials (no disconnect)", async () => {
     const client = makeClient({
       verifyTr: vi.fn(() => new Promise<{ status: "connected" }>(() => undefined)),

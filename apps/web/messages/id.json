@@ -2006,6 +2006,7 @@
     "renewHint": "Login Trade Republic Anda kedaluwarsa. Memperbarui memakai nomor telepon dan PIN yang tersimpan, jadi Anda hanya perlu konfirmasi di aplikasi Trade Republic.",
     "renew": "Perbarui login",
     "useOtherCredentials": "Atau masukkan kredensial lain di bawah.",
+    "renewNeedsWafToken": "Perpanjang dengan login tersimpan tidak berhasil. Masukkan nomor telepon dan PIN di bawah, lalu tempel aws-waf-token di bagian Lanjutan.",
     "error": "Terjadi kesalahan. Silakan coba lagi.",
     "boundElsewhere": "Akun Trade Republic ini terhubung ke portofolio lain. Menghubungkan di sini akan memindahkannya ke portofolio ini.",
     "errors": {
