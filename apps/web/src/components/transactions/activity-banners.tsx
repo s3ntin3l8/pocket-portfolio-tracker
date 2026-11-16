@@ -171,10 +171,13 @@ export function ReconciliationBanner({
   dismissLabel,
   onDismiss,
   action,
+  rows,
 }: {
   title: string;
   detail: string;
   tag: string;
+  /** Further gaps bundled under the same banner (each its own detail line + link). */
+  rows?: { key: string; detail: string; action?: { href: string; label: string } }[];
   /** A link to where the gap can be looked at / fixed (the holding, the connection). */
   action?: { href: string; label: string };
   /** Accessible name for the dismiss button — this component takes pre-resolved
@@ -190,15 +193,19 @@ export function ReconciliationBanner({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-bold">{title}</p>
-        <p className="text-xs text-muted-foreground">{detail}</p>
-        {action && (
-          <Link
-            href={action.href}
-            className="mt-1.5 inline-block text-xs font-semibold text-warn-strong underline-offset-2 hover:underline"
-          >
-            {action.label}
-          </Link>
-        )}
+        {[{ key: "main", detail, action }, ...(rows ?? [])].map((r, i) => (
+          <div key={r.key} className={i === 0 ? undefined : "mt-2"}>
+            <p className="text-xs text-muted-foreground">{r.detail}</p>
+            {r.action && (
+              <Link
+                href={r.action.href}
+                className="mt-1 inline-block text-xs font-semibold text-warn-strong underline-offset-2 hover:underline"
+              >
+                {r.action.label}
+              </Link>
+            )}
+          </div>
+        ))}
       </div>
       <span className="shrink-0 rounded-md bg-warning/15 px-2 py-1 text-micro font-bold uppercase tracking-wide text-warn-strong">
         {tag}

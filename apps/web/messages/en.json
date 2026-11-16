@@ -2451,11 +2451,10 @@
     },
     "dismiss": "Dismiss warning",
     "reconciliationTitle": "Cash doesn't reconcile",
+    "reconciliationGroupTitle": "Broker data doesn't reconcile",
     "reconciliationPositionTitle": "Position doesn't reconcile",
     "viewHolding": "View holding",
     "openConnection": "Open connection",
-    "unmappedTitle": "Broker events not imported",
-    "openConnections": "Open connections",
     "dismissForNow": "Hide for now",
     "portfolioTag": "Portfolio"
   },

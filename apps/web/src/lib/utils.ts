@@ -230,12 +230,23 @@ export function rowAnomalyCounts(anomalies: Anomaly[]): { errors: number; warnin
   return { errors, warnings };
 }
 
+/** Broker reconciliation gaps — the only anomalies a bundled banner titles as "reconciliation". */
+export function isReconciliationAnomaly(code: string): boolean {
+  return (
+    code === "reconciliation_gap" || code === "reconciliation_drift" || code === "position_gap"
+  );
+}
+
 /**
  * Anomalies with nowhere to attach as a row — always render these as their own standalone
  * banner (e.g. ReconciliationBanner), never fold them into the row-count headline.
  */
-export function bannerAnomalies<T extends { transactionId?: string }>(anomalies: T[]): T[] {
-  return anomalies.filter((a) => !isRowAnomaly(a));
+export function bannerAnomalies<T extends { transactionId?: string; code?: string }>(
+  anomalies: T[],
+): T[] {
+  // Unmapped broker events are a data-mapping problem the user cannot act on: they belong
+  // to the admin (Jobs page + badge), never to a user-facing banner.
+  return anomalies.filter((a) => !isRowAnomaly(a) && a.code !== "unmapped_broker_events");
 }
 
 /**
@@ -376,6 +387,7 @@ export function formatRatio(value: number, locale = "en") {
 
 export interface ReconciliationItem {
   key: string;
+  code: string;
   title: string;
   detail: string;
   tag: string;
@@ -399,30 +411,24 @@ export function reconciliationItem(
 ): ReconciliationItem {
   const meta = a.meta ?? {};
   const isPosition = a.code === "position_gap";
-  const isUnmapped = a.code === "unmapped_broker_events";
   const portfolioId = typeof meta.portfolioId === "string" ? meta.portfolioId : fallbackPortfolioId;
-  // Same code+subject can occur once per portfolio in the aggregate view.
-  const key = [a.code, meta.currency ?? meta.isin ?? meta.eventType ?? "", portfolioId ?? ""].join(
-    ":",
-  );
+  // Same code+subject can occur once per portfolio (aggregate view) and once per broker.
+  const key = [
+    a.code,
+    meta.currency ?? meta.isin ?? meta.eventType ?? "",
+    portfolioId ?? "",
+    ...(typeof meta.broker === "string" ? [meta.broker] : []),
+  ].join(":");
   let action: ReconciliationItem["action"];
   if (isPosition && typeof meta.instrumentId === "string") {
     action = { href: `/instruments/${meta.instrumentId}`, label: ta("viewHolding") };
-  } else if (isUnmapped) {
-    // The types are listed in Settings › Data & connections (`UnmappedTypesAlert`).
-    action = { href: "/settings/connections", label: ta("openConnections") };
   } else if (!isPosition && portfolioId) {
     action = { href: `/settings/portfolios/${portfolioId}`, label: ta("openConnection") };
   }
   return {
     key,
-    title: ta(
-      isUnmapped
-        ? "unmappedTitle"
-        : isPosition
-          ? "reconciliationPositionTitle"
-          : "reconciliationTitle",
-    ),
+    code: a.code,
+    title: ta(isPosition ? "reconciliationPositionTitle" : "reconciliationTitle"),
     detail: anomalyLabel(a, ta, locale),
     tag: ta("portfolioTag"),
     // A portfolio-scoped anomaly points at no transaction, so the server-side dismissal

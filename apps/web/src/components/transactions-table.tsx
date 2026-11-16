@@ -8,6 +8,7 @@ import { ListFilter } from "lucide-react";
 import { useRegisterPageCommands } from "@/components/page-commands";
 import { useApiClient } from "@/lib/api";
 import { Spinner } from "@/components/ui/spinner";
+import { ReconciliationBannerGroup } from "@/components/reconciliation-banner-group";
 import { bannerAnomalies, reconciliationItem, cn, type AnomalyTranslator } from "@/lib/utils";
 import { useTableSort } from "@/lib/table-sort";
 import { useLongPressSelect } from "@/lib/use-long-press-select";
@@ -18,7 +19,6 @@ import {
   AllFilterBanner,
   IncomeFilterBanner,
   TradeFilterBanner,
-  ReconciliationBanner,
 } from "@/components/transactions/activity-banners";
 import type { Anomaly } from "@portfolio/api-client";
 import type { PickablePortfolio } from "@/components/portfolio-picker";
@@ -116,7 +116,6 @@ export function TransactionsTable({
   const [showFlagged, setShowFlagged] = useState(false);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [headerPinned, setHeaderPinned] = useState(false);
-  const [dismissedRecon, setDismissedRecon] = useState<Set<string>>(new Set());
 
   const { flaggedRows, flaggedLoading } = useFlaggedRows(showFlagged, anomalyByTxId, portfolioId);
 
@@ -469,20 +468,12 @@ export function TransactionsTable({
                 onDismiss={() => setBannerDismissed(true)}
               />
             )}
-            {showFilterBanners &&
-              reconciliationItems
-                .filter((item) => !dismissedRecon.has(item.key))
-                .map((item) => (
-                  <ReconciliationBanner
-                    key={item.key}
-                    title={item.title}
-                    detail={item.detail}
-                    tag={item.tag}
-                    dismissLabel={item.dismissLabel}
-                    action={item.action}
-                    onDismiss={() => setDismissedRecon((prev) => new Set(prev).add(item.key))}
-                  />
-                ))}
+            {showFilterBanners && (
+              <ReconciliationBannerGroup
+                items={reconciliationItems}
+                groupTitle={ta("reconciliationGroupTitle")}
+              />
+            )}
           </div>
           <FilterBar
             typeFilter={typeFilter}

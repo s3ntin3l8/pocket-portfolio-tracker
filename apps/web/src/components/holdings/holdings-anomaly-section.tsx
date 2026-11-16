@@ -18,8 +18,8 @@ import {
  * negative_cash, …). Unlike Transactions, Holdings is a positions list — it has no
  * transaction rows and no "Show flagged only" filter, so a row-attached anomaly can never
  * be located ON this page; it links to Transactions instead, where it can. Anomalies with
- * nowhere to attach at all (reconciliation_gap, position_gap, …) are rendered as their own
- * labeled ReconciliationBanner — already fully locatable right here, no link needed (see
+ * nowhere to attach at all (reconciliation_gap, position_gap, …) are rendered together as one
+ * labeled ReconciliationBanner (a group title when several) — already fully locatable right here, no link needed (see
  * apps/web/src/lib/utils.ts `isRowAnomaly` for why this is a transactionId partition, not a
  * hardcoded code list).
  */
@@ -67,6 +67,7 @@ export async function HoldingsAnomalySection({ scope, locale }: { scope: Scope; 
         </div>
       )}
       <ReconciliationBannerGroup
+        groupTitle={ta("reconciliationGroupTitle")}
         items={standaloneAnomalies.map((a) =>
           reconciliationItem(
             a,
