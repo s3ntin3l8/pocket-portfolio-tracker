@@ -198,7 +198,20 @@ export function registerInsightsRoutes(app: FastifyInstance) {
         });
 
         // ── Drawdown ───────────────────────────────────────────────────
-        const drawdown = maxDrawdown(indexed.map((p) => ({ date: p.date, netWorth: p.index })));
+        const drawdownCore = maxDrawdown(indexed.map((p) => ({ date: p.date, netWorth: p.index })));
+        // Size context for the card. The index is time-weighted, so a drawdown that happened while
+        // the portfolio held a tiny position reads the same as one on a large book. Report the
+        // holdings value (the series the index is chained on, display currency) on the peak days
+        // and today, so the card can say how big the book was when the high was set.
+        const valueOn = (date: string | null): string | null =>
+          (date && aggregated.find((p) => p.date === date)?.marketValue) || null;
+        const drawdown = {
+          ...drawdownCore,
+          peakValue: valueOn(drawdownCore.peakDate),
+          currentPeakValue: valueOn(drawdownCore.currentPeakDate),
+          currentValue:
+            aggregated.length > 0 ? aggregated[aggregated.length - 1]!.marketValue : null,
+        };
 
         // ── Volatility & Sharpe ────────────────────────────────────────
         const idxPoints = indexed.map((p) => ({ date: p.date, index: p.index }));

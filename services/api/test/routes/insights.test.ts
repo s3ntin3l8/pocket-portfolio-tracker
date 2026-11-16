@@ -182,6 +182,13 @@ describe("GET /insights", () => {
 
     expect(Number(flat.json().drawdown.maxDrawdownPct)).toBeCloseTo(0, 6);
     expect(Number(crash.json().drawdown.maxDrawdownPct)).toBeCloseTo(-0.5, 6);
+    // Size context for the card: the holdings value on the high (1,000,000), on the high the
+    // current drawdown is measured against (the same day here) and today (500,000 after the halving).
+    const ctx = crash.json().drawdown;
+    expect(ctx.currentPeakDate).toBe("2026-01-01");
+    expect(Number(ctx.peakValue)).toBe(1_000_000);
+    expect(Number(ctx.currentPeakValue)).toBe(1_000_000);
+    expect(Number(ctx.currentValue)).toBe(500_000);
     // The aggregate blends both portfolios, so it lands strictly between the two —
     // proving portfolioId genuinely filters rather than being ignored.
     const aggDd = Number(aggregate.json().drawdown.maxDrawdownPct);

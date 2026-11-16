@@ -128,5 +128,29 @@ describe("maxDrawdown", () => {
       expect(r.maxDrawdownPct).toBe("-1");
       expect(r.currentDrawdownPct).toBe("-1");
     });
+
+    it("reports the all-time-high date the current drawdown is measured against", () => {
+      // Deepest drop 100 → 50 (a recovered episode: back to 100 on 01-05), then a NEW high of 200
+      // and a fall to 150 today. The max episode peaks on 01-01, but "current" is measured
+      // against the 01-06 high — the two dates differ.
+      const r = maxDrawdown([
+        pt("2026-01-01", "100"),
+        pt("2026-01-02", "50"),
+        pt("2026-01-05", "100"),
+        pt("2026-01-06", "200"),
+        pt("2026-01-07", "150"),
+      ]);
+      expect(r.peakDate).toBe("2026-01-01");
+      expect(r.maxDrawdownPct).toBe("-0.5");
+      expect(r.currentPeakDate).toBe("2026-01-06");
+      expect(r.currentDrawdownPct).toBe("-0.25"); // 150 / 200 - 1
+    });
+
+    it("has no current peak date without a positive value", () => {
+      expect(maxDrawdown([]).currentPeakDate).toBeNull();
+      expect(
+        maxDrawdown([pt("2026-01-01", "0"), pt("2026-01-02", "-5")]).currentPeakDate,
+      ).toBeNull();
+    });
   });
 });

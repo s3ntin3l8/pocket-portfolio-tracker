@@ -231,7 +231,11 @@ export default async function InsightsPage({ params }: { params: Promise<{ local
 
           {insightsData && (
             <>
-              <DrawdownCard drawdown={insightsData.drawdown} locale={locale} />
+              <DrawdownCard
+                drawdown={insightsData.drawdown}
+                locale={locale}
+                currency={summary.displayCurrency}
+              />
               <VolatilityCard volatility={insightsData.volatility} locale={locale} />
               <StreaksCard streaks={insightsData.streaks} locale={locale} />
               <BenchmarkCard
