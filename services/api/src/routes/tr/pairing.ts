@@ -106,10 +106,8 @@ export function registerPairingRoutes(app: FastifyInstance) {
 
   // One-tap renew: the stored (encrypted) phone + PIN start a fresh push login, so the user
   // only confirms in the Trade Republic app. Completion reuses POST /tr/connection/verify.
-  // A Trade Republic login lasts 24 h and is not extended by syncing, so renewing a still
-  // `connected` connection early is the normal case. That renew is non-destructive: the row
-  // stays `connected` on the working session, and a declined / timed-out / cancelled attempt
-  // leaves it exactly as it was (only a login that succeeds replaces the session).
+  // Only a connection that already needs attention (or is mid-pairing) can be renewed: a
+  // working one keeps its session until a login actually replaces it.
   app.post("/tr/connection/renew", { preHandler: app.authenticate }, async (request, reply) => {
     const id = request.userId;
     if (!app.encryption.isEnabled) {
@@ -120,6 +118,9 @@ export function registerPairingRoutes(app: FastifyInstance) {
       return reply.code(409).send({ error: "not_connected" });
     }
     if (conn.syncing) return reply.code(409).send({ error: "sync_in_progress" });
+    if (conn.status === "connected") {
+      return reply.code(409).send({ error: "already_connected" });
+    }
 
     request.log.info({ userId: id }, "tr renew started");
     const started = await beginPairing(app, request, id, {
@@ -128,21 +129,15 @@ export function registerPairingRoutes(app: FastifyInstance) {
     });
     if ("reply" in started) return reply.code(started.reply.code).send(started.reply.body);
 
-    // A working connection keeps its status (and session) while the new login is pending.
-    if (conn.status !== "connected") {
-      await app.db
-        .update(trConnections)
-        // `lastError` is kept on purpose: with `sessionEnc` it marks a connection that existed
-        // before this pairing (see `wasConnectedBefore`), so an abandoned renew can be recovered.
-        .set({ status: "awaiting_2fa", updatedAt: new Date() })
-        .where(eq(trConnections.userId, id));
-    }
+    await app.db
+      .update(trConnections)
+      // `lastError` is kept on purpose: with `sessionEnc` it marks a connection that existed
+      // before this pairing (see `wasConnectedBefore`), so an abandoned renew can be recovered.
+      .set({ status: "awaiting_2fa", updatedAt: new Date() })
+      .where(eq(trConnections.userId, id));
 
     reply.code(202);
-    return {
-      status: conn.status === "connected" ? "connected" : "awaiting_2fa",
-      method: started.method,
-    };
+    return { status: "awaiting_2fa", method: started.method };
   });
 
   // Abort an in-flight pairing WITHOUT forgetting the saved credentials (DELETE
@@ -165,18 +160,7 @@ export function registerPairingRoutes(app: FastifyInstance) {
     const id = request.userId;
 
     const conn = await getConnection(app, id);
-    // A pending login belongs to one of: a first pairing or a renew of a stopped connection
-    // (`awaiting_2fa`), or an early renew of a working one (`connected`). A sync can flip an
-    // early renew's row to `expired` / `error` while the user is still approving; that login is
-    // still alive and must still be completable, so those rows count too when they were a
-    // connection before (only /renew can have started a pairing on them).
-    const renewingWorking = conn?.status === "connected";
-    const renewable =
-      conn !== null &&
-      (conn.status === "awaiting_2fa" ||
-        renewingWorking ||
-        ((conn.status === "expired" || conn.status === "error") && wasConnectedBefore(conn)));
-    if (!conn || !renewable || !app.pytr.hasPendingPairing(id)) {
+    if (!conn || conn.status !== "awaiting_2fa" || !app.pytr.hasPendingPairing(id)) {
       return reply.code(409).send({ error: "no_pairing_in_progress" });
     }
 
@@ -200,14 +184,10 @@ export function registerPairingRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: "code_invalid" });
       }
       const error = sanitizeConnectionError(err, "approval failed");
-      // A declined renew of a working session must not break it: the old login still works
-      // until it expires, and the user can simply try again.
-      if (!renewingWorking) {
-        await app.db
-          .update(trConnections)
-          .set({ status: "error", lastError: error, updatedAt: new Date() })
-          .where(eq(trConnections.userId, id));
-      }
+      await app.db
+        .update(trConnections)
+        .set({ status: "error", lastError: error, updatedAt: new Date() })
+        .where(eq(trConnections.userId, id));
       if (err instanceof PytrApprovalError) {
         request.log.info({ err }, "tr login not approved");
         return reply.code(400).send({ error: "not_approved" });
@@ -222,8 +202,6 @@ export function registerPairingRoutes(app: FastifyInstance) {
         sessionEnc: app.encryption.encryptString(sessionData),
         status: "connected",
         lastError: null,
-        // A new login has a new expiry: re-arm the "expires soon" notification.
-        expiryNotifiedFor: null,
         updatedAt: new Date(),
       })
       .where(eq(trConnections.userId, id));

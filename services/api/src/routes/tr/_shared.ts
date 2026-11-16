@@ -1,14 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { and, eq } from "drizzle-orm";
 import { accountHolders, portfolios, trConnections } from "@portfolio/db";
-import { sessionExpiresAt } from "../../services/pytr/session-expiry.js";
 
 type TrConnection = typeof trConnections.$inferSelect;
 
 export function serialize(
   conn: TrConnection | null,
   pairingMethod: "push" | "authenticator" | null = null,
-  sessionExpiresAt: Date | null = null,
 ) {
   return {
     status: conn?.status ?? "disconnected",
@@ -19,9 +17,6 @@ export function serialize(
     syncing: conn?.syncing ?? false,
     // How the in-flight pairing signs in; null when none is pending.
     pairingMethod,
-    // When the stored login stops working (derived from the session, never stored); null when
-    // there is no session or its expiry can't be read. Trade Republic sessions last 24 h.
-    sessionExpiresAt,
   };
 }
 
@@ -60,17 +55,4 @@ export async function lookupPortfolio(app: FastifyInstance, userId: string, port
  */
 export function wasConnectedBefore(conn: Pick<TrConnection, "sessionEnc" | "lastError">): boolean {
   return conn.sessionEnc !== null || conn.lastError !== null;
-}
-
-/** The stored session's expiry, or null when none is stored, encryption is off or it can't be read. */
-export function storedSessionExpiry(
-  app: FastifyInstance,
-  conn: Pick<TrConnection, "sessionEnc" | "status"> | null,
-): Date | null {
-  if (!conn?.sessionEnc || !app.encryption.isEnabled) return null;
-  try {
-    return sessionExpiresAt(app.encryption.decryptString(conn.sessionEnc));
-  } catch {
-    return null;
-  }
 }

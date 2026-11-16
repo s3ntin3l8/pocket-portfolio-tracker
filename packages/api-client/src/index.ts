@@ -2289,11 +2289,6 @@ export interface TrConnection {
   portfolioId: string | null;
   lastSyncAt: string | null;
   lastError: string | null;
-  /**
-   * When the stored login stops working, derived from the session (a Trade Republic login lasts
-   * 24 h and syncing does not extend it). null when there is no session or it can't be read.
-   */
-  sessionExpiresAt?: string | null;
   /** Last cash reconciliation (TR-reported vs derived), or null until first synced. */
   lastReconciliation: CashReconciliation | null;
   /** True while a background sync job is running. Poll GET /tr/connection to observe. */

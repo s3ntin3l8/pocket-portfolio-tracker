@@ -54,7 +54,6 @@ export function TrConnectFlow({
   initial,
   onChanged,
   compact = false,
-  autoRenew = false,
 }: {
   client: TrConnectClient;
   /**
@@ -73,8 +72,6 @@ export function TrConnectFlow({
   /** Collapse the connected state to a single row (last sync, Sync, ⋯ menu). Every other
    *  status keeps the full flow. */
   compact?: boolean;
-  /** Start a one-tap renew as soon as this mounts (the "login expires soon" banner's dialog). */
-  autoRenew?: boolean;
 }) {
   const t = useTranslations("TradeRepublic");
   const tB = useTranslations("BrokerConnection");
@@ -91,16 +88,6 @@ export function TrConnectFlow({
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   // True while the pairing in flight is a renew: backing out must keep the saved credentials.
   const [renewing, setRenewing] = useState(false);
-  // A renew of a still-`connected` connection (a Trade Republic login lasts 24 h, so this is
-  // routine). The status is `connected` throughout, so the status poll can't tell "approved"
-  // from "waiting": verify's own result is the outcome, and a failure leaves the working
-  // connection as it was. `attemptRef` drops the result of an attempt the user cancelled.
-  const [earlyRenew, setEarlyRenew] = useState(false);
-  const attemptRef = useRef(0);
-  const verifyFiredRef = useRef(false);
-  const windowStartRef = useRef(0);
-  // Hides the connected row until the auto-started renew has taken over the dialog.
-  const [starting, setStarting] = useState(autoRenew);
 
   const expired = initial.status === "expired";
   // A connection that stopped working keeps its stored credentials: offer the one-tap renew
@@ -124,7 +111,6 @@ export function TrConnectFlow({
       setError(messageForError(err));
     } finally {
       setBusy(false);
-      setStarting(false);
     }
   }
 
@@ -166,33 +152,9 @@ export function TrConnectFlow({
     void run(async () => {
       const res = await client.renewTr();
       setRenewing(true);
-      setEarlyRenew(res.status === "connected");
-      attemptRef.current += 1;
       enterPairing(res.method);
     });
   };
-
-  // Outcome of an early renew's verify (the only signal there is: see `earlyRenew`).
-  const settleEarlyRenew = (attempt: number, err: unknown) => {
-    if (attempt !== attemptRef.current) return;
-    setEarlyRenew(false);
-    setRenewing(false);
-    setPhase("connected");
-    if (err === null) {
-      setError(null);
-      onChanged?.();
-    } else {
-      setError(messageForError(err));
-    }
-  };
-
-  const autoRenewedRef = useRef(false);
-  useEffect(() => {
-    if (!autoRenew || autoRenewedRef.current) return;
-    autoRenewedRef.current = true;
-    renew();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Backing out of the waiting phase. A first pairing is simply discarded; a renew only stops
   // the login, so the Renew button (and the stored phone + PIN behind it) is still there.
@@ -200,11 +162,8 @@ export function TrConnectFlow({
     void run(async () => {
       if (renewing) {
         await client.cancelTrPairing();
-        attemptRef.current += 1;
         setRenewing(false);
-        // A working connection goes back to its connected view; an expired one to the form.
-        setPhase(earlyRenew ? "connected" : "form");
-        setEarlyRenew(false);
+        setPhase("form");
         onChanged?.();
       } else {
         await client.disconnectTr();
@@ -225,23 +184,15 @@ export function TrConnectFlow({
     setError(null);
     verifyFiredRef.current = true;
     setPhase("awaiting");
-    const attempt = attemptRef.current;
-    void client
-      .verifyTr({ code })
-      .then(() => {
-        if (earlyRenew) settleEarlyRenew(attempt, null);
-      })
-      .catch((err: unknown) => {
-        const apiCode = apiErrorCode(err);
-        if (apiCode === "code_invalid" || apiCode === "code_required") {
-          verifyFiredRef.current = false;
-          setError(messageForError(err));
-          setCode("");
-          setPhase("code");
-        } else if (earlyRenew) {
-          settleEarlyRenew(attempt, err);
-        }
-      });
+    void client.verifyTr({ code }).catch((err: unknown) => {
+      const apiCode = apiErrorCode(err);
+      if (apiCode === "code_invalid" || apiCode === "code_required") {
+        verifyFiredRef.current = false;
+        setError(messageForError(err));
+        setCode("");
+        setPhase("code");
+      }
+    });
   };
 
   // Drives the `awaiting` phase. verifyTr() is the request that completes the pairing
@@ -253,6 +204,8 @@ export function TrConnectFlow({
   // status leaves `awaiting_2fa`. This is robust to those hiccups and resumes correctly
   // after a page refresh mid-pairing (the fresh mount re-fires verify; the server resumes
   // via hasPendingPairing).
+  const verifyFiredRef = useRef(false);
+  const windowStartRef = useRef(0);
   useEffect(() => {
     if (phase !== "awaiting" && phase !== "code") return;
     // connect() starts the approval window; a pairing resumed on mount starts it here.
@@ -260,14 +213,6 @@ export function TrConnectFlow({
     // Authenticator pairings fire their verify from submitCode, with the code.
     if (phase !== "awaiting" || verifyFiredRef.current || authenticator) return;
     verifyFiredRef.current = true;
-    if (earlyRenew) {
-      const attempt = attemptRef.current;
-      void client
-        .verifyTr()
-        .then(() => settleEarlyRenew(attempt, null))
-        .catch((err: unknown) => settleEarlyRenew(attempt, err));
-      return;
-    }
     // Fire-and-forget: this kicks off server-side completion; the poll observes it.
     void client.verifyTr().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,7 +252,7 @@ export function TrConnectFlow({
         setPhase("form");
       }
     },
-    (phase === "awaiting" || phase === "code") && !earlyRenew ? STATUS_POLL_INTERVAL_MS : null,
+    phase === "awaiting" || phase === "code" ? STATUS_POLL_INTERVAL_MS : null,
     { initialDelayMs: STATUS_POLL_INITIAL_DELAY_MS },
   );
 
@@ -348,12 +293,6 @@ export function TrConnectFlow({
   return (
     <div className="max-w-md space-y-4">
       {error && <ErrorBanner>{error}</ErrorBanner>}
-      {starting && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Spinner size="sm" />
-          {t("approveWaiting")}
-        </div>
-      )}
 
       {phase === "form" && (
         <form onSubmit={connect} className="space-y-4">
@@ -467,7 +406,7 @@ export function TrConnectFlow({
         </div>
       )}
 
-      {phase === "connected" && !starting && compact && initial.status === "connected" && (
+      {phase === "connected" && compact && initial.status === "connected" && (
         <>
           <ConnectedCompactRow
             lastSyncAt={initial.lastSyncAt}
@@ -526,7 +465,7 @@ export function TrConnectFlow({
         </>
       )}
 
-      {phase === "connected" && !starting && !(compact && initial.status === "connected") && (
+      {phase === "connected" && !(compact && initial.status === "connected") && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">{t("connectedHint")}</p>
 
