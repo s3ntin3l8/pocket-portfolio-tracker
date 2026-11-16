@@ -51,6 +51,17 @@
  *     is applied inside `xirr()` so every consumer of the all-time XIRR
  *     (`/insights` hero card, `/networth`, `/portfolios/:id/performance`)
  *     gets the same null result for absurd rates. See issue #756.
+ *   - V_PAIR_TOLERANCE (0.01): how exactly two ADJACENT daily growths must cancel
+ *     (`|g1 × g2 − 1| ≤ 0.01`) for the TWR chain to treat them as one single-day
+ *     artifact and its rebound (`neutralizeVPairs`, twr.ts). SINGLE_DAY_MAX_PCT is
+ *     asymmetric in effect: an artifact removing 33–50 % is under the cap and accepted,
+ *     but the rebound that undoes it (+50 … +100 %) is over the cap and dropped, which
+ *     leaves a permanent step in the index. A genuine pair of moves landing within 1 %
+ *     of exactly cancelling, on consecutive days, with the second beyond the cap, is
+ *     far likelier a bad snapshot than two real moves; 1 % is tight enough that real
+ *     moves are not swallowed (a −40 % day followed days later by an unrelated +60 %
+ *     is never paired — adjacency is required) yet absorbs the rounding between a
+ *     cost-valued and a market-valued day.
  */
 
 export const SINGLE_DAY_MAX_PCT = 50;
@@ -60,6 +71,7 @@ export const MAX_PRICE_CARRY_FORWARD_DAYS = 10;
 export const FX_MAX_CARRY_FORWARD_DAYS = 14;
 export const DEAD_FEED_MISS_THRESHOLD = 7;
 export const XIRR_MAX_RATE = 50;
+export const V_PAIR_TOLERANCE = 0.01;
 
 /**
  * Amount band for matching an announced dividend to a projected cadence payment

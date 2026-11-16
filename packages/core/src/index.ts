@@ -126,6 +126,7 @@ export {
   chainIndex,
   chainAggregateIndex,
   aggregateValueFlows,
+  neutralizeVPairs,
   twrFields,
   splitAdjustmentFactor,
   isDepotTransfer,
@@ -137,6 +138,7 @@ export {
 } from "./twr.js";
 export {
   SINGLE_DAY_MAX_PCT,
+  V_PAIR_TOLERANCE,
   PERIOD_GAIN_MAX_PCT,
   PERIOD_LOSS_MAX_PCT,
   MAX_PRICE_CARRY_FORWARD_DAYS,

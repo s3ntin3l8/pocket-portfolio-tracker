@@ -19,6 +19,7 @@ import { degraded, degradedExpected } from "./ledgers/degraded.js";
 import { deTax, deTaxExpected } from "./ledgers/de-tax.js";
 import { deTaxPots, deTaxPotsExpected } from "./ledgers/de-tax-pots.js";
 import { history, historyExpected } from "./ledgers/history.js";
+import { twrVPair, twrVPairExpected } from "./ledgers/twr-v-pair.js";
 import { income, incomeExpected } from "./ledgers/income.js";
 import { merger, mergerExpected } from "./ledgers/merger.js";
 import { mixedBoundary, mixedBoundaryExpected } from "./ledgers/mixed-boundary.js";
@@ -451,6 +452,25 @@ describe("history", () => {
     for (const [i, e] of historyExpected.b.entries()) {
       expectDecimal(b[i]!.netWorth, e.netWorth, `${e.date} netWorth`);
       expectDecimal(b[i]!.marketValue, e.marketValue, `${e.date} marketValue`);
+    }
+  });
+});
+
+describe("twr-v-pair", () => {
+  let l: LoadedLedger;
+  beforeAll(async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date(twrVPair.asOf) });
+    l = await loadLedger(app, sign, twrVPair);
+  }, 60_000);
+
+  it("a one-day artifact and its rebound chain as neutral (#1263)", async () => {
+    const h = (await get(l, `/portfolios/${l.portfolioIds.depot}/history?range=all`)) as {
+      date: string;
+      pct: string;
+    }[];
+    expect(h.map((p) => p.date)).toEqual(twrVPairExpected.pct.map((p) => p.date));
+    for (const [i, e] of twrVPairExpected.pct.entries()) {
+      expectDecimal(h[i]!.pct, e.pct, `${e.date} pct`);
     }
   });
 });

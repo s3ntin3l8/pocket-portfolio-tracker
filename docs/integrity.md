@@ -60,6 +60,9 @@ touch every cost basis in the app, and every golden ledger, for no gain. Instead
 - application code must never compare two such strings for equality: compare them as decimals
   with a tolerance.
 
+The `twr-v-pair` ledger covers the TWR chain's V-pair rule (`neutralizeVPairs`, #1263): a one-day
+artifact snapshot and its rebound chain as neutral instead of leaving a permanent step.
+
 Adding a ledger: create `ledgers/<name>.ts` exporting the `Ledger` and its expected figures,
 assert them in `golden.test.ts`, and add it to `ledgers/index.ts` so the invariant suite and
 the metamorphic relations (where it fits) run on it too.
