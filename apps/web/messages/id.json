@@ -234,7 +234,9 @@
       "title": "Penarikan Maks",
       "current": "Saat ini",
       "recoveredIn": "Pulih dalam {days}h",
-      "stillUnderwater": "Masih terendam",
+      "belowHigh": "Saat ini diukur dari puncak {date}.",
+      "notRecovered": "Belum pulih",
+      "smallPeak": "Puncak itu tercapai saat nilai kepemilikan {peak}; kini nilainya {current}. Angkanya berbobot waktu, jadi posisi awal yang kecil bisa menjadi puncaknya.",
       "insufficientData": "Data tidak mencukupi"
     },
     "volatility": {

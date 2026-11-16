@@ -1436,6 +1436,13 @@ export interface InsightsDrawdown {
   recoveryDate?: string;
   recoveryDays?: number;
   currentDrawdownPct: string;
+  /** The running all-time-high date `currentDrawdownPct` is measured against. */
+  currentPeakDate?: string | null;
+  /** Holdings value (display currency) on `peakDate`, on `currentPeakDate` and on the last day. The
+   *  drawdown is time-weighted, so these say how big the book was when the high was set. */
+  peakValue?: string | null;
+  currentPeakValue?: string | null;
+  currentValue?: string | null;
 }
 
 export interface InsightsVolatility {

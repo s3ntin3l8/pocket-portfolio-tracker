@@ -12,11 +12,21 @@ export interface DrawdownResult {
   recoveryDate?: string;
   recoveryDays?: number;
   currentDrawdownPct: string;
+  /** The running all-time-high date `currentDrawdownPct` is measured against. It is the same day as
+   *  `peakDate` only when the deepest drawdown was also measured from the all-time high. Null when
+   *  the series has no positive value. */
+  currentPeakDate: string | null;
 }
 
 export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
   if (series.length === 0) {
-    return { maxDrawdownPct: "0", peakDate: null, troughDate: null, currentDrawdownPct: "0" };
+    return {
+      maxDrawdownPct: "0",
+      peakDate: null,
+      troughDate: null,
+      currentDrawdownPct: "0",
+      currentPeakDate: null,
+    };
   }
 
   // A drawdown is measured against a POSITIVE running peak. A non-positive value (an
@@ -34,6 +44,7 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
       peakDate: series[0].date,
       troughDate: series[0].date,
       currentDrawdownPct: "0",
+      currentPeakDate: null,
     };
   }
 
@@ -70,6 +81,7 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
       peakDate: series[firstPositive].date,
       troughDate: series[firstPositive].date,
       currentDrawdownPct: currentDrawdown.toString(),
+      currentPeakDate: peakDate,
     };
   }
 
@@ -96,5 +108,6 @@ export function maxDrawdown(series: NetWorthPoint[]): DrawdownResult {
     troughDate: maxDdTroughDate,
     ...(recoveryDate ? { recoveryDate, recoveryDays } : {}),
     currentDrawdownPct: currentDrawdown.toString(),
+    currentPeakDate: peakDate,
   };
 }
