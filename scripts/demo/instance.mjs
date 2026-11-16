@@ -463,7 +463,13 @@ export async function startDemo({
         // As in teardown: a dying worker can recreate files just after the
         // delete, so repeat it a few times before exiting.
         for (const pid of strayPids(home)) signalPid(pid, "SIGKILL");
-        rmSync(demoDir, { recursive: true, force: true });
+        // A dying process can still write into the dir mid-delete (ENOTEMPTY/EBUSY). Left
+        // uncaught that exits 1 instead of 130, so retry here and let the loop below repeat.
+        try {
+          rmSync(demoDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+        } catch (err) {
+          console.warn(`[demo] hard stop cleanup attempt failed: ${err}`);
+        }
         // Re-check after a beat; exit as soon as the directory stays gone.
         if (++attempts < 5)
           return setTimeout(() => (existsSync(demoDir) ? finish() : process.exit(130)), 500);
