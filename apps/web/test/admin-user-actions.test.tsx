@@ -36,7 +36,7 @@ function renderActions(onboardingCompleted = true) {
 }
 
 // Radix opens its dropdown on keyboard/pointer events, not a synthetic click; Enter on
-// the focused trigger is the most reliable opener under jsdom (see portfolio-card-menu).
+// the focused trigger is the most reliable opener under jsdom.
 function openMenu() {
   const trigger = screen.getByRole("button", { name: m.usersActions });
   fireEvent.keyDown(trigger, { key: "Enter" });

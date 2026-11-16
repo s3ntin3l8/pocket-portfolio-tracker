@@ -6,7 +6,10 @@ import { useTranslations } from "next-intl";
 import { useApiClient } from "@/lib/api";
 import { useRouter } from "@/i18n/navigation";
 import { useInterval } from "@/lib/use-interval";
-import type { PortfolioSyncConfig } from "@/components/portfolio-card-menu";
+
+export interface PortfolioSyncConfig {
+  initialSyncing: boolean;
+}
 
 const POLL_INTERVAL_MS = 3000;
 const POLL_TIMEOUT_MS = 300_000; // 5 min — same ceiling as runner exportTimeoutMs
@@ -17,7 +20,7 @@ const POLL_TIMEOUT_MS = 300_000; // 5 min — same ceiling as runner exportTimeo
  * (computed server-side in `settings/portfolios/page.tsx`) picks up the new state without
  * a manual reload.
  *
- * Extracted from `PortfolioCardMenu`'s poll effects (unchanged logic) so the list can keep
+ * Extracted from the old card menu's poll effects (unchanged logic) so the list can keep
  * auto-updating a syncing portfolio's badge now that the card's `⋯` menu — and its "Sync
  * now" trigger — moved into the portfolio edit page (`portfolio-edit-form.tsx`'s connection
  * sections already run their own polling while that page is open; this component covers
