@@ -230,6 +230,13 @@ export function rowAnomalyCounts(anomalies: Anomaly[]): { errors: number; warnin
   return { errors, warnings };
 }
 
+/** Broker reconciliation gaps — the only anomalies a bundled banner titles as "reconciliation". */
+export function isReconciliationAnomaly(code: string): boolean {
+  return (
+    code === "reconciliation_gap" || code === "reconciliation_drift" || code === "position_gap"
+  );
+}
+
 /**
  * Anomalies with nowhere to attach as a row — always render these as their own standalone
  * banner (e.g. ReconciliationBanner), never fold them into the row-count headline.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { isReconciliationAnomaly } from "@/lib/utils";
 import { ReconciliationBanner } from "@/components/transactions/activity-banners";
 
 export interface BannerItem {
@@ -9,14 +10,11 @@ export interface BannerItem {
   detail: string;
   tag: string;
   /** Anomaly code — the group title only applies when every item is a broker reconciliation gap. */
-  code?: string;
+  code: string;
   /** `Anomalies.dismiss` — pre-resolved server-side, same reason as the other fields. */
   dismissLabel: string;
   action?: { href: string; label: string };
 }
-
-const isReconciliationCode = (c?: string) =>
-  c === "reconciliation_gap" || c === "reconciliation_drift" || c === "position_gap";
 
 export function ReconciliationBannerGroup({
   items,
@@ -41,7 +39,7 @@ export function ReconciliationBannerGroup({
   return (
     <ReconciliationBanner
       title={
-        rest.length > 0 && visible.every((v) => isReconciliationCode(v.code))
+        rest.length > 0 && visible.every((v) => isReconciliationAnomaly(v.code))
           ? groupTitle
           : first.title
       }
