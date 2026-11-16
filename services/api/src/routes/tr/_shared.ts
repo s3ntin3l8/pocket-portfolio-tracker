@@ -46,8 +46,12 @@ export async function lookupPortfolio(app: FastifyInstance, userId: string, port
 /**
  * True for a row that was a real connection before the pairing now in flight: it had a session,
  * or it carries the error a failed sync/login left behind. A first setup has neither (the first
- * pairing clears both), so an abandoned one is not something to nag about. The one predicate
- * behind `POST /tr/connection/cancel`, `reapAbandonedPairings` and the Holdings banner.
+ * pairing clears both), so an abandoned one is not something to nag about.
+ *
+ * The same rule is expressed in three places that must change together: this function (used by
+ * `POST /tr/connection/cancel`), the SQL in `reapAbandonedPairings`
+ * (services/scheduler/cleanup.ts) and `abandoned` in the Holdings banner
+ * (`tr-connection-banner.tsx`, which also accepts `lastSyncAt`).
  */
 export function wasConnectedBefore(conn: Pick<TrConnection, "sessionEnc" | "lastError">): boolean {
   return conn.sessionEnc !== null || conn.lastError !== null;

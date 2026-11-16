@@ -14,8 +14,8 @@ const api = {
   disconnectTr: vi.fn(),
   reimportTr: vi.fn(),
   reprocessTrDocuments: vi.fn(),
-  getTrConnection: vi.fn(async () => ({
-    status: "connected" as const,
+  getTrConnection: vi.fn<() => Promise<TrConnection>>(async () => ({
+    status: "connected",
     portfolioId: "p1",
     lastSyncAt: null,
     lastError: null,
@@ -73,7 +73,7 @@ describe("TrConnectionBanner", () => {
   it("a cancelled renew neither syncs nor closes the dialog", async () => {
     api.syncTr.mockClear();
     api.getTrConnection.mockResolvedValueOnce({
-      status: "expired" as never,
+      status: "expired",
       portfolioId: "p1",
       lastSyncAt: null,
       lastError: null,
