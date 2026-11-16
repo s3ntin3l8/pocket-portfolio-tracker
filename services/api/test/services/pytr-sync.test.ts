@@ -1009,6 +1009,52 @@ describe("syncTrConnection", () => {
     expect(updated.lastError).toBeTruthy();
   });
 
+  it("calls the expired hook exactly once when this sync expires the connection", async () => {
+    const conn = await makeConnection("expired-hook");
+    const onExpired = vi.fn();
+    const runner = runnerWith(async () => {
+      throw new PytrAuthError();
+    });
+    await syncTrConnection(getDb(), enc, runner, conn, undefined, undefined, { onExpired });
+    expect(onExpired).toHaveBeenCalledTimes(1);
+
+    // An ordinary failure is `error`, not an expired login: no hook.
+    const other = await makeConnection("error-no-hook");
+    const onExpired2 = vi.fn();
+    await syncTrConnection(
+      getDb(),
+      enc,
+      runnerWith(async () => {
+        throw new Error("boom");
+      }),
+      other,
+      undefined,
+      undefined,
+      { onExpired: onExpired2 },
+    );
+    expect(onExpired2).not.toHaveBeenCalled();
+  });
+
+  it("a hook that throws does not fail the sync", async () => {
+    const conn = await makeConnection("expired-hook-throws");
+    const result = await syncTrConnection(
+      getDb(),
+      enc,
+      runnerWith(async () => {
+        throw new PytrAuthError();
+      }),
+      conn,
+      undefined,
+      undefined,
+      {
+        onExpired: async () => {
+          throw new Error("push down");
+        },
+      },
+    );
+    expect(result.status).toBe("expired");
+  });
+
   // --- document download tests (#243) ---------------------------------------
 
   it("stages postbox documents for new drafts when documentRetention=true", async () => {

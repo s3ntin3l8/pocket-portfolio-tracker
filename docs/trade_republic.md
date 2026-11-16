@@ -63,6 +63,27 @@ answered the approval poll with a status pytr doesn't treat as pending or confir
 vendored login tolerated a response with no terminal state if it set a session cookie; pytr's
 does not.
 
+## Session lifetime
+
+A Trade Republic login lasts **24 hours**, and syncing does not extend it. The `tr_refresh` cookie
+is a JWT whose `exp` is its issue time plus 24 h and is never rotated; the hourly sync only
+refreshes the short-lived `tr_session` token, and the other cookies are session cookies with no
+expiry (only `tr_device` has one, a year). Measured on stored sessions: one paired at 17:43 last
+synced at 17:00 the next day and was `expired` at the following sweep. So a pairing stops working a
+day after it was approved, the first sync after that fails and the connection flips to `expired`,
+and renewing is a daily routine.
+
+We only flag it: the Holdings banner (below) shows as soon as the connection is `expired`, with a
+one-tap Renew, and a push notification (`docs/notifications.md`) is sent once when a sync flips it
+(tag `tr-login`, opens Holdings). There is deliberately no early warning: the cap is fixed, so a
+warning would only move the same daily step earlier.
+
+Not used on purpose: Trade Republic's own web app re-logs in with the PIN only (an
+`X-TR-OTP-Less` login) after 2 hours of inactivity. Doing that from the server would mean logging in
+with the stored PIN without the in-app confirmation, so a leaked database and key could open the
+brokerage account without the phone. It has not been tried and should not be added without that
+trade-off being decided.
+
 ## Expired login and one-tap renew
 
 Trade Republic ends a web session after a while. The app finds out when a sync cannot resume

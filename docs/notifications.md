@@ -43,6 +43,14 @@ the job that raised it), prunes subscriptions the push service reports gone (404
 only ever lets `url` be a same-origin path. A newer notification with the same `tag` replaces
 the older one instead of stacking.
 
+## Trade Republic login
+
+The first user of this channel: one push when a sync finds the stored Trade Republic login has
+expired (title "Trade Republic login expired", tag `tr-login`, opens `/holdings`). A login lasts
+24 h, so this is a daily event; see `docs/trade_republic.md` › "Session lifetime". The text is
+English only (no per-user locale is stored). It is sent from the sync that flips the connection to
+`expired`, so a renew that is abandoned and later recovered to `expired` by the sweep does not push.
+
 ## Security notes
 
 - The server POSTs to the subscription endpoint, so `endpoint` must be an `https` URL on a known

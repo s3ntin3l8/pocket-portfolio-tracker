@@ -55,6 +55,8 @@ export async function syncTrConnection(
   log?: FastifyBaseLogger,
   /** Optional storage provider for document cleanup on cancellation (#231). */
   storage?: StorageProvider,
+  /** Called once when this sync flipped the connection to `expired` (e.g. to send a push). */
+  hooks?: { onExpired?: () => void | Promise<void> },
 ): Promise<SyncResult> {
   if (!connection.sessionEnc || !connection.portfolioId) {
     log?.warn({ connectionId: connection.id }, "tr sync skipped: missing session/portfolio");
@@ -95,6 +97,13 @@ export async function syncTrConnection(
         updatedAt: new Date(),
       })
       .where(eq(trConnections.id, connection.id));
+    if (status === "expired") {
+      try {
+        await hooks?.onExpired?.();
+      } catch (hookErr) {
+        log?.warn({ connectionId, err: hookErr }, "tr expired hook failed");
+      }
+    }
     return { status };
   }
 

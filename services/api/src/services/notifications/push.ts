@@ -157,3 +157,23 @@ export async function notifyUser(
     return none;
   }
 }
+
+/** The app-level dependencies `notifyUser` needs, for callers that hold the Fastify instance. */
+export function pushDeps(
+  app: {
+    db: Db;
+    encryption: EncryptionService;
+    config: PushConfig;
+    log: Logger;
+    pushSender: PushSender;
+  },
+  log: Logger = app.log,
+): NotifyDeps {
+  return {
+    db: app.db,
+    encryption: app.encryption,
+    config: app.config,
+    log,
+    sender: app.pushSender,
+  };
+}
