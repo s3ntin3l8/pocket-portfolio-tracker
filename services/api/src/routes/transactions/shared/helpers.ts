@@ -1,6 +1,6 @@
 import type { FastifyBaseLogger, FastifyInstance } from "fastify";
 import { z } from "zod";
-import { and, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql, type SQL } from "drizzle-orm";
 import { Decimal } from "decimal.js";
 import {
   corporateActions,
@@ -10,6 +10,7 @@ import {
   trConnections,
   ibkrConnections,
   userPreferences,
+  screenshotImports,
 } from "@portfolio/db";
 import {
   type Anomaly,
@@ -32,6 +33,7 @@ import {
   recordFxMissing,
   type FxProvider,
 } from "../../../services/fx.js";
+import { groupUnmappedEvents } from "../../../services/pytr/unmapped.js";
 import { anomaliesCache } from "./caches.js";
 
 export function yearRange(year: number): { start: Date; end: Date } {
@@ -225,7 +227,7 @@ export async function computePortfolioAnomalies(
   portfolio: { id: string; cashCounted: boolean; allowNegativeCash: boolean },
 ): Promise<Anomaly[]> {
   const { filtered } = await withDerivationCache(anomaliesCache, portfolio.id, async () => {
-    const [rows, trConn, ibkrConn, dismissed] = await Promise.all([
+    const [rows, trConn, ibkrConn, dismissed, pytrImports] = await Promise.all([
       app.db.select().from(transactions).where(eq(transactions.portfolioId, portfolio.id)),
       app.db
         .select({ lastReconciliation: trConnections.lastReconciliation })
@@ -249,6 +251,22 @@ export async function computePortfolioAnomalies(
         })
         .from(dismissedAnomalies)
         .where(eq(dismissedAnomalies.portfolioId, portfolio.id)),
+      // Events the TR mapper could not classify live in the anchor import's errors; they mean
+      // shares or cash missing from the ledger, so they surface as a warning here.
+      app.db
+        .select({
+          status: screenshotImports.status,
+          createdAt: screenshotImports.createdAt,
+          parsedJson: screenshotImports.parsedJson,
+        })
+        .from(screenshotImports)
+        .where(
+          and(
+            eq(screenshotImports.portfolioId, portfolio.id),
+            eq(screenshotImports.parser, "pytr"),
+            ne(screenshotImports.status, "discarded"),
+          ),
+        ),
     ]);
     const coreTxns: CoreTransaction[] = toCoreTxns(rows);
     const cas = await corporateActionsFor(
@@ -279,6 +297,14 @@ export async function computePortfolioAnomalies(
     // to the right place.
     for (const a of anomalies) {
       if (a.scope === "portfolio") a.meta = { ...a.meta, portfolioId: portfolio.id };
+    }
+    for (const g of groupUnmappedEvents(pytrImports)) {
+      anomalies.push({
+        code: "unmapped_broker_events",
+        severity: "warning",
+        scope: "portfolio",
+        meta: { eventType: g.eventType ?? g.message, count: g.count, portfolioId: portfolio.id },
+      });
     }
     await attachPositionGapInstruments(app, anomalies);
     const dismissedSet = new Set(dismissed.map((d) => `${d.transactionId}:${d.code}`));

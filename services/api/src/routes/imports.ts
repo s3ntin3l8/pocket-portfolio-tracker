@@ -3,7 +3,8 @@ import { z } from "zod";
 import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { loans, screenshotImports, transactions, trResolvedEvents } from "@portfolio/db";
 import { toDateKey } from "@portfolio/core";
-import { type ImportIssue, type ParsedTransaction } from "@portfolio/schema";
+import { groupUnmappedEvents } from "../services/pytr/unmapped.js";
+import { type ParsedTransaction } from "@portfolio/schema";
 import { classifyMatchByParser } from "../services/parsers/dedup.js";
 import { isEnrichmentCapable, parserCarriesDocument } from "../services/import-policy.js";
 import { findCommittedDuplicates } from "../services/parsers/likely-duplicates.js";
@@ -215,40 +216,7 @@ export async function importsRoute(app: FastifyInstance) {
       .from(screenshotImports)
       .where(eq(screenshotImports.userId, id))
       .orderBy(desc(screenshotImports.createdAt));
-    const byKey = new Map<
-      string,
-      {
-        eventType: string | null;
-        code: NonNullable<ImportIssue["code"]>;
-        message: string;
-        count: number;
-        lastSeen: Date;
-        sample: ImportIssue["raw"] | null;
-      }
-    >();
-    for (const r of rows) {
-      if (r.status === "discarded") continue;
-      const parsed = (r.parsedJson ?? {}) as { errors?: ImportIssue[] };
-      for (const e of parsed.errors ?? []) {
-        if (e.code !== "unmapped_event_type" && e.code !== "unparseable_event") continue;
-        const key = `${e.code}:${e.eventType ?? e.message}`;
-        const existing = byKey.get(key);
-        if (existing) {
-          existing.count += 1;
-          if (r.createdAt > existing.lastSeen) existing.lastSeen = r.createdAt;
-        } else {
-          byKey.set(key, {
-            eventType: e.eventType ?? null,
-            code: e.code,
-            message: e.message,
-            count: 1,
-            lastSeen: r.createdAt,
-            sample: e.raw ?? null,
-          });
-        }
-      }
-    }
-    return Array.from(byKey.values()).sort((a, b) => b.count - a.count);
+    return groupUnmappedEvents(rows);
   });
 
   // Discard a draft import (draft → discarded). Confirmed imports are undone via DELETE.
