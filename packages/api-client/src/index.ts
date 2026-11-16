@@ -1133,7 +1133,8 @@ export type AnomalyCode =
   | "zero_price"
   | "reconciliation_gap"
   | "reconciliation_drift"
-  | "position_gap";
+  | "position_gap"
+  | "unmapped_broker_events";
 
 export interface Anomaly {
   code: AnomalyCode;

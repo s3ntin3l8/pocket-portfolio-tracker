@@ -186,6 +186,15 @@ price × share count is cross-checked against the booked total; a mismatch beyon
 tolerance drops the draft's confidence to 0.5 so it's flagged for review rather than
 trusted.
 
+**Unmapped events are a portfolio anomaly.** The `unmapped_event_type` / `unparseable_event`
+errors left in a connection's pytr import also surface as one `unmapped_broker_events`
+warning per event type (`meta: { eventType, count, portfolioId }`) on
+`GET /portfolios/:id/anomalies`, `GET /networth/anomalies` and the MCP `get_anomalies` tool,
+because shares or cash may be missing from the ledger. Discarded imports and other portfolios'
+imports don't count; the grouping is shared with `GET /imports/unmapped-types`. It is a
+warning only — no figure changes — and has no dismiss path (it clears once the events are
+mapped or the import is discarded).
+
 **Dividend corrections.** TR periodically restates a dividend after the fact (e.g. a
 withholding-tax true-up). When the restated event resolves cleanly, the mapper splits it
 into two bookings: the original amount re-attributed to its true distribution period, and
