@@ -529,6 +529,35 @@ describe("mapTrEventToDraft", () => {
     expect(categoryForEventType("DIVIDEND_REINVESTMENT_TRADE_EXECUTED")).toBe("trade");
   });
 
+  it("always books DIVIDEND_REINVESTMENT_TRADE_EXECUTED as a buy, never a sell, and refuses a positive amount", () => {
+    const common = {
+      ...base,
+      eventType: "DIVIDEND_REINVESTMENT_TRADE_EXECUTED",
+      isin: "US7561091049",
+      shares: 0.2,
+    };
+    // A zero amount must not fall through to the sign-derived side (a phantom sell at price 0).
+    expect(draftOf({ ...common, amount: 0 })).toMatchObject({ action: "buy", price: "0" });
+    // A positive amount is cash received, not paid: not booked as an outflow.
+    expect(mapTrEventToDraft({ ...common, amount: 10 })).toMatchObject({
+      skip: true,
+      severity: "attention",
+      code: "unmapped_event_type",
+    });
+  });
+
+  it("does not turn cash RECEIVED alongside shares (SSP_CORPORATE_ACTION_CASH_AND_STOCK) into a buy", () => {
+    expect(
+      mapTrEventToDraft({
+        ...base,
+        eventType: "SSP_CORPORATE_ACTION_CASH_AND_STOCK",
+        isin: "US56035L1044",
+        shares: 0.25,
+        amount: 5,
+      }),
+    ).toMatchObject({ skip: true, severity: "attention", code: "unmapped_event_type" });
+  });
+
   it("maps SSP_CORPORATE_ACTION_CASH_AND_STOCK (cash paid for new shares) to a reinvestment buy", () => {
     const draft = draftOf({
       ...base,

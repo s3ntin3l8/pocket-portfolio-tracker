@@ -50,6 +50,11 @@ export const CARD_EVENTS = new Set([
   "CARD_AFT",
 ]);
 
+/** A distribution reinvested into more shares. Always a buy of the shares it bought, never a sell:
+ *  pinned in {@link FIXED_ACTIONS} (checked before the sign-derived `TRADE_EVENTS` side) and kept
+ *  in {@link TRADE_EVENTS} only so it classifies as a `trade`. */
+export const DIVIDEND_REINVESTMENT_TRADE = "DIVIDEND_REINVESTMENT_TRADE_EXECUTED";
+
 export const FIXED_ACTIONS: Record<string, ParsedAction> = {
   PAYMENT_INBOUND: "deposit",
   PAYMENT_INBOUND_SEPA_DIRECT_DEBIT: "deposit",
@@ -80,14 +85,14 @@ export const FIXED_ACTIONS: Record<string, ParsedAction> = {
   TRANSFER_IN: "transfer_in",
   TRANSFER_OUT: "transfer_out",
   SSP_SECURITIES_TRANSFER_INCOMING: "transfer_in",
+  [DIVIDEND_REINVESTMENT_TRADE]: "buy",
 };
 
 export const TRADE_EVENTS = new Set([
   "ORDER_EXECUTED",
   "TRADE_INVOICE",
   "TRADING_TRADE_EXECUTED",
-  // A distribution reinvested into more shares: a buy of the shares it bought (negative cash).
-  "DIVIDEND_REINVESTMENT_TRADE_EXECUTED",
+  DIVIDEND_REINVESTMENT_TRADE,
 ]);
 
 export const CASH_BY_SIGN = new Set(["JUNIOR_P2P_TRANSFER", "SSP_TAX_CORRECTION", "CARD_AFT"]);

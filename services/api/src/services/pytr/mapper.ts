@@ -20,6 +20,7 @@ import {
   CASH_CORPORATE_ACTION,
   CASH_NON_DIVIDEND_CORPORATE_ACTION,
   CASH_AND_STOCK_CORPORATE_ACTION,
+  DIVIDEND_REINVESTMENT_TRADE,
   SHARE_CORPORATE_ACTION,
   NO_CASH_CORPORATE_ACTION,
   SKIP_EVENTS,
@@ -69,7 +70,7 @@ function isReinvestment(eventType: string): boolean {
   return (
     eventType === SHARE_CORPORATE_ACTION ||
     eventType === CASH_AND_STOCK_CORPORATE_ACTION ||
-    eventType === "DIVIDEND_REINVESTMENT_TRADE_EXECUTED"
+    eventType === DIVIDEND_REINVESTMENT_TRADE
   );
 }
 
@@ -107,17 +108,30 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
   ) {
     action = ev.isin ? "dividend" : "deposit";
   }
-  if (
-    !action &&
-    (ev.eventType === SHARE_CORPORATE_ACTION || ev.eventType === CASH_AND_STOCK_CORPORATE_ACTION)
-  ) {
+  if (!action && ev.eventType === SHARE_CORPORATE_ACTION) {
     action = ev.amount !== 0 ? "buy" : "bonus";
+  }
+  if (!action && ev.eventType === CASH_AND_STOCK_CORPORATE_ACTION) {
+    // Cash paid for the new shares (a buy) or none (a free issue). Cash RECEIVED alongside shares
+    // (e.g. a mixed-consideration merger) is neither, so it stays an unmapped gap rather than being
+    // booked as an outflow the broker never made.
+    action = ev.amount < 0 ? "buy" : ev.amount === 0 ? "bonus" : undefined;
   }
   if (!action && ev.eventType === NO_CASH_CORPORATE_ACTION && ev.kind === "vorabpauschale") {
     action = "tax";
   }
   if (!action) {
     return skip(`unmapped event type: ${ev.eventType}`, "attention", ev, "unmapped_event_type");
+  }
+
+  if (ev.eventType === DIVIDEND_REINVESTMENT_TRADE && ev.amount > 0) {
+    // Pinned to a buy: a positive amount would book cash paid that was in fact received.
+    return skip(
+      `${ev.eventType} with a positive amount (cash received, not paid) — check the event details`,
+      "attention",
+      ev,
+      "unmapped_event_type",
+    );
   }
 
   const amount = Math.abs(ev.amount);
