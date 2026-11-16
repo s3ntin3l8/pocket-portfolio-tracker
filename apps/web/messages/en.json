@@ -2451,6 +2451,7 @@
     },
     "dismiss": "Dismiss warning",
     "reconciliationTitle": "Cash doesn't reconcile",
+    "reconciliationGroupTitle": "Broker data doesn't reconcile",
     "reconciliationPositionTitle": "Position doesn't reconcile",
     "viewHolding": "View holding",
     "openConnection": "Open connection",

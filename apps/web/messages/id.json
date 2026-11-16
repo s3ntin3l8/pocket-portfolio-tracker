@@ -2451,6 +2451,7 @@
     },
     "dismiss": "Tutup peringatan",
     "reconciliationTitle": "Kas tidak sesuai",
+    "reconciliationGroupTitle": "Data broker tidak cocok",
     "reconciliationPositionTitle": "Posisi tidak sesuai",
     "viewHolding": "Lihat kepemilikan",
     "openConnection": "Buka koneksi",

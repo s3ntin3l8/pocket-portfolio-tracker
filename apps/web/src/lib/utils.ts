@@ -234,8 +234,12 @@ export function rowAnomalyCounts(anomalies: Anomaly[]): { errors: number; warnin
  * Anomalies with nowhere to attach as a row — always render these as their own standalone
  * banner (e.g. ReconciliationBanner), never fold them into the row-count headline.
  */
-export function bannerAnomalies<T extends { transactionId?: string }>(anomalies: T[]): T[] {
-  return anomalies.filter((a) => !isRowAnomaly(a));
+export function bannerAnomalies<T extends { transactionId?: string; code?: string }>(
+  anomalies: T[],
+): T[] {
+  // Unmapped broker events are a data-mapping problem the user cannot act on: they belong
+  // to the admin (Jobs page + badge), never to a user-facing banner.
+  return anomalies.filter((a) => !isRowAnomaly(a) && a.code !== "unmapped_broker_events");
 }
 
 /**
@@ -399,7 +403,6 @@ export function reconciliationItem(
 ): ReconciliationItem {
   const meta = a.meta ?? {};
   const isPosition = a.code === "position_gap";
-  const isUnmapped = a.code === "unmapped_broker_events";
   const portfolioId = typeof meta.portfolioId === "string" ? meta.portfolioId : fallbackPortfolioId;
   // Same code+subject can occur once per portfolio in the aggregate view.
   const key = [a.code, meta.currency ?? meta.isin ?? meta.eventType ?? "", portfolioId ?? ""].join(
@@ -408,21 +411,12 @@ export function reconciliationItem(
   let action: ReconciliationItem["action"];
   if (isPosition && typeof meta.instrumentId === "string") {
     action = { href: `/instruments/${meta.instrumentId}`, label: ta("viewHolding") };
-  } else if (isUnmapped) {
-    // The types are listed in Settings › Data & connections (`UnmappedTypesAlert`).
-    action = { href: "/settings/connections", label: ta("openConnections") };
   } else if (!isPosition && portfolioId) {
     action = { href: `/settings/portfolios/${portfolioId}`, label: ta("openConnection") };
   }
   return {
     key,
-    title: ta(
-      isUnmapped
-        ? "unmappedTitle"
-        : isPosition
-          ? "reconciliationPositionTitle"
-          : "reconciliationTitle",
-    ),
+    title: ta(isPosition ? "reconciliationPositionTitle" : "reconciliationTitle"),
     detail: anomalyLabel(a, ta, locale),
     tag: ta("portfolioTag"),
     // A portfolio-scoped anomaly points at no transaction, so the server-side dismissal

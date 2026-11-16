@@ -67,6 +67,7 @@ export async function HoldingsAnomalySection({ scope, locale }: { scope: Scope; 
         </div>
       )}
       <ReconciliationBannerGroup
+        groupTitle={ta("reconciliationGroupTitle")}
         items={standaloneAnomalies.map((a) =>
           reconciliationItem(
             a,

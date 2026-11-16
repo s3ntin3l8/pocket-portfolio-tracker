@@ -1528,7 +1528,7 @@ describe("TransactionsTable", () => {
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
     });
 
-    it("renders an unmapped_broker_events anomaly as a banner, not a flagged row", () => {
+    it("never shows an unmapped_broker_events anomaly to the user (admin-only data-mapping issue)", () => {
       render(
         <NextIntlClientProvider locale="en" messages={messages}>
           <TransactionsTable
@@ -1544,11 +1544,8 @@ describe("TransactionsTable", () => {
           />
         </NextIntlClientProvider>,
       );
-      expect(
-        screen.getByText(
-          "3 Trade Republic event(s) of type foo.bar could not be mapped and are missing from your balances",
-        ),
-      ).toBeInTheDocument();
+      expect(screen.queryByText(/could not be mapped/)).toBeNull();
+      expect(screen.queryByText(messages.Anomalies.unmappedTitle)).toBeNull();
       expect(screen.queryByText(messages.Anomalies.codes.unknown)).toBeNull();
       // No transactionId → never a flagged row, so no "Show flagged only" toggle.
       expect(screen.queryByRole("button", { name: messages.Anomalies.showFlagged })).toBeNull();
@@ -1593,8 +1590,8 @@ describe("TransactionsTable", () => {
       // All 3 render as distinct ReconciliationBanners (interpolated meta makes each unique),
       // not just the first one found — previously .find() only ever surfaced one.
       // A position gap says so — it's not titled "Cash doesn't reconcile".
-      expect(screen.getAllByText("Cash doesn't reconcile").length).toBe(1);
-      expect(screen.getAllByText("Position doesn't reconcile").length).toBe(2);
+      // Bundled: one banner titled for the group, one detail line per gap.
+      expect(screen.getAllByText("Broker data doesn't reconcile").length).toBe(1);
       expect(screen.getByText(/XF000BTC0017/)).toBeInTheDocument();
       expect(screen.getByText(/XF000ETH0019/)).toBeInTheDocument();
       // Money / quantities are formatted, not the API's raw decimal strings.
@@ -1638,8 +1635,9 @@ describe("TransactionsTable", () => {
       // show. The 3 portfolio-scoped anomalies render as their own ReconciliationBanners
       // instead of inflating this count to a number nothing on the page can match.
       expect(screen.getByText("1 error and 1 warning found in your data")).toBeInTheDocument();
-      expect(screen.getAllByText("Cash doesn't reconcile").length).toBe(1);
-      expect(screen.getAllByText("Position doesn't reconcile").length).toBe(2);
+      // All three gaps share ONE bundled banner.
+      expect(screen.getAllByText("Broker data doesn't reconcile").length).toBe(1);
+      expect(screen.getAllByText(/reconciliation gap vs\. broker/).length).toBe(3);
       fireEvent.click(screen.getByRole("button", { name: messages.Anomalies.showFlagged }));
       await waitFor(() => expect(screen.getAllByRole("row").slice(1).length).toBe(2));
     });
