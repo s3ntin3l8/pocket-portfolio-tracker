@@ -236,7 +236,8 @@
       "recoveredIn": "Pulih dalam {days}h",
       "belowHigh": "Saat ini diukur dari puncak {date}.",
       "notRecovered": "Belum pulih",
-      "smallPeak": "Puncak itu tercapai saat nilai kepemilikan {peak}; kini nilainya {current}. Angkanya berbobot waktu, jadi posisi awal yang kecil bisa menjadi puncaknya.",
+      "smallPeak": "Puncak {date} tercapai saat nilai kepemilikan {peak}; kini nilainya {current}.",
+      "smallPeakNote": "Angkanya berbobot waktu, jadi posisi awal yang kecil bisa menjadi puncaknya.",
       "insufficientData": "Data tidak mencukupi"
     },
     "volatility": {

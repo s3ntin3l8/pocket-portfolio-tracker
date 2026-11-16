@@ -236,7 +236,8 @@
       "recoveredIn": "Recovered in {days}d",
       "belowHigh": "Current is measured from the {date} high.",
       "notRecovered": "Not yet recovered",
-      "smallPeak": "That high was set when holdings were worth {peak}; today they are worth {current}. The figure is time-weighted, so a small early position can set the peak.",
+      "smallPeak": "The {date} high was set when holdings were worth {peak}; today they are worth {current}.",
+      "smallPeakNote": "The figure is time-weighted, so a small early position can set the peak.",
       "insufficientData": "Insufficient data"
     },
     "volatility": {

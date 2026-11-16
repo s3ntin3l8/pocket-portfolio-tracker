@@ -39,23 +39,54 @@ describe("DrawdownCard", () => {
 
   it("puts a drawdown set on a tiny book into perspective", () => {
     renderCard({ ...base, peakValue: "466", currentPeakValue: "466", currentValue: "33130" });
-    const note = screen.getByText(/That high was set when holdings were worth/);
+    const note = screen.getByText(/The 2021-11-08 high was set when holdings were worth/);
     expect(note).toHaveTextContent("€466.00");
     expect(note).toHaveTextContent("€33,130.00");
-    expect(note).toHaveTextContent(/time-weighted/);
+    expect(screen.getByText(/time-weighted/)).toBeInTheDocument();
+  });
+
+  it("dates each size note with its own high when the current high differs from the deepest episode's", () => {
+    renderCard({
+      ...base,
+      currentPeakDate: "2024-05-20",
+      peakValue: "466",
+      currentPeakValue: "28000",
+      currentValue: "33130",
+    });
+    // The deepest drop started on a tiny book; the high the current drawdown is measured from did not.
+    const notes = screen.getAllByText(/high was set when holdings were worth/);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toHaveTextContent("The 2021-11-08 high");
+    expect(notes[0]).toHaveTextContent("€466.00");
+    expect(screen.queryByText(/2024-05-20 high was set/)).toBeNull();
+  });
+
+  it("also explains a small CURRENT high with that high's own value", () => {
+    renderCard({
+      ...base,
+      currentPeakDate: "2024-05-20",
+      peakValue: "466",
+      currentPeakValue: "5000",
+      currentValue: "33130",
+    });
+    expect(screen.getAllByText(/high was set when holdings were worth/)).toHaveLength(2);
+    expect(
+      screen.getByText(/The 2024-05-20 high was set when holdings were worth €5,000\.00/),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/time-weighted/)).toHaveLength(1);
   });
 
   it("leaves the size note out when the high was set on a book of comparable size", () => {
     renderCard({ ...base, peakValue: "30000", currentPeakValue: "30000", currentValue: "33130" });
-    expect(screen.queryByText(/That high was set/)).toBeNull();
+    expect(screen.queryByText(/high was set when holdings/)).toBeNull();
   });
 
   it("leaves the size note out without a currency or without values", () => {
     const { unmount } = renderCard({ ...base, peakValue: "466", currentValue: "33130" }, null);
-    expect(screen.queryByText(/That high was set/)).toBeNull();
+    expect(screen.queryByText(/high was set when holdings/)).toBeNull();
     unmount();
     renderCard(base);
-    expect(screen.queryByText(/That high was set/)).toBeNull();
+    expect(screen.queryByText(/high was set when holdings/)).toBeNull();
   });
 
   it("shows no 'measured from' or 'not recovered' text when there is no drawdown", () => {

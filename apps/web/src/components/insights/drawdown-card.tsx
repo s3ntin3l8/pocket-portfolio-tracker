@@ -23,16 +23,26 @@ export function DrawdownCard({
   const belowHigh = currDdpct < 0 && !!drawdown.currentPeakDate;
 
   // Context for a drawdown set while the book was tiny (e.g. a single early position): the index is
-  // time-weighted, so −77% on €470 reads like −77% on a large book unless the size is shown.
-  // Measured against the high the card compares with: the deepest episode's peak, else the current one.
-  const peakValue = Number(drawdown.peakValue ?? Number.NaN);
+  // time-weighted, so −77% on €470 reads like −77% on a large book unless the size is shown. Each
+  // high is dated and carries ITS OWN value: the deepest episode's peak, and — when the current
+  // drawdown is measured from a different, later high — that one.
   const currentValue = Number(drawdown.currentValue ?? Number.NaN);
-  const showSmallPeak =
-    !!currency &&
-    maxDdpct < 0 &&
-    peakValue > 0 &&
-    currentValue > 0 &&
-    peakValue < currentValue * SMALL_PEAK_SHARE;
+  const isSmall = (value: string | null | undefined) => {
+    const v = Number(value ?? Number.NaN);
+    return !!currency && v > 0 && currentValue > 0 && v < currentValue * SMALL_PEAK_SHARE;
+  };
+  const sizeNotes: { date: string; peak: number }[] = [];
+  if (maxDdpct < 0 && drawdown.peakDate && isSmall(drawdown.peakValue)) {
+    sizeNotes.push({ date: drawdown.peakDate, peak: Number(drawdown.peakValue) });
+  }
+  if (
+    belowHigh &&
+    drawdown.currentPeakDate &&
+    drawdown.currentPeakDate !== drawdown.peakDate &&
+    isSmall(drawdown.currentPeakValue)
+  ) {
+    sizeNotes.push({ date: drawdown.currentPeakDate, peak: Number(drawdown.currentPeakValue) });
+  }
 
   return (
     <Card className="rounded-lg bg-card p-4 shadow-card">
@@ -82,13 +92,18 @@ export function DrawdownCard({
         </p>
       )}
 
-      {showSmallPeak && (
-        <p className="mt-1 text-xs leading-5 text-text-2">
-          {t("smallPeak", {
-            peak: formatMoney(peakValue, currency, locale),
-            current: formatMoney(currentValue, currency, locale),
-          })}
-        </p>
+      {currency &&
+        sizeNotes.map((n) => (
+          <p key={n.date} className="mt-1 text-xs leading-5 text-text-2">
+            {t("smallPeak", {
+              date: n.date,
+              peak: formatMoney(n.peak, currency, locale),
+              current: formatMoney(currentValue, currency, locale),
+            })}
+          </p>
+        ))}
+      {sizeNotes.length > 0 && (
+        <p className="mt-1 text-xs leading-5 text-text-2">{t("smallPeakNote")}</p>
       )}
     </Card>
   );
