@@ -141,12 +141,26 @@ function rotateRefreshTokenOnce(refreshToken: string): Promise<RefreshResult> {
 const localAuthAvailable = Boolean(process.env.AUTH_LOCAL_SECRET);
 const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);
 
+// Optional session lifetime in seconds (Auth.js default: 30 days). Auth.js stamps the session
+// cookie's `Expires` from the server clock, so a server whose clock runs behind the browser's
+// (the demo's frozen `DEMO_NOW`) hands out a cookie that is already expired and the browser drops
+// it. Unset keeps the default; a set but invalid value keeps it too, with a warning.
+const rawSessionMaxAge = process.env.AUTH_SESSION_MAX_AGE;
+const sessionMaxAge = Number(rawSessionMaxAge);
+if (rawSessionMaxAge?.trim() && !(Number.isFinite(sessionMaxAge) && sessionMaxAge > 0)) {
+  console.warn(
+    `[auth] ignoring AUTH_SESSION_MAX_AGE=${JSON.stringify(rawSessionMaxAge)}: expected a positive number of seconds; using the 30-day default`,
+  );
+}
+
 export const authConfig: NextAuthConfig = {
   // Self-hosted behind a reverse proxy (Proxmox / same origin as Authentik): trust
   // the forwarded host so Auth.js derives the right callback origin and cookie
   // security under `next start`. Without this, production throws `UntrustedHost`
   // and dev↔prod proto mismatches corrupt the PKCE cookie. Honors AUTH_TRUST_HOST too.
   trustHost: true,
+  ...(Number.isFinite(sessionMaxAge) &&
+    sessionMaxAge > 0 && { session: { maxAge: sessionMaxAge } }),
   // Send auth failures (notably a failed OAuth callback: a stale/replayed single-use
   // `code` or a PKCE-verifier mismatch from overlapping login tabs) to our own page,
   // which restarts a fresh sign-in instead of dead-ending on Auth.js's generic 500.

@@ -10,7 +10,12 @@ const authentikFactory = vi.fn(() => ({ id: "authentik" }));
 vi.mock("next-auth", () => ({ default: vi.fn((config) => config) }));
 vi.mock("next-auth/providers/authentik", () => ({ default: authentikFactory }));
 
-const ENV_KEYS = ["AUTH_SECRET", "AUTHENTIK_ISSUER", "AUTH_LOCAL_SECRET"] as const;
+const ENV_KEYS = [
+  "AUTH_SECRET",
+  "AUTHENTIK_ISSUER",
+  "AUTH_LOCAL_SECRET",
+  "AUTH_SESSION_MAX_AGE",
+] as const;
 const savedEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
@@ -52,6 +57,43 @@ describe("authConfig.providers — Authentik registration", () => {
 
     expect(authentikFactory).toHaveBeenCalled();
     expect(authConfig.providers).toContainEqual(expect.objectContaining({ id: "authentik" }));
+  });
+});
+
+describe("authConfig.session — AUTH_SESSION_MAX_AGE", () => {
+  // Auth.js stamps the session cookie's Expires from the server clock. The demo freezes that clock
+  // weeks behind the browser's, so with the 30-day default the cookie is born expired once the real
+  // date passes the frozen one + 30 days (the visual check lost its login that way).
+  const load = async (value: string | undefined) => {
+    process.env.AUTH_SECRET = "test-secret-1234567890-test-secret-12345"; // pragma: allowlist secret
+    delete process.env.AUTHENTIK_ISSUER;
+    delete process.env.AUTH_LOCAL_SECRET;
+    if (value === undefined) delete process.env.AUTH_SESSION_MAX_AGE;
+    else process.env.AUTH_SESSION_MAX_AGE = value;
+    vi.resetModules();
+    return (await import("../src/auth")).authConfig;
+  };
+
+  it("uses the Auth.js default when unset", async () => {
+    expect((await load(undefined)).session).toBeUndefined();
+  });
+
+  it("applies a positive number of seconds", async () => {
+    expect((await load("315360000")).session?.maxAge).toBe(315360000);
+  });
+
+  it.each(["abc", "10y", "0", "-5"])("ignores the invalid value %j and warns", async (value) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await load(value)).session).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("AUTH_SESSION_MAX_AGE"));
+    warn.mockRestore();
+  });
+
+  it("does not warn for an empty value", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await load("")).session).toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

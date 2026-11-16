@@ -645,6 +645,19 @@ describe("startDemo clock and session hand-off", () => {
     }
   });
 
+  it("gives the web app a long session only while the clock is frozen", async () => {
+    // Auth.js stamps the session cookie's Expires from the server clock; frozen behind the
+    // browser's, the default 30 days would hand out a cookie that is already expired.
+    let webEnv;
+    const boot = async (ctx) => {
+      webEnv = ctx.webEnv;
+    };
+    await startDemo({ quiet: true, demoNow: "2026-10-15T10:00:00Z", boot }).then((d) => d.stop());
+    expect(webEnv.AUTH_SESSION_MAX_AGE).toBe(String(10 * 365 * 24 * 60 * 60));
+    await startDemo({ quiet: true, demoNow: undefined, boot }).then((d) => d.stop());
+    expect(webEnv.AUTH_SESSION_MAX_AGE).toBeUndefined();
+  });
+
   it.each([
     [false, "demo|pocket"],
     [true, "local|demo@pocket.invalid"],
