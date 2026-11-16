@@ -1441,7 +1441,7 @@
     "installAppIosHint": "Ketuk Bagikan, lalu \"Add to Home Screen\".",
     "assistantLabel": "Asisten",
     "notificationsLabel": "Notifikasi di perangkat ini",
-    "notificationsHint": "Dapatkan notifikasi saat ada yang perlu diperhatikan, misalnya login broker yang kedaluwarsa. Hanya berlaku untuk browser atau aplikasi terpasang ini.",
+    "notificationsHint": "Dapatkan notifikasi saat ada yang perlu diperhatikan. Hanya berlaku untuk browser atau aplikasi terpasang ini.",
     "notificationsUnsupported": "Browser ini tidak dapat menerima notifikasi. Di iPhone atau iPad, tambahkan Pocket ke Layar Utama terlebih dahulu.",
     "notificationsDenied": "Notifikasi diblokir untuk situs ini. Izinkan di pengaturan browser, lalu coba lagi.",
     "notificationsError": "Tidak dapat memperbarui notifikasi. Silakan coba lagi.",

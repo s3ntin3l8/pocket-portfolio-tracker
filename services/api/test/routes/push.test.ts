@@ -196,6 +196,17 @@ describe("Web Push routes (configured)", () => {
     expect(JSON.parse(sent[0].body)).toMatchObject({ title: "Pocket", url: "/", tag: "test" });
   });
 
+  it("rate-limits test pushes to 5 per hour with a retry-after", async () => {
+    const t = await token("push-rate");
+    await post(t, sub("rate"));
+    const test = () => app.inject({ method: "POST", url: "/me/push/test", headers: auth(t) });
+    for (let i = 0; i < 5; i++) expect((await test()).statusCode).toBe(200);
+    const sixth = await test();
+    expect(sixth.statusCode).toBe(429);
+    expect(sixth.json()).toEqual({ error: "push_test_rate_limited" });
+    expect(Number(sixth.headers["retry-after"])).toBeGreaterThan(0);
+  });
+
   it("409s a test push when the user has no device", async () => {
     const t = await token("push-test-none");
     const res = await app.inject({ method: "POST", url: "/me/push/test", headers: auth(t) });

@@ -1,5 +1,5 @@
 {
-  "id": "22e80c80-d465-49a0-a85c-1a7fff30f1e0",
+  "id": "63fdd33b-b306-4064-ad0d-ffe7f540fb19",
   "prevId": "adacac82-6817-4372-bab4-df75062feeeb",
   "version": "7",
   "dialect": "postgresql",
@@ -2770,7 +2770,23 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "push_subscriptions_user_id_idx": {
+          "name": "push_subscriptions_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "push_subscriptions_user_id_users_id_fk": {
           "name": "push_subscriptions_user_id_users_id_fk",

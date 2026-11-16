@@ -75,13 +75,6 @@ export async function pushRoute(app: FastifyInstance) {
     const user = requireUser(request);
     if (!pushEnabled(app.config)) return reply.code(503).send({ error: "push_not_configured" });
 
-    const allowed = testLimiter.check(user.id);
-    if (!allowed.ok) {
-      return reply
-        .code(429)
-        .header("retry-after", String(allowed.retryAfterSec))
-        .send({ error: "push_test_rate_limited" });
-    }
     const [any] = await app.db
       .select({ id: pushSubscriptions.id })
       .from(pushSubscriptions)
@@ -89,7 +82,14 @@ export async function pushRoute(app: FastifyInstance) {
       .limit(1);
     if (!any) return reply.code(409).send({ error: "no_subscriptions" });
 
-    testLimiter.hit(user.id);
+    // `hit()` alone decides, so two concurrent requests cannot both slip past a `check()`.
+    const allowed = testLimiter.hit(user.id);
+    if (!allowed.ok) {
+      return reply
+        .code(429)
+        .header("retry-after", String(allowed.retryAfterSec))
+        .send({ error: "push_test_rate_limited" });
+    }
     const result = await notifyUser(
       {
         db: app.db,

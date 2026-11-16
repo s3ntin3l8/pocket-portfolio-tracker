@@ -1441,7 +1441,7 @@
     "installAppIosHint": "Tap Share, then \"Add to Home Screen\".",
     "assistantLabel": "Assistant",
     "notificationsLabel": "Notifications on this device",
-    "notificationsHint": "Get a notification when something needs your attention, such as an expired broker login. Applies to this browser or installed app only.",
+    "notificationsHint": "Get a notification when something needs your attention. Applies to this browser or installed app only.",
     "notificationsUnsupported": "This browser can't receive notifications. On iPhone or iPad, add Pocket to your Home Screen first.",
     "notificationsDenied": "Notifications are blocked for this site. Allow them in your browser settings, then try again.",
     "notificationsError": "Couldn't update notifications. Please try again.",

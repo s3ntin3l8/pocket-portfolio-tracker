@@ -97,7 +97,8 @@ self.addEventListener("push", (event: PushEvent) => {
 self.addEventListener("notificationclick", (event: NotificationEvent) => {
   event.notification.close();
   const raw = (event.notification.data as { url?: string } | undefined)?.url;
-  const path = raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
+  const path =
+    raw && raw.startsWith("/") && !raw.startsWith("//") && !raw.includes("\\") ? raw : "/";
   const target = new URL(path, self.location.origin).href;
   event.waitUntil(
     (async () => {

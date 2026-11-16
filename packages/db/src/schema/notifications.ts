@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, index } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 
 /**
@@ -7,15 +7,20 @@ import { users } from "./users.js";
  * subscriber's own public encryption material, stored encrypted at rest like other
  * connection secrets (`DB_ENCRYPTION_KEY`).
  */
-export const pushSubscriptions = pgTable("push_subscriptions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  endpoint: text("endpoint").notNull().unique(),
-  p256dhEnc: text("p256dh_enc").notNull(),
-  authEnc: text("auth_enc").notNull(),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
-}).enableRLS();
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dhEnc: text("p256dh_enc").notNull(),
+    authEnc: text("auth_enc").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  },
+  // Every notifyUser fan-out, the per-user cap and the users FK cascade filter on user_id.
+  (t) => [index("push_subscriptions_user_id_idx").on(t.userId)],
+).enableRLS();
