@@ -237,6 +237,7 @@
       "belowHigh": "Current is measured from the {date} high.",
       "notRecovered": "Not yet recovered",
       "smallPeak": "The {date} high was set when holdings were worth {peak}; today they are worth {current}.",
+      "smallPeakShort": "The {date} high was set when holdings were worth {peak}.",
       "smallPeakNote": "The figure is time-weighted, so a small early position can set the peak.",
       "insufficientData": "Insufficient data"
     },

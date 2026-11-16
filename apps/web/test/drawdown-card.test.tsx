@@ -74,6 +74,8 @@ describe("DrawdownCard", () => {
       screen.getByText(/The 2024-05-20 high was set when holdings were worth €5,000\.00/),
     ).toBeInTheDocument();
     expect(screen.getAllByText(/time-weighted/)).toHaveLength(1);
+    // Today's value is stated once, not repeated on the second note.
+    expect(screen.getAllByText(/today they are worth/)).toHaveLength(1);
   });
 
   it("leaves the size note out when the high was set on a book of comparable size", () => {

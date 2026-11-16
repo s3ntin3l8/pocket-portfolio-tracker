@@ -93,13 +93,19 @@ export function DrawdownCard({
       )}
 
       {currency &&
-        sizeNotes.map((n) => (
+        sizeNotes.map((n, i) => (
           <p key={n.date} className="mt-1 text-xs leading-5 text-text-2">
-            {t("smallPeak", {
-              date: n.date,
-              peak: formatMoney(n.peak, currency, locale),
-              current: formatMoney(currentValue, currency, locale),
-            })}
+            {/* Today's value is stated once, on the first note. */}
+            {i === 0
+              ? t("smallPeak", {
+                  date: n.date,
+                  peak: formatMoney(n.peak, currency, locale),
+                  current: formatMoney(currentValue, currency, locale),
+                })
+              : t("smallPeakShort", {
+                  date: n.date,
+                  peak: formatMoney(n.peak, currency, locale),
+                })}
           </p>
         ))}
       {sizeNotes.length > 0 && (

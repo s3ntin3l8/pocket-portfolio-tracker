@@ -237,6 +237,7 @@
       "belowHigh": "Saat ini diukur dari puncak {date}.",
       "notRecovered": "Belum pulih",
       "smallPeak": "Puncak {date} tercapai saat nilai kepemilikan {peak}; kini nilainya {current}.",
+      "smallPeakShort": "Puncak {date} tercapai saat nilai kepemilikan {peak}.",
       "smallPeakNote": "Angkanya berbobot waktu, jadi posisi awal yang kecil bisa menjadi puncaknya.",
       "insufficientData": "Data tidak mencukupi"
     },
