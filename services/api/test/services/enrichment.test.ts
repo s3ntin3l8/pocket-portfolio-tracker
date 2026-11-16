@@ -16,6 +16,7 @@ import {
   documents,
   screenshotImports,
   instruments,
+  txSourceTypeEnum,
 } from "@portfolio/db";
 import { ensureDb, getDb, closeDb } from "../../src/db/client.js";
 import {
@@ -25,6 +26,7 @@ import {
   sourcesForTransactions,
 } from "../../src/services/enrichment.js";
 import { buildDocumentName, slug } from "../../src/storage/naming.js";
+import { SOURCE_RANK } from "@portfolio/schema";
 import type { ParsedTransaction } from "@portfolio/schema";
 
 /**
@@ -551,6 +553,10 @@ describe("sourcesForTransactions", () => {
       "pdf",
       "manual",
     ]);
+  });
+
+  it("ranks every stored source type, so a new tx_source_type cannot slip into the default rank", () => {
+    expect(Object.keys(SOURCE_RANK).sort()).toEqual([...txSourceTypeEnum.enumValues].sort());
   });
 
   it("returns empty map for empty input", async () => {

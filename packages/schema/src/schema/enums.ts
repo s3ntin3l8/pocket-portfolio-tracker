@@ -46,4 +46,26 @@ export type CostBasisMode = z.infer<typeof costBasisModeSchema>;
 export const transactionSourceSchema = z.enum(["screenshot", "csv", "manual", "pytr", "pdf"]);
 export type TransactionSource = z.infer<typeof transactionSourceSchema>;
 
+/**
+ * Display/merge order of a transaction's sources: the broker feed first, then file imports, manual
+ * last. One table for both sides: the API orders `transaction_sources` rows with it (ties on
+ * `created_at`, which also decides which source wins the last-wins tax-component merge) and the web
+ * orders the badges with it. A source type missing here ranks {@link SOURCE_RANK_DEFAULT}; the API
+ * test asserts every `tx_source_type` value has an entry, so a new one cannot slip in silently.
+ */
+export const SOURCE_RANK: Readonly<Record<string, number>> = {
+  pytr: 0,
+  ibkr: 0,
+  csv: 1,
+  screenshot: 2,
+  pdf: 3,
+  manual: 9,
+};
+
+export const SOURCE_RANK_DEFAULT = 5;
+
+export function sourceRank(sourceType: string): number {
+  return SOURCE_RANK[sourceType] ?? SOURCE_RANK_DEFAULT;
+}
+
 export const LOW_CONFIDENCE_THRESHOLD = 0.9;

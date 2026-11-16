@@ -21,6 +21,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { sourceRank } from "@portfolio/schema";
 import type { SourceSummary, TransactionStatus } from "@portfolio/api-client";
 
 export const SOURCE_ICON: Record<string, LucideIcon> = {
@@ -85,23 +86,11 @@ export const SRC_TONES: Record<string, React.CSSProperties> = {
   manual: { background: "var(--border)", color: "var(--text-mute)" },
 };
 
-/** Display order of source badges: the broker feed first, then file imports, manual last. The API
- *  returns sources in attach order, but a stable product order reads the same on every row. */
-const SOURCE_RANK: Record<string, number> = {
-  pytr: 0,
-  ibkr: 0,
-  csv: 1,
-  screenshot: 2,
-  pdf: 3,
-  manual: 9,
-};
-
 export function sourceTypesFor(tx: TxRow): string[] {
   const types = (tx.sources ?? []).map((s) => s.sourceType).filter(Boolean);
   if (types.length === 0) return [tx.source];
-  const rank = (t: string) => SOURCE_RANK[t] ?? 5;
   // Array.prototype.sort is stable, so equal ranks keep the API's attach order.
-  return [...new Set(types)].sort((a, b) => rank(a) - rank(b));
+  return [...new Set(types)].sort((a, b) => sourceRank(a) - sourceRank(b));
 }
 
 export interface TxRow {
