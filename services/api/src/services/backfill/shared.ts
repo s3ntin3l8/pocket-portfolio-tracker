@@ -281,13 +281,11 @@ export type EarliestPriceDates = Map<string, Map<string, string>>;
  */
 export async function loadEarliestPriceDates(
   db: DB,
-  instrRows: { id: string; assetClass: string; [k: string]: unknown }[],
+  instrRows: Pick<BackfillContext["instrRows"][number], "id" | "assetClass" | "manualPrice">[],
   inceptionDate: string,
 ): Promise<EarliestPriceDates> {
   const out: EarliestPriceDates = new Map();
-  const ids = instrRows
-    .filter((i) => !(i.assetClass === "bond" && isManualPriceBond(i as never)))
-    .map((i) => i.id);
+  const ids = instrRows.filter((i) => !isManualPriceBond(i)).map((i) => i.id);
   if (ids.length === 0) return out;
   const rows = await db
     .select({
