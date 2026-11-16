@@ -82,8 +82,18 @@ describe("authConfig.session — AUTH_SESSION_MAX_AGE", () => {
     expect((await load("315360000")).session?.maxAge).toBe(315360000);
   });
 
-  it.each(["", "abc", "0", "-5"])("ignores the invalid value %j", async (value) => {
+  it.each(["abc", "10y", "0", "-5"])("ignores the invalid value %j and warns", async (value) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect((await load(value)).session).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("AUTH_SESSION_MAX_AGE"));
+    warn.mockRestore();
+  });
+
+  it("does not warn for an empty value", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect((await load("")).session).toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
 

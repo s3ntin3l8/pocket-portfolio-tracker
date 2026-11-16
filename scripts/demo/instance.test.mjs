@@ -653,7 +653,7 @@ describe("startDemo clock and session hand-off", () => {
       webEnv = ctx.webEnv;
     };
     await startDemo({ quiet: true, demoNow: "2026-10-15T10:00:00Z", boot }).then((d) => d.stop());
-    expect(Number(webEnv.AUTH_SESSION_MAX_AGE)).toBeGreaterThanOrEqual(365 * 24 * 60 * 60);
+    expect(webEnv.AUTH_SESSION_MAX_AGE).toBe(String(10 * 365 * 24 * 60 * 60));
     await startDemo({ quiet: true, demoNow: undefined, boot }).then((d) => d.stop());
     expect(webEnv.AUTH_SESSION_MAX_AGE).toBeUndefined();
   });

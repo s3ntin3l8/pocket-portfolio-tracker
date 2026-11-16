@@ -144,8 +144,14 @@ const authentikAvailable = Boolean(process.env.AUTHENTIK_ISSUER);
 // Optional session lifetime in seconds (Auth.js default: 30 days). Auth.js stamps the session
 // cookie's `Expires` from the server clock, so a server whose clock runs behind the browser's
 // (the demo's frozen `DEMO_NOW`) hands out a cookie that is already expired and the browser drops
-// it. Unset or invalid keeps the default.
-const sessionMaxAge = Number(process.env.AUTH_SESSION_MAX_AGE);
+// it. Unset keeps the default; a set but invalid value keeps it too, with a warning.
+const rawSessionMaxAge = process.env.AUTH_SESSION_MAX_AGE;
+const sessionMaxAge = Number(rawSessionMaxAge);
+if (rawSessionMaxAge?.trim() && !(Number.isFinite(sessionMaxAge) && sessionMaxAge > 0)) {
+  console.warn(
+    `[auth] ignoring AUTH_SESSION_MAX_AGE=${JSON.stringify(rawSessionMaxAge)}: expected a positive number of seconds; using the 30-day default`,
+  );
+}
 
 export const authConfig: NextAuthConfig = {
   // Self-hosted behind a reverse proxy (Proxmox / same origin as Authentik): trust
