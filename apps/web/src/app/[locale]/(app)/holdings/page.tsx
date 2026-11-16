@@ -19,6 +19,7 @@ import { HoldingsPageCommands } from "@/components/holdings/holdings-page-comman
 import { HoldingsAnomalySection } from "@/components/holdings/holdings-anomaly-section";
 import { HoldingsSidebar } from "@/components/holdings/holdings-sidebar";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
+import { TrConnectionBanner } from "@/components/holdings/tr-connection-banner";
 import { collectFxMissing } from "@/lib/fx-missing";
 import {
   loadHoldings,
@@ -26,6 +27,7 @@ import {
   loadPreferences,
   loadMe,
   loadScopeAnomalies,
+  loadTrConnection,
 } from "@/lib/server-api";
 import {
   getScopeSelection,
@@ -109,9 +111,10 @@ export default async function HoldingsPage({
   const prefs = await loadPreferences();
   const costBasis = prefs?.costBasisMode ?? "purchase_price";
 
-  const [result, netWorthResult] = await Promise.all([
+  const [result, netWorthResult, trConnection] = await Promise.all([
     loadHoldings(costBasis),
     loadNetWorth(costBasis),
+    loadTrConnection(),
   ]);
 
   if (TIMING) {
@@ -271,6 +274,7 @@ export default async function HoldingsPage({
     <div className="space-y-5">
       {Heading}
       <FxMissingBanner currencies={fxMissing} />
+      <TrConnectionBanner connection={trConnection} />
       <HoldingsPageCommands />
 
       {/* ── Hero chart: full-width above the table; streams in behind a skeleton ── */}

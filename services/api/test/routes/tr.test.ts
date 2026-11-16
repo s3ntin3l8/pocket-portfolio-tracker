@@ -31,7 +31,9 @@ class FakePytr {
   };
   lastCode: string | undefined;
   approvalResult: string | Error = "MOZILLA_COOKIE_JAR";
-  async startPairing(userId: string) {
+  lastStart: { phone: string; pin: string } | undefined;
+  async startPairing(userId: string, creds?: { phone: string; pin: string }) {
+    this.lastStart = creds;
     if (this.startResult instanceof Error) throw this.startResult;
     this.pending.add(userId);
     return this.startResult;
@@ -632,6 +634,177 @@ describe("Trade Republic connection (encryption enabled)", () => {
     expect(res.json()).toMatchObject({ status: "error" });
   });
 
+  describe("renew", () => {
+    async function pairedUser(sub: string, phone: string) {
+      const t = await token(sub);
+      const portfolioId = await portfolioFor(app, t);
+      await app.inject({
+        method: "POST",
+        url: "/tr/connection",
+        headers: auth(t),
+        payload: { phone, pin: "4321", portfolioId },
+      });
+      await app.inject({ method: "POST", url: "/tr/connection/verify", headers: auth(t) });
+      return { t, portfolioId };
+    }
+
+    it("restarts the login from the stored credentials, then completes via verify", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-ok", "+4915100000001");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired", lastError: "Trade Republic session expired" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(202);
+      expect(res.json()).toEqual({ status: "awaiting_2fa", method: "push" });
+      // The user typed nothing: the runner got the decrypted stored phone + PIN.
+      expect(fake.lastStart).toMatchObject({ phone: "+4915100000001", pin: "4321" });
+
+      const pending = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      // The prior error stays: it marks this pairing as a renew, so an abandoned one is recovered.
+      expect(pending.json()).toMatchObject({
+        status: "awaiting_2fa",
+        lastError: "Trade Republic session expired",
+      });
+
+      const verify = await app.inject({
+        method: "POST",
+        url: "/tr/connection/verify",
+        headers: auth(t),
+      });
+      expect(verify.json()).toEqual({ status: "connected" });
+    });
+
+    it("renews an errored connection too", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-error", "+4915100000002");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "error", lastError: "pytr failed (see server logs)" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(202);
+    });
+
+    it("409s not_connected when there is nothing to renew", async () => {
+      const t = await token("tr-renew-none");
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: "not_connected" });
+    });
+
+    it("409s already_connected rather than replacing a working session", async () => {
+      const { t } = await pairedUser("tr-renew-healthy", "+4915100000003");
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: "already_connected" });
+    });
+
+    it("409s sync_in_progress while a sync is running", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-busy", "+4915100000004");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired", syncing: true })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      const res = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: "sync_in_progress" });
+    });
+
+    it("503s when pytr is unavailable and leaves the connection expired", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-unavail", "+4915100000005");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      const prev = fake.startResult;
+      fake.startResult = new PytrUnavailableError();
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/tr/connection/renew",
+          headers: auth(t),
+        });
+        expect(res.statusCode).toBe(503);
+        expect(res.json()).toEqual({ error: "pytr_not_available" });
+      } finally {
+        fake.startResult = prev;
+      }
+      const after = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(after.json()).toMatchObject({ status: "expired" });
+    });
+
+    it("502s tr_pairing_failed when the login cannot start, leaving the connection expired", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-502", "+4915100000006");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      const prev = fake.startResult;
+      fake.startResult = new PytrError("boom");
+      try {
+        const res = await app.inject({
+          method: "POST",
+          url: "/tr/connection/renew",
+          headers: auth(t),
+        });
+        expect(res.statusCode).toBe(502);
+        expect(res.json()).toEqual({ error: "tr_pairing_failed" });
+      } finally {
+        fake.startResult = prev;
+      }
+      const after = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(after.json()).toMatchObject({ status: "expired" });
+    });
+
+    it("cancel aborts the pairing but keeps the saved credentials, so renew works again", async () => {
+      const { t, portfolioId } = await pairedUser("tr-renew-cancel", "+4915100000007");
+      await getDb()
+        .update(trConnections)
+        .set({ status: "expired" })
+        .where(eq(trConnections.portfolioId, portfolioId));
+      await app.inject({ method: "POST", url: "/tr/connection/renew", headers: auth(t) });
+      expect(fake.pending.size).toBeGreaterThan(0);
+
+      const cancel = await app.inject({
+        method: "POST",
+        url: "/tr/connection/cancel",
+        headers: auth(t),
+      });
+      expect(cancel.statusCode).toBe(204);
+      const after = await app.inject({ method: "GET", url: "/tr/connection", headers: auth(t) });
+      expect(after.json()).toMatchObject({ status: "expired", portfolioId });
+
+      const again = await app.inject({
+        method: "POST",
+        url: "/tr/connection/renew",
+        headers: auth(t),
+      });
+      expect(again.statusCode).toBe(202);
+      expect(fake.lastStart).toMatchObject({ phone: "+4915100000007", pin: "4321" });
+    });
+  });
+
   it("disconnects: DELETE wipes the connection", async () => {
     const t = await token("tr-disc");
     const portfolioId = await portfolioFor(app, t);
@@ -672,6 +845,13 @@ describe("Trade Republic connection (encryption disabled)", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: "encryption_required" });
+    const renew = await app.inject({
+      method: "POST",
+      url: "/tr/connection/renew",
+      headers: auth(t),
+    });
+    expect(renew.statusCode).toBe(503);
+    expect(renew.json()).toEqual({ error: "encryption_required" });
     await app.close();
     await closeDb();
     delete process.env.AUTHENTIK_ISSUER;

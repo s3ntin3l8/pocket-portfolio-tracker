@@ -1990,6 +1990,22 @@
     },
     "disconnect": "Putuskan",
     "expiredHint": "Sesi Anda kedaluwarsa. Hubungkan kembali untuk melanjutkan sinkronisasi.",
+    "banner": {
+      "action": "Perbarui",
+      "dialogHintError": "Sinkronisasi Trade Republic terakhir gagal. Memperbarui memakai nomor telepon dan PIN yang tersimpan, jadi Anda hanya perlu konfirmasi di aplikasi Trade Republic.",
+      "dialogTitle": "Perbarui login Trade Republic",
+      "expired": {
+        "title": "Login Trade Republic kedaluwarsa.",
+        "body": "Sinkronisasi dijeda sampai Anda memperbaruinya."
+      },
+      "error": {
+        "title": "Sinkronisasi Trade Republic perlu perhatian.",
+        "body": "Sinkronisasi terakhir gagal. Perbarui login untuk melanjutkan."
+      }
+    },
+    "renewHint": "Login Trade Republic Anda kedaluwarsa. Memperbarui memakai nomor telepon dan PIN yang tersimpan, jadi Anda hanya perlu konfirmasi di aplikasi Trade Republic.",
+    "renew": "Perbarui login",
+    "useOtherCredentials": "Atau masukkan kredensial lain di bawah.",
     "error": "Terjadi kesalahan. Silakan coba lagi.",
     "boundElsewhere": "Akun Trade Republic ini terhubung ke portofolio lain. Menghubungkan di sini akan memindahkannya ke portofolio ini.",
     "errors": {
@@ -2000,6 +2016,12 @@
       "tr_pairing_failed": "Tidak dapat memulai login Trade Republic. Silakan coba lagi.",
       "portfolio_not_found": "Portofolio tersebut tidak ditemukan lagi.",
       "not_connected": "Belum terhubung. Hubungkan kembali lalu coba lagi.",
+      "not_approved": "Login tidak disetujui di aplikasi Trade Republic. Coba lagi.",
+      "tr_approval_failed": "Tidak dapat menyelesaikan login Trade Republic. Silakan coba lagi.",
+      "sync_in_progress": "Sinkronisasi sedang berjalan. Coba lagi setelah selesai.",
+      "tr_child_account_unsupported": "Akun anak Trade Republic belum didukung.",
+      "no_pairing_in_progress": "Tidak ada login yang sedang berlangsung. Mulai lagi.",
+      "already_connected": "Sudah terhubung.",
       "tr_sync_failed": "Sinkronisasi gagal. Silakan coba lagi."
     }
   },

@@ -9,6 +9,9 @@ import messages from "../messages/en.json";
 function makeClient(over: Partial<TrConnectClient> = {}): TrConnectClient {
   return {
     connectTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
+    renewTr: vi.fn(async () => ({ status: "awaiting_2fa" as const, method: "push" as const })),
+    cancelTrPairing: vi.fn(async () => undefined),
+    // Never settles on its own: keeps the awaiting phase (and its Cancel button) on screen.
     verifyTr: vi.fn(async () => ({ status: "connected" as const })),
     syncTr: vi.fn(async () => ({ status: "connected" as const, drafts: 3 })),
     disconnectTr: vi.fn(async () => undefined),
@@ -269,6 +272,100 @@ describe("TrConnectFlow", () => {
     });
     expect(screen.getByText(/Your session expired/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Connect/ })).toBeTruthy();
+  });
+
+  it("renews an expired login in one tap with no credentials typed", async () => {
+    const client = makeClient();
+    const onChanged = renderFlow(client, {
+      status: "expired",
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: "Trade Republic session expired",
+      lastReconciliation: null,
+      syncing: false,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Renew login/ }));
+
+    await waitFor(() => expect(client.renewTr).toHaveBeenCalledTimes(1));
+    expect(client.connectTr).not.toHaveBeenCalled();
+    // Same completion path as a first pairing: verify fires, the poll sees `connected`.
+    await waitFor(() => expect(client.verifyTr).toHaveBeenCalledWith());
+    expect(await screen.findByRole("button", { name: /Sync now/ }, { timeout: 4000 })).toBeTruthy();
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("cancelling a renew keeps the saved credentials (no disconnect)", async () => {
+    const client = makeClient({
+      verifyTr: vi.fn(() => new Promise<{ status: "connected" }>(() => undefined)),
+      getTrConnection: vi.fn(async () => ({
+        status: "awaiting_2fa" as const,
+        portfolioId: "p1",
+        lastSyncAt: null,
+        lastError: null,
+        lastReconciliation: null,
+        syncing: false,
+        pairingMethod: "push" as const,
+      })),
+    });
+    renderFlow(client, {
+      status: "expired",
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: "Trade Republic session expired",
+      lastReconciliation: null,
+      syncing: false,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Renew login/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(client.cancelTrPairing).toHaveBeenCalledTimes(1));
+    expect(client.disconnectTr).not.toHaveBeenCalled();
+    // Back on the form with the one-tap Renew still offered.
+    expect(await screen.findByRole("button", { name: /Renew login/ })).toBeTruthy();
+  });
+
+  it("cancelling a first pairing still discards it", async () => {
+    const client = makeClient({
+      verifyTr: vi.fn(() => new Promise<{ status: "connected" }>(() => undefined)),
+      getTrConnection: vi.fn(async () => ({
+        status: "awaiting_2fa" as const,
+        portfolioId: "p1",
+        lastSyncAt: null,
+        lastError: null,
+        lastReconciliation: null,
+        syncing: false,
+        pairingMethod: "push" as const,
+      })),
+    });
+    renderFlow(client);
+    fireEvent.change(screen.getByLabelText("Phone number"), {
+      target: { value: "+4915112345678" },
+    });
+    fireEvent.change(screen.getByLabelText("PIN"), { target: { value: "1234" } });
+    fireEvent.click(screen.getByRole("button", { name: /Connect/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(client.disconnectTr).toHaveBeenCalledTimes(1));
+    expect(client.cancelTrPairing).not.toHaveBeenCalled();
+  });
+
+  it("offers no renew for a never-connected or healthy connection", () => {
+    renderFlow(makeClient());
+    expect(screen.queryByRole("button", { name: /Renew login/ })).toBeNull();
+  });
+
+  it("shows the failure reason and a renew button after a failed sync", () => {
+    renderFlow(makeClient(), {
+      status: "error",
+      portfolioId: "p1",
+      lastSyncAt: null,
+      lastError: "pytr failed (see server logs)",
+      lastReconciliation: null,
+      syncing: false,
+    });
+    expect(screen.getByText("pytr failed (see server logs)")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Renew login/ })).toBeTruthy();
   });
 
   it("surfaces an error when connect fails", async () => {

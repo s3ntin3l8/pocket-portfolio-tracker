@@ -2,6 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { users, portfolios, trConnections, ibkrConnections } from "@portfolio/db";
 import { ensureDb, closeDb } from "../../src/db/client.js";
+import {
+  ABANDONED_PAIRING_MS,
+  reapAbandonedPairings,
+} from "../../src/services/scheduler/cleanup.js";
 import { resetStaleSyncFlags } from "../../src/services/scheduler.js";
 
 // resetStaleSyncFlags is the scheduler's startup reaper (see startScheduler in
@@ -109,5 +113,102 @@ describe("resetStaleSyncFlags", () => {
 
     const [after] = await db.select().from(ibkrConnections).where(eq(ibkrConnections.id, conn.id));
     expect(after.syncing).toBe(false);
+  });
+});
+
+// A renew the user walked away from must not leave the connection stuck in awaiting_2fa
+// (the hourly sweep only syncs `connected` rows).
+describe("reapAbandonedPairings", () => {
+  async function seed(sub: string, over: Partial<typeof trConnections.$inferInsert>) {
+    const db = await ensureDb();
+    const [user] = await db
+      .insert(users)
+      .values({ authSub: `reap-pairing|${sub}`, email: `${sub}@example.com` })
+      .returning();
+    const [pf] = await db
+      .insert(portfolios)
+      .values({ userId: user.id, name: sub, baseCurrency: "EUR" })
+      .returning();
+    const [conn] = await db
+      .insert(trConnections)
+      .values({
+        userId: user.id,
+        portfolioId: pf.id,
+        phoneEnc: "enc-phone",
+        pinEnc: "enc-pin",
+        status: "awaiting_2fa",
+        ...over,
+      })
+      .returning();
+    return conn.id;
+  }
+  const statusOf = async (id: string) =>
+    (await (await ensureDb()).select().from(trConnections).where(eq(trConnections.id, id)))[0]
+      .status;
+  const old = () => new Date(Date.now() - ABANDONED_PAIRING_MS - 60_000);
+
+  afterAll(async () => {
+    await closeDb();
+  });
+
+  it("returns an old awaiting_2fa row that once had a session to expired", async () => {
+    const id = await seed("old-with-session", { sessionEnc: "enc-session", updatedAt: old() });
+    const res = await reapAbandonedPairings(await ensureDb());
+    expect(res.trConnections).toBeGreaterThanOrEqual(1);
+    expect(await statusOf(id)).toBe("expired");
+  });
+
+  it("leaves a fresh pairing (still within its approval window) alone", async () => {
+    const id = await seed("fresh", { sessionEnc: "enc-session", updatedAt: new Date() });
+    await reapAbandonedPairings(await ensureDb());
+    expect(await statusOf(id)).toBe("awaiting_2fa");
+  });
+
+  it("leaves a never-connected first setup alone", async () => {
+    const id = await seed("first-setup", { sessionEnc: null, updatedAt: old() });
+    await reapAbandonedPairings(await ensureDb());
+    expect(await statusOf(id)).toBe("awaiting_2fa");
+  });
+
+  it("does not touch connected or errored rows", async () => {
+    const ok = await seed("connected", {
+      status: "connected",
+      sessionEnc: "enc-session",
+      updatedAt: old(),
+    });
+    const err = await seed("errored", {
+      status: "error",
+      sessionEnc: "enc-session",
+      updatedAt: old(),
+    });
+    await reapAbandonedPairings(await ensureDb());
+    expect(await statusOf(ok)).toBe("connected");
+    expect(await statusOf(err)).toBe("error");
+  });
+
+  it("recovers a renew started from an errored connection that never had a session", async () => {
+    // first pairing declined (error, no session) -> user tapped Renew -> abandoned
+    const id = await seed("error-renew", {
+      sessionEnc: null,
+      lastError: "approval failed",
+      updatedAt: old(),
+    });
+    await reapAbandonedPairings(await ensureDb());
+    expect(await statusOf(id)).toBe("expired");
+  });
+
+  it("at boot (olderThanMs 0) reaps even a fresh orphan, stamped with the real time", async () => {
+    const id = await seed("boot", { sessionEnc: "enc-session", updatedAt: new Date() });
+    const before = Date.now();
+    await reapAbandonedPairings(await ensureDb(), { olderThanMs: 0 });
+    expect(await statusOf(id)).toBe("expired");
+    const [row] = await (
+      await ensureDb()
+    )
+      .select()
+      .from(trConnections)
+      .where(eq(trConnections.id, id));
+    expect(row.updatedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(row.updatedAt.getTime()).toBeLessThanOrEqual(Date.now() + 1000);
   });
 });

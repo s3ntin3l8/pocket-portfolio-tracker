@@ -20,6 +20,8 @@ import { useInterval } from "@/lib/use-interval";
 export type TrConnectClient = Pick<
   ApiClient,
   | "connectTr"
+  | "renewTr"
+  | "cancelTrPairing"
   | "verifyTr"
   | "syncTr"
   | "disconnectTr"
@@ -84,8 +86,13 @@ export function TrConnectFlow({
   const [error, setError] = useState<string | null>(null);
   const [confirmingReimport, setConfirmingReimport] = useState(false);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
+  // True while the pairing in flight is a renew: backing out must keep the saved credentials.
+  const [renewing, setRenewing] = useState(false);
 
   const expired = initial.status === "expired";
+  // A connection that stopped working keeps its stored credentials: offer the one-tap renew
+  // before the full form.
+  const renewable = initial.status === "expired" || initial.status === "error";
 
   // Map the API's machine-readable error code (e.g. `pytr_not_available`) to a specific
   // translated message, falling back to the generic one for unknown / non-API errors.
@@ -107,6 +114,22 @@ export function TrConnectFlow({
     }
   }
 
+  // Both a first pairing and a renew answer `{ method }`; this moves the UI into the matching
+  // waiting phase and re-arms the awaiting effect so the fresh login fires its own verify.
+  function enterPairing(method: "push" | "authenticator") {
+    windowStartRef.current = Date.now();
+    verifyFiredRef.current = false;
+    if (method === "authenticator") {
+      // The code has to be typed first; submitCode fires the verify with it.
+      setAuthenticator(true);
+      setCode("");
+      setPhase("code");
+    } else {
+      setAuthenticator(false);
+      setPhase("awaiting");
+    }
+  }
+
   const connect = (e: React.FormEvent) => {
     e.preventDefault();
     if (busy || !phone || !pin || !portfolioId) return;
@@ -118,20 +141,37 @@ export function TrConnectFlow({
         ...(showAdvanced && wafToken ? { wafToken } : {}),
       });
       setPin("");
-      windowStartRef.current = Date.now();
-      // Re-arm the awaiting effect so this fresh pairing fires its own verify.
-      verifyFiredRef.current = false;
-      if (res.method === "authenticator") {
-        // The code has to be typed first; submitCode fires the verify with it.
-        setAuthenticator(true);
-        setCode("");
-        setPhase("code");
-      } else {
-        setAuthenticator(false);
-        setPhase("awaiting");
-      }
+      setRenewing(false);
+      enterPairing(res.method);
     });
   };
+
+  // One tap: the server reuses the stored phone + PIN, so only the in-app approval is left.
+  const renew = () => {
+    if (busy) return;
+    void run(async () => {
+      const res = await client.renewTr();
+      setRenewing(true);
+      enterPairing(res.method);
+    });
+  };
+
+  // Backing out of the waiting phase. A first pairing is simply discarded; a renew only stops
+  // the login, so the Renew button (and the stored phone + PIN behind it) is still there.
+  const cancelPairing = () =>
+    void run(async () => {
+      if (renewing) {
+        await client.cancelTrPairing();
+        setRenewing(false);
+        setPhase("form");
+        onChanged?.();
+      } else {
+        await client.disconnectTr();
+        setConfirmingDisconnect(false);
+        setPhase("form");
+        onChanged?.();
+      }
+    });
 
   // Authenticator-app pairing: send the code, then wait for the login to be confirmed in the
   // TR app. A refused code (code_invalid) brings the user back here to try again; any other
@@ -257,6 +297,19 @@ export function TrConnectFlow({
       {phase === "form" && (
         <form onSubmit={connect} className="space-y-4">
           {expired && <p className="text-sm text-muted-foreground">{t("expiredHint")}</p>}
+          {renewable && (
+            <div className="space-y-2 rounded-md border p-3">
+              {initial.status === "error" && initial.lastError && (
+                <p className="text-xs text-muted-foreground">{initial.lastError}</p>
+              )}
+              <p className="text-sm text-muted-foreground">{t("renewHint")}</p>
+              <Button type="button" onClick={renew} disabled={busy}>
+                {busy ? <Spinner size="sm" /> : <RefreshCw className="size-4" />}
+                {t("renew")}
+              </Button>
+              <p className="text-xs text-muted-foreground">{t("useOtherCredentials")}</p>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="tr-phone">{t("phone")}</Label>
             <Input
@@ -322,7 +375,7 @@ export function TrConnectFlow({
             />
           </div>
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={disconnect} disabled={busy}>
+            <Button type="button" variant="outline" onClick={cancelPairing} disabled={busy}>
               {t("cancel")}
             </Button>
             <Button type="submit" disabled={code.length !== 6}>
@@ -346,7 +399,7 @@ export function TrConnectFlow({
             {t("approveWaiting")}
           </div>
           <div className="flex justify-end">
-            <Button variant="outline" onClick={disconnect} disabled={busy}>
+            <Button variant="outline" onClick={cancelPairing} disabled={busy}>
               {t("cancel")}
             </Button>
           </div>
