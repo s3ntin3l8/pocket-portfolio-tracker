@@ -54,3 +54,17 @@ describe("UnmappedTypesAlert", () => {
     expect(container.textContent).toContain("unmapped event type: TAXES");
   });
 });
+
+describe("UnmappedTypesAlert owner", () => {
+  it("names the account the events belong to in the admin view", async () => {
+    const el = await UnmappedTypesAlert({ types: TYPES, owner: "someone@example.com" });
+    render(el as React.ReactElement);
+    expect(screen.getByText("owner")).toBeInTheDocument();
+  });
+
+  it("shows no account line without an owner", async () => {
+    const el = await UnmappedTypesAlert({ types: TYPES });
+    render(el as React.ReactElement);
+    expect(screen.queryByText("owner")).toBeNull();
+  });
+});

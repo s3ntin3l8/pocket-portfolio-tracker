@@ -9,10 +9,12 @@ import {
   documents,
   apiTokens,
   adminAuditLog,
+  screenshotImports,
 } from "@portfolio/db";
 import { deleteStorageObjectsByKey } from "../../storage/receipts.js";
 import { hashPassword } from "../../plugins/auth.js";
 import { normalizeEmail } from "../auth.js";
+import { groupUnmappedEvents } from "../../services/pytr/unmapped.js";
 
 const createUserSchema = z.object({
   email: z.string().email().transform(normalizeEmail),
@@ -37,6 +39,43 @@ function generateTempPassword(): string {
 }
 
 export function registerUsersRoutes(app: FastifyInstance) {
+  // Unmapped / unparseable broker events across ALL users (admin troubleshooting). The per-user
+  // grouping is the one `/imports/unmapped-types` uses, so the two cannot disagree. Users with no
+  // gaps are omitted; sorted by most affected events first.
+  app.get(
+    "/admin/imports/unmapped-types",
+    {
+      config: { rateLimit: { max: 40, timeWindow: "1 minute" } },
+      preHandler: app.requireAdmin,
+    },
+    async () => {
+      const rows = await app.db
+        .select({
+          userId: screenshotImports.userId,
+          email: users.email,
+          status: screenshotImports.status,
+          createdAt: screenshotImports.createdAt,
+          parsedJson: screenshotImports.parsedJson,
+        })
+        .from(screenshotImports)
+        .innerJoin(users, eq(users.id, screenshotImports.userId))
+        .where(eq(screenshotImports.parser, "pytr"));
+      const byUser = new Map<string, { email: string; rows: typeof rows }>();
+      for (const r of rows) {
+        const entry = byUser.get(r.userId) ?? { email: r.email, rows: [] };
+        entry.rows.push(r);
+        byUser.set(r.userId, entry);
+      }
+      return Array.from(byUser, ([userId, { email, rows: userRows }]) => ({
+        userId,
+        email,
+        types: groupUnmappedEvents(userRows),
+      }))
+        .filter((u) => u.types.length > 0)
+        .sort((a, b) => b.types.length - a.types.length);
+    },
+  );
+
   app.get(
     "/admin/users",
     {
