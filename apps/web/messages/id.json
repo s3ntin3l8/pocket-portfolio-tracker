@@ -464,6 +464,7 @@
     "storageDiskTotal": "Total disk",
     "storageStatsUnavailable": "Statistik tidak tersedia",
     "users": "Pengguna",
+    "usersUnavailable": "Daftar pengguna tidak tersedia saat ini.",
     "usersHint": "Lihat pengguna terdaftar, penggunaan penyimpanan mereka, dan kelola akses.",
     "revokeTokens": "Cabut token",
     "revokeTokensConfirm": "Cabut semua token akses pribadi untuk {email}? Mereka harus login lagi untuk membuat token baru.",

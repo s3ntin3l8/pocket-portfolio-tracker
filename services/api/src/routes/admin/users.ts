@@ -2,15 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { eq, sql, ne, and } from "drizzle-orm";
 import { z } from "zod";
-import {
-  users,
-  portfolios,
-  transactions,
-  documents,
-  apiTokens,
-  adminAuditLog,
-  screenshotImports,
-} from "@portfolio/db";
+import { users, documents, apiTokens, adminAuditLog, screenshotImports } from "@portfolio/db";
 import { deleteStorageObjectsByKey } from "../../storage/receipts.js";
 import { hashPassword } from "../../plugins/auth.js";
 import { normalizeEmail } from "../auth.js";
@@ -92,19 +84,24 @@ export function registerUsersRoutes(app: FastifyInstance) {
           name: users.name,
           createdAt: users.createdAt,
           onboardingCompletedAt: users.onboardingCompletedAt,
-          portfolioCount: sql<number>`count(distinct ${portfolios.id})`,
-          transactionCount: sql<number>`count(distinct ${transactions.id})`,
-          documentCount: sql<number>`count(distinct ${documents.id})`,
-          storageBytes: sql<number>`coalesce((select sum(${documents.sizeBytes})
-            from ${documents} where ${documents.userId} = ${users.id}), 0)`,
-          tokenCount: sql<number>`count(distinct ${apiTokens.id})`,
+          // One scalar subquery per figure. Joining portfolios→transactions, documents
+          // and tokens side by side multiplies their row counts per user (a cartesian
+          // fan-out that took ~17 s with a few thousand rows) before count(distinct).
+          // Columns are written qualified: drizzle drops table prefixes in a
+          // single-table select, which would make "id" ambiguous inside the subqueries.
+          portfolioCount: sql<number>`(select count(*) from portfolios p
+            where p.user_id = users.id)`,
+          transactionCount: sql<number>`(select count(*) from transactions t
+            inner join portfolios p on p.id = t.portfolio_id
+            where p.user_id = users.id)`,
+          documentCount: sql<number>`(select count(*) from documents d
+            where d.user_id = users.id)`,
+          storageBytes: sql<number>`coalesce((select sum(d.size_bytes)
+            from documents d where d.user_id = users.id), 0)`,
+          tokenCount: sql<number>`(select count(*) from api_tokens a
+            where a.user_id = users.id)`,
         })
         .from(users)
-        .leftJoin(portfolios, eq(portfolios.userId, users.id))
-        .leftJoin(transactions, eq(transactions.portfolioId, portfolios.id))
-        .leftJoin(documents, eq(documents.userId, users.id))
-        .leftJoin(apiTokens, eq(apiTokens.userId, users.id))
-        .groupBy(users.id)
         .orderBy(sql`${users.createdAt} desc`);
 
       return rows.map((r) => ({
