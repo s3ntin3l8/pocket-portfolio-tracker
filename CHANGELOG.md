@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.11](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.10...v0.2.11) (2026-11-18)
+
+
+### Features
+
+* **assistant:** attach documents to a chat (opt-in) ([#1300](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1300)) ([2c97bf4](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/2c97bf49e7a25e7405b9dd4641ece5ba2b9eb8e8))
+* **tr:** map IPO_TRADE_EXECUTED to a buy ([#1296](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1296)) ([ef6583d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/ef6583d8629aeb550f40e3d9e23f55f4988a227c))
+* **web:** assistant as a docked sidebar on desktop, fixed phone layout, hand-off from Add transaction ([#1294](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1294)) ([422b799](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/422b79938e37ff7096270df073a3302977ffc425)), closes [#1248](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1248)
+* **web:** bundle reconciliation gaps into one banner and keep unmapped events admin-only ([#1290](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1290)) ([0557ab1](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/0557ab17d78913a8911c193c77237f6faf1cbe72))
+* **web:** show every user's unmapped broker events to admins ([#1298](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1298)) ([b20c790](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/b20c7904ae53e8f949f2f69149adcf03d7a0f520))
+
+
+### Bug Fixes
+
+* **api:** keep pg-boss pool from wedging on dead connections ([#1295](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1295)) ([6d3975d](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/6d3975d15ec6fc0a8112b560cf17484893d3f61a))
+* **api:** stop admin users list from timing out on large accounts ([#1299](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1299)) ([94b66a6](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/94b66a6227f937ba5d0f39af4380f67d80c08408))
+* **web:** show avg cost in its cost currency, not the quote currency ([#1301](https://github.com/s3ntin3l8/pocket-portfolio-tracker/issues/1301)) ([cad17a8](https://github.com/s3ntin3l8/pocket-portfolio-tracker/commit/cad17a84b0e6afe24a6b7829ad08f1a1f9dff83c))
+
 ## [0.2.10](https://github.com/s3ntin3l8/pocket-portfolio-tracker/compare/v0.2.9...v0.2.10) (2026-11-16)
 
 
