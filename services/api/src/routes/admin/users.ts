@@ -38,10 +38,12 @@ function generateTempPassword(): string {
   return `pw_${randomBytes(18).toString("base64url")}`;
 }
 
+const totalCount = (types: { count: number }[]) => types.reduce((n, t) => n + t.count, 0);
+
 export function registerUsersRoutes(app: FastifyInstance) {
   // Unmapped / unparseable broker events across ALL users (admin troubleshooting). The per-user
   // grouping is the one `/imports/unmapped-types` uses, so the two cannot disagree. Users with no
-  // gaps are omitted; sorted by most affected events first.
+  // gaps are omitted; sorted by most affected events first (by total event count).
   app.get(
     "/admin/imports/unmapped-types",
     {
@@ -59,7 +61,7 @@ export function registerUsersRoutes(app: FastifyInstance) {
         })
         .from(screenshotImports)
         .innerJoin(users, eq(users.id, screenshotImports.userId))
-        .where(eq(screenshotImports.parser, "pytr"));
+        .where(ne(screenshotImports.status, "discarded"));
       const byUser = new Map<string, { email: string; rows: typeof rows }>();
       for (const r of rows) {
         const entry = byUser.get(r.userId) ?? { email: r.email, rows: [] };
@@ -72,7 +74,7 @@ export function registerUsersRoutes(app: FastifyInstance) {
         types: groupUnmappedEvents(userRows),
       }))
         .filter((u) => u.types.length > 0)
-        .sort((a, b) => b.types.length - a.types.length);
+        .sort((a, b) => totalCount(b.types) - totalCount(a.types));
     },
   );
 

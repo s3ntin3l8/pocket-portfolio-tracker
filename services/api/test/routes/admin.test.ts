@@ -735,6 +735,7 @@ describe("admin provider config", () => {
 
   const userEndpoints: { method: "GET" | "POST" | "PATCH"; url: string }[] = [
     { method: "GET", url: "/admin/users" },
+    { method: "GET", url: "/admin/imports/unmapped-types" },
     { method: "POST", url: "/admin/users" },
     { method: "POST", url: "/admin/users/00000000-0000-0000-0000-000000000000/revoke-tokens" },
     { method: "POST", url: "/admin/users/00000000-0000-0000-0000-000000000000/reset-onboarding" },

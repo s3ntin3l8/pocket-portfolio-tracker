@@ -28,7 +28,7 @@ export async function UnmappedTypesAlert({
         <div className="min-w-0 space-y-2">
           <p className="font-medium">{t("title", { count: types.length })}</p>
           {owner ? <p className="text-sm font-medium">{t("owner", { email: owner })}</p> : null}
-          <p className="text-sm opacity-90">{t("description")}</p>
+          <p className="text-sm opacity-90">{t(owner ? "ownerDescription" : "description")}</p>
           <ul className="space-y-1.5 text-sm">
             {types.map((x) => (
               <li key={`${x.code}:${x.eventType ?? x.message}`}>
