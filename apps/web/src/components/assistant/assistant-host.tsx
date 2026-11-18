@@ -9,6 +9,7 @@ import type { AssistantPanelState } from "@/components/assistant/assistant-panel
 import { useApiClient } from "@/lib/api";
 import { currentScope } from "@/lib/assistant-chat";
 import { useAssistantChat } from "@/lib/use-assistant-chat";
+import { useComposerAttachments } from "@/lib/use-composer-attachments";
 import { useMediaQuery } from "@/lib/use-media-query";
 
 export interface AssistantSeed {
@@ -62,6 +63,13 @@ export default function AssistantHost({
     [serverScope],
   );
   const chat = useAssistantChat(client, getScope);
+  // Files the conversation already carries count against the API's cap of 3 per conversation.
+  const sentFiles = chat.turns.reduce(
+    (n, t) => n + (t.attachments?.filter((a) => !a.reattach).length ?? 0),
+    0,
+  );
+  const attachments = useComposerAttachments(status?.attachments, sentFiles);
+  const clearAttachments = attachments.clear;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -144,6 +152,7 @@ export default function AssistantHost({
       ...chat,
       reset: () => {
         scopeOverride.current = null;
+        clearAttachments();
         chat.reset();
       },
       history,
@@ -156,6 +165,7 @@ export default function AssistantHost({
     showHistory,
     setShowHistory,
     inputRef,
+    attachments,
   };
 
   if (docked) {

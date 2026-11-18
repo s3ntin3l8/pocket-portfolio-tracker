@@ -330,7 +330,13 @@ export function AddTransactionMenu({
     // After the close has committed, so the assistant (not this dialog) ends up focused.
     requestAnimationFrame(() =>
       assistant.open({
-        prefill: ta("handOffPrefill", { portfolio: portfolio.name }),
+        // With attachments on, the starter also invites a statement or screenshot.
+        prefill: ta(
+          assistant.status?.attachments?.enabled ? "handOffPrefillAttach" : "handOffPrefill",
+          {
+            portfolio: portfolio.name,
+          },
+        ),
         scope: `p:${portfolio.id}`,
       }),
     );

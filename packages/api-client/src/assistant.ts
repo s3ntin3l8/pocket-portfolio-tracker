@@ -9,6 +9,35 @@ export interface AssistantStatus {
   local: boolean;
   /** The user opted in to keeping conversations (and this credential may write them). */
   saveHistory?: boolean;
+  /**
+   * Attaching documents to a chat: `enabled` = the user opted in AND this credential may write.
+   * `images` is per model ("maybe" = the provider doesn't say); `pdf` = native PDF input (without
+   * it a PDF is sent as extracted text).
+   */
+  attachments?: AssistantAttachmentCapability;
+}
+
+export interface AssistantAttachmentCapability {
+  enabled: boolean;
+  images: "yes" | "maybe" | "no";
+  pdf: boolean;
+}
+
+/** The types a chat accepts, and the limits (the API refuses anything else, see docs/assistant.md). */
+export const ASSISTANT_ATTACHMENT_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "application/pdf",
+] as const;
+export const ASSISTANT_MAX_ATTACHMENTS = 3;
+export const ASSISTANT_MAX_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+
+/** A document on a user turn. `data` is base64. Sent with the request, never stored server-side. */
+export interface AssistantAttachment {
+  name: string;
+  mediaType: (typeof ASSISTANT_ATTACHMENT_TYPES)[number];
+  data: string;
 }
 
 export interface AssistantConversationSummary {
@@ -32,9 +61,14 @@ export interface AssistantChatMessage {
   content: string;
 }
 
+/** A request message: a user turn may carry attachments (opt-in; ≤ 3 across the conversation). */
+export interface AssistantChatRequestMessage extends AssistantChatMessage {
+  attachments?: AssistantAttachment[];
+}
+
 export interface AssistantChatRequest {
   /** Must start and end with a user message (≤ 20 messages, ≤ 4000 chars each). */
-  messages: AssistantChatMessage[];
+  messages: AssistantChatRequestMessage[];
   /** `all`, `p:<portfolio id>` or `h:<holder id>` — what the user is currently viewing. */
   scope?: string;
   /** Append the turn to this stored conversation (history on); omit to start a new one. */

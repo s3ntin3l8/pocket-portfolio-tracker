@@ -1359,6 +1359,8 @@ export interface UserPreferences {
   retirementAge: number | null;
   /** Opt-in: keep assistant conversations server-side (off by default). */
   assistantSaveHistory: boolean;
+  /** Opt-in: attach documents to an assistant chat (off by default). */
+  assistantAttachments: boolean;
 }
 
 /** A personal access token's metadata (never the secret). */
@@ -2549,9 +2551,15 @@ export function duplicatesFromError(err: unknown): DuplicateConflict | null {
 
 export { proposeTransactionsBodySchema, MAX_PROPOSED_TRANSACTIONS } from "@portfolio/schema";
 export {
+  ASSISTANT_ATTACHMENT_TYPES,
+  ASSISTANT_MAX_ATTACHMENT_BYTES,
+  ASSISTANT_MAX_ATTACHMENTS,
   parseAssistantStream,
+  type AssistantAttachment,
+  type AssistantAttachmentCapability,
   type AssistantChatMessage,
   type AssistantChatRequest,
+  type AssistantChatRequestMessage,
   type AssistantConversation,
   type AssistantConversationSummary,
   type AssistantEvent,
@@ -2983,6 +2991,7 @@ export function createApiClient(config: ApiClientConfig) {
         riskFreeRate: number | null;
         retirementAge: number | null;
         assistantSaveHistory: boolean;
+        assistantAttachments: boolean;
       }>,
     ) => request<UserPreferences>("PUT", "/me/preferences", prefs),
     getIncome: (holderId?: string) =>

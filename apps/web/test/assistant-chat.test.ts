@@ -9,6 +9,7 @@ import {
   errorKeyFor,
   MAX_HISTORY_MESSAGES,
   MAX_MESSAGE_CHARS,
+  splitAttachmentMarkers,
   toRequestMessages,
   type ChatTurn,
 } from "@/lib/assistant-chat";
@@ -83,6 +84,41 @@ describe("applyEvent", () => {
   });
 });
 
+describe("attachments in the request", () => {
+  const file = { name: "s.png", mediaType: "image/png" as const, data: "AQID" };
+
+  it("sends a turn's files with that turn only, and never for an assistant turn", () => {
+    const first = turn({ id: "u1", role: "user", content: "Record this" });
+    const answer = turn({ id: "a1", role: "assistant", content: "Price?" });
+    const follow = turn({ id: "u2", role: "user", content: "In the document" });
+    const files = new Map([
+      ["u1", [file]],
+      ["a1", [file]],
+    ]);
+    expect(toRequestMessages([first, answer, follow], files)).toEqual([
+      { role: "user", content: "Record this", attachments: [file] },
+      { role: "assistant", content: "Price?" },
+      { role: "user", content: "In the document" },
+    ]);
+  });
+
+  it("omits the field when there are no files", () => {
+    const msgs = toRequestMessages([turn({ id: "u1", role: "user", content: "hi" })]);
+    expect(msgs[0]).toEqual({ role: "user", content: "hi" });
+  });
+
+  it("splits stored 📎 markers off the text and flags them to be attached again", () => {
+    expect(splitAttachmentMarkers("Record this\n📎 a.pdf\n📎 b one.png")).toEqual({
+      content: "Record this",
+      attachments: [
+        { name: "a.pdf", reattach: true },
+        { name: "b one.png", reattach: true },
+      ],
+    });
+    expect(splitAttachmentMarkers("no files")).toEqual({ content: "no files" });
+  });
+});
+
 describe("error keys", () => {
   it("covers every server code and falls back to generic", () => {
     for (const code of [
@@ -93,6 +129,8 @@ describe("error keys", () => {
     ]) {
       expect(errorKey(code)).toBe(code);
     }
+    expect(errorKey("attachments_disabled")).toBe("attachments_disabled");
+    expect(errorKey("attachment_unsupported")).toBe("attachment_unsupported");
     expect(errorKey("nope")).toBe("generic");
   });
 
@@ -101,6 +139,13 @@ describe("error keys", () => {
     expect(errorKeyFor(new ApiError(429, "{}"))).toBe("assistant_rate_limited");
     expect(errorKeyFor(new ApiError(503, "{}"))).toBe("chat_not_configured");
     expect(errorKeyFor(new ApiError(400, "{}"))).toBe("invalid_request");
+    expect(errorKeyFor(new ApiError(400, '{"error":"attachments_disabled"}'))).toBe(
+      "attachments_disabled",
+    );
+    expect(errorKeyFor(new ApiError(400, '{"error":"attachment_unsupported"}'))).toBe(
+      "attachment_unsupported",
+    );
+    expect(errorKeyFor(new ApiError(400, '{"error":"something_else"}'))).toBe("invalid_request");
     expect(errorKeyFor(new ApiError(500, "{}"))).toBe("chat_failed");
     expect(errorKeyFor(new TypeError("fetch failed"))).toBe("network");
   });

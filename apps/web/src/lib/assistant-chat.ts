@@ -1,5 +1,9 @@
-import { ApiError } from "@portfolio/api-client";
-import type { AssistantChatMessage, AssistantEvent } from "@portfolio/api-client";
+import { ApiError, apiErrorCode } from "@portfolio/api-client";
+import type {
+  AssistantAttachment,
+  AssistantChatRequestMessage,
+  AssistantEvent,
+} from "@portfolio/api-client";
 import { formatScopeParam, parseCookieScope, parseScopeParam } from "@/lib/portfolio-selection";
 
 /** Mirror the API's request caps (docs/assistant.md) so a long chat never fails with a 400. */
@@ -12,10 +16,19 @@ export interface ToolStep {
   status: "running" | "done" | "failed";
 }
 
+/** A file shown on a user turn. Only its name is kept here; the bytes live in the chat hook. */
+export interface TurnAttachment {
+  name: string;
+  /** True for a turn reopened from History: the file was never stored and must be attached again. */
+  reattach?: boolean;
+}
+
 export interface ChatTurn {
   id: string;
   role: "user" | "assistant";
   content: string;
+  /** Documents attached to this user turn (names only; see {@link TurnAttachment}). */
+  attachments?: TurnAttachment[];
   /** Text of the model turn still being generated (a preview; `message` replaces it). */
   streaming?: string;
   /** The model's latest progress note ("what I'm doing"); shown until the answer text starts. */
@@ -30,15 +43,45 @@ export interface ChatTurn {
   stopped?: boolean;
 }
 
+/** The `📎 name` lines the API stores after a turn's text instead of the file (docs/assistant.md). */
+const MARKER_LINE = /\n📎 ([^\n]+)/g;
+
 /**
- * The conversation as the API wants it: text only (tool context is not replayed), the last
- * {@link MAX_HISTORY_MESSAGES}, starting with a user message. Turns that produced no text
+ * Split a stored user message into its text and the names of the files that were attached. The
+ * files themselves are never stored, so each comes back flagged `reattach`.
+ */
+export function splitAttachmentMarkers(content: string): {
+  content: string;
+  attachments?: TurnAttachment[];
+} {
+  const names = [...content.matchAll(MARKER_LINE)].map((m) => m[1]!.trim());
+  if (names.length === 0) return { content };
+  return {
+    content: content.replace(MARKER_LINE, ""),
+    attachments: names.map((name) => ({ name, reattach: true })),
+  };
+}
+
+/**
+ * The conversation as the API wants it: text, plus the files still held in memory for a turn
+ * (resent so a follow-up still sees the document), the last {@link MAX_HISTORY_MESSAGES},
+ * starting with a user message. Tool context is not replayed. Turns that produced no text
  * (a failed or stopped answer) are left out so they don't poison the next request.
  */
-export function toRequestMessages(turns: ChatTurn[]): AssistantChatMessage[] {
+export function toRequestMessages(
+  turns: ChatTurn[],
+  files: ReadonlyMap<string, AssistantAttachment[]> = new Map(),
+): AssistantChatRequestMessage[] {
   const messages = turns
     .filter((t) => !t.pending && t.content.trim().length > 0)
-    .map((t) => ({ role: t.role, content: t.content.slice(0, MAX_MESSAGE_CHARS) }));
+    .map((t) => {
+      const attached = t.role === "user" ? files.get(t.id) : undefined;
+      return {
+        role: t.role,
+        content: t.content.slice(0, MAX_MESSAGE_CHARS),
+        ...(attached?.length ? { attachments: attached } : {}),
+      };
+    });
   const recent = messages.slice(-MAX_HISTORY_MESSAGES);
   while (recent.length > 0 && recent[0]!.role !== "user") recent.shift();
   return recent;
@@ -105,6 +148,8 @@ const KNOWN_ERRORS = new Set([
   "assistant_rate_limited",
   "chat_not_configured",
   "invalid_request",
+  "attachments_disabled",
+  "attachment_unsupported",
 ]);
 
 /** Map a server error code to an `Assistant.errors` key; anything unexpected is `generic`. */
@@ -119,7 +164,12 @@ export function errorKeyFor(err: unknown): string {
     if (err.status === 401) return "unauthorized";
     if (err.status === 429) return "assistant_rate_limited";
     if (err.status === 503) return "chat_not_configured";
-    if (err.status === 400) return "invalid_request";
+    if (err.status === 400) {
+      const code = apiErrorCode(err);
+      return code === "attachments_disabled" || code === "attachment_unsupported"
+        ? code
+        : "invalid_request";
+    }
     return "chat_failed";
   }
   return "network";

@@ -1454,6 +1454,12 @@
     "assistantHistoryLabel": "Keep assistant conversations",
     "assistantHistoryHint": "Off by default. When on, your questions and the assistant's answers (text only — never tool data) are stored so you can reopen them on any device. Kept for 90 days, up to 50 conversations; you can delete them anytime.",
     "assistantHistoryError": "Couldn't update this setting. Please try again.",
+    "assistantAttachmentsLabel": "Attach documents to the assistant",
+    "assistantAttachmentsHint": "Off by default. When on, you can attach a screenshot or PDF to a chat so the assistant can read it and propose a draft transaction for you to review. Nothing is booked, and Pocket does not store or log the file.",
+    "assistantAttachmentsWarning": "The whole document is sent to {provider} as it is — account numbers, IBANs and names included. Pocket's usual redaction does not apply to attachments.",
+    "assistantAttachmentsWarningLocal": "The whole document is sent to the model on your own server as it is — account numbers, IBANs and names included. It stays on your infrastructure.",
+    "assistantAttachmentsWarningGeneric": "The whole document is sent to the selected chat provider as it is — account numbers, IBANs and names included. Pocket's usual redaction does not apply to attachments.",
+    "assistantAttachmentsError": "Couldn't update this setting. Please try again.",
     "assistantHistoryOffTitle": "Stop saving conversations?",
     "assistantHistoryOffBody": "All your saved assistant conversations will be deleted from the server. This can't be undone.",
     "assistantHistoryOffConfirm": "Turn off and delete",
@@ -2890,6 +2896,8 @@
     "stopped": "Stopped.",
     "disclosureCloud": "Answers use your portfolio figures, sent to {provider} to generate the reply. Account numbers and IBANs are never shared.",
     "disclosureLocal": "Runs on your own server — your data stays on your infrastructure. Account numbers and IBANs are never shared.",
+    "disclosureCloudAttachments": "Answers use your portfolio figures, sent to {provider} to generate the reply. Account numbers and IBANs are never shared — except in documents you attach, which go to {provider} as they are.",
+    "disclosureLocalAttachments": "Runs on your own server — your data stays on your infrastructure. Documents you attach are given to the model as they are, including account numbers and IBANs.",
     "disclaimer": "Explanations only — not financial, tax or legal advice. Check important figures in the app.",
     "emptyHint": "Ask a question about your portfolio, or try one of these:",
     "suggestions": {
@@ -2941,7 +2949,9 @@
       "chat_failed": "Something went wrong while answering. Please try again.",
       "assistant_rate_limited": "You've reached the hourly limit for assistant questions. Try again later.",
       "chat_not_configured": "The assistant isn't set up on this server.",
-      "invalid_request": "That message couldn't be sent. Try a shorter one or start a new chat."
+      "invalid_request": "That message couldn't be sent. Try a shorter one or start a new chat.",
+      "attachments_disabled": "Attachments are off for this session. Turn them on in Settings › Investing and try again.",
+      "attachment_unsupported": "The assistant's model can't read that file. Try a PNG, JPEG or WebP image, or a PDF with selectable text."
     },
     "history": "History",
     "historyBack": "Back to chat",
@@ -2956,11 +2966,25 @@
     "historyEnable": "Turn on saving",
     "historyEnableError": "Couldn't turn on saving. You can also do it in Settings → Investing.",
     "historyFull": "This conversation is full, so new messages aren't being saved. Start a new chat to keep going.",
+    "attach": "Attach a document",
+    "attachedFiles": "Attached files",
+    "removeAttachment": "Remove {name}",
+    "attachWarning": "Attached documents are sent to {provider} unredacted, including account numbers and IBANs.",
+    "attachWarningLocal": "Attached documents are sent to your own model unredacted, including account numbers and IBANs.",
+    "attachAgain": "The file isn't kept. Attach it again to ask about it.",
+    "attachHint": "Have a statement or screenshot? <link>Allow attachments in Settings</link>.",
+    "attachErrors": {
+      "type": "Only PNG, JPEG, WebP or PDF files can be attached.",
+      "size": "That file is larger than 5 MB.",
+      "read": "That file couldn't be read.",
+      "count": "At most 3 files per conversation."
+    },
     "expand": "Widen the assistant",
     "collapse": "Narrow the assistant",
     "close": "Close the assistant",
     "handOff": "Describe it to the assistant",
     "handOffPrefill": "Record this in {portfolio}: ",
+    "handOffPrefillAttach": "Record this in {portfolio} — paste the text or attach a statement: ",
     "handOffDesc": "Paste a broker email or details; you review the draft it creates."
   }
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "user_preferences" ADD COLUMN "assistant_attachments" boolean DEFAULT false NOT NULL;

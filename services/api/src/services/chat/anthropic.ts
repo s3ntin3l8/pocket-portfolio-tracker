@@ -3,6 +3,7 @@ import {
   ChatProviderError,
   STREAM_IDLE_TIMEOUT_MS,
   withTimeout,
+  type AttachmentSupport,
   type ChatMessage,
   type ChatProvider,
   type ChatRequest,
@@ -10,6 +11,7 @@ import {
   type ChatToolCall,
 } from "./types.js";
 import type { Logger } from "../parsers/types.js";
+import { anthropicMediaBlock } from "../ai/media-blocks.js";
 
 export interface AnthropicChatOptions {
   baseUrl?: string;
@@ -52,6 +54,11 @@ export class AnthropicChatProvider implements ChatProvider {
   readonly name = "claude";
   readonly label = "Claude (Anthropic)";
   readonly local = false;
+  /** Claude reads images and PDFs natively. */
+  readonly attachmentSupport = async (): Promise<AttachmentSupport> => ({
+    images: "yes",
+    pdf: true,
+  });
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly effort: string | undefined;
@@ -301,7 +308,17 @@ function mapStop(reason: string | undefined): ChatResult["stop"] {
 }
 
 function toAnthropicMessage(m: ChatMessage) {
-  if (m.role === "user") return { role: "user", content: m.content };
+  if (m.role === "user") {
+    if (!m.attachments?.length) return { role: "user", content: m.content };
+    // Media first, then the question about it.
+    return {
+      role: "user",
+      content: [
+        ...m.attachments.map((a) => anthropicMediaBlock(a.mediaType, a.data)),
+        { type: "text", text: m.content },
+      ],
+    };
+  }
   if (m.role === "tool") {
     return {
       role: "user",

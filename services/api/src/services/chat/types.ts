@@ -1,5 +1,25 @@
 import type { Logger } from "../parsers/types.js";
 
+/**
+ * A document the user attached to a message (opt-in). `data` is base64. Held in memory for the
+ * request only: never stored, never logged (the bytes would otherwise reach a provider
+ * unredacted AND a log or a table).
+ */
+export interface ChatAttachment {
+  name: string;
+  mediaType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
+  data: string;
+}
+
+/**
+ * What a provider's chat model can read. Image support is per model, so it may be unknown
+ * ("maybe"). `pdf` means native PDF input; a PDF to a provider without it is sent as extracted text.
+ */
+export interface AttachmentSupport {
+  images: "yes" | "maybe" | "no";
+  pdf: boolean;
+}
+
 /** A tool as the model sees it: name, description and a JSON Schema for its input. */
 export interface ChatToolSpec {
   name: string;
@@ -26,7 +46,7 @@ export interface ChatToolResult {
  * loop appends assistant turns (with their tool calls) and tool results.
  */
 export type ChatMessage =
-  | { role: "user"; content: string }
+  | { role: "user"; content: string; attachments?: ChatAttachment[] }
   | {
       role: "assistant";
       text: string;
@@ -57,6 +77,8 @@ export interface ChatProvider {
   /** True when data stays on the user's own infrastructure (Ollama / LM Studio). */
   readonly local: boolean;
   isConfigured(): boolean;
+  /** What attachments the model reads. Absent = unknown: images "maybe", no native PDF. */
+  attachmentSupport?: () => Promise<AttachmentSupport>;
   complete(req: ChatRequest, log?: Logger): Promise<ChatResult>;
   /**
    * Same turn as `complete`, but text is reported through `onDelta` as it arrives. Resolves with

@@ -1454,6 +1454,12 @@
     "assistantHistoryLabel": "Simpan percakapan asisten",
     "assistantHistoryHint": "Nonaktif secara default. Jika aktif, pertanyaan Anda dan jawaban asisten (hanya teks — tanpa data alat) disimpan agar bisa dibuka lagi di perangkat mana pun. Disimpan 90 hari, maksimal 50 percakapan; Anda bisa menghapusnya kapan saja.",
     "assistantHistoryError": "Tidak dapat memperbarui pengaturan ini. Silakan coba lagi.",
+    "assistantAttachmentsLabel": "Lampirkan dokumen ke asisten",
+    "assistantAttachmentsHint": "Nonaktif secara default. Jika aktif, Anda bisa melampirkan tangkapan layar atau PDF ke obrolan agar asisten membacanya dan mengusulkan draf transaksi untuk Anda tinjau. Tidak ada yang dicatat, dan Pocket tidak menyimpan maupun mencatat berkasnya.",
+    "assistantAttachmentsWarning": "Seluruh dokumen dikirim apa adanya ke {provider} — termasuk nomor rekening, IBAN, dan nama. Penyamaran data yang biasa tidak berlaku untuk lampiran.",
+    "assistantAttachmentsWarningLocal": "Seluruh dokumen dikirim apa adanya ke model di server Anda sendiri — termasuk nomor rekening, IBAN, dan nama. Data tetap di infrastruktur Anda.",
+    "assistantAttachmentsWarningGeneric": "Seluruh dokumen dikirim apa adanya ke penyedia obrolan yang dipilih — termasuk nomor rekening, IBAN, dan nama. Penyamaran data yang biasa tidak berlaku untuk lampiran.",
+    "assistantAttachmentsError": "Tidak dapat memperbarui pengaturan ini. Silakan coba lagi.",
     "assistantHistoryOffTitle": "Berhenti menyimpan percakapan?",
     "assistantHistoryOffBody": "Semua percakapan asisten yang tersimpan akan dihapus dari server. Tindakan ini tidak dapat dibatalkan.",
     "assistantHistoryOffConfirm": "Matikan dan hapus",
@@ -2890,6 +2896,8 @@
     "stopped": "Dihentikan.",
     "disclosureCloud": "Jawaban memakai angka portofolio Anda, yang dikirim ke {provider} untuk menyusun balasan. Nomor rekening dan IBAN tidak pernah dibagikan.",
     "disclosureLocal": "Berjalan di server Anda sendiri — data tetap di infrastruktur Anda. Nomor rekening dan IBAN tidak pernah dibagikan.",
+    "disclosureCloudAttachments": "Jawaban memakai angka portofolio Anda, yang dikirim ke {provider} untuk menyusun balasan. Nomor rekening dan IBAN tidak dibagikan — kecuali di dokumen yang Anda lampirkan, yang dikirim ke {provider} apa adanya.",
+    "disclosureLocalAttachments": "Berjalan di server Anda sendiri — data tetap di infrastruktur Anda. Dokumen yang Anda lampirkan diberikan ke model apa adanya, termasuk nomor rekening dan IBAN.",
     "disclaimer": "Hanya penjelasan — bukan nasihat keuangan, pajak, atau hukum. Periksa angka penting di aplikasi.",
     "emptyHint": "Ajukan pertanyaan tentang portofolio Anda, atau coba salah satu ini:",
     "suggestions": {
@@ -2941,7 +2949,9 @@
       "chat_failed": "Terjadi kesalahan saat menjawab. Silakan coba lagi.",
       "assistant_rate_limited": "Anda telah mencapai batas pertanyaan asisten per jam. Coba lagi nanti.",
       "chat_not_configured": "Asisten belum diatur di server ini.",
-      "invalid_request": "Pesan itu tidak dapat dikirim. Coba yang lebih pendek atau mulai obrolan baru."
+      "invalid_request": "Pesan itu tidak dapat dikirim. Coba yang lebih pendek atau mulai obrolan baru.",
+      "attachments_disabled": "Lampiran sedang nonaktif untuk sesi ini. Aktifkan di Pengaturan › Investasi, lalu coba lagi.",
+      "attachment_unsupported": "Model asisten tidak dapat membaca berkas itu. Coba gambar PNG, JPEG, atau WebP, atau PDF dengan teks yang bisa dipilih."
     },
     "history": "Riwayat",
     "historyBack": "Kembali ke chat",
@@ -2956,11 +2966,25 @@
     "historyEnable": "Aktifkan penyimpanan",
     "historyEnableError": "Gagal mengaktifkan penyimpanan. Anda juga bisa mengaturnya di Pengaturan → Investasi.",
     "historyFull": "Percakapan ini sudah penuh, sehingga pesan baru tidak disimpan. Mulai chat baru untuk melanjutkan.",
+    "attach": "Lampirkan dokumen",
+    "attachedFiles": "Berkas terlampir",
+    "removeAttachment": "Hapus {name}",
+    "attachWarning": "Dokumen terlampir dikirim ke {provider} tanpa disamarkan, termasuk nomor rekening dan IBAN.",
+    "attachWarningLocal": "Dokumen terlampir dikirim ke model Anda sendiri tanpa disamarkan, termasuk nomor rekening dan IBAN.",
+    "attachAgain": "Berkas tidak disimpan. Lampirkan lagi untuk menanyakannya.",
+    "attachHint": "Punya laporan atau tangkapan layar? <link>Izinkan lampiran di Pengaturan</link>.",
+    "attachErrors": {
+      "type": "Hanya berkas PNG, JPEG, WebP, atau PDF yang bisa dilampirkan.",
+      "size": "Berkas itu lebih dari 5 MB.",
+      "read": "Berkas itu tidak dapat dibaca.",
+      "count": "Maksimal 3 berkas per percakapan."
+    },
     "expand": "Perlebar asisten",
     "collapse": "Persempit asisten",
     "close": "Tutup asisten",
     "handOff": "Jelaskan ke asisten",
     "handOffPrefill": "Catat ini di {portfolio}: ",
+    "handOffPrefillAttach": "Catat ini di {portfolio} — tempel teksnya atau lampirkan laporan: ",
     "handOffDesc": "Tempel email broker atau rinciannya; Anda meninjau draf yang dibuatnya."
   }
 }

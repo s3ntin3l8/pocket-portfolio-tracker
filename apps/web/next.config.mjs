@@ -32,6 +32,11 @@ const withSerwist = withSerwistInit({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // The proxy (src/proxy.ts) matches /api/backend/*, and Next buffers a matched request's body up to
+  // this size, silently truncating the rest (default 10 MB). The API takes up to 25 MB on its upload
+  // routes (/imports/screenshot, and /assistant/chat with three attached documents), so allow a
+  // little more: an oversize request is then refused by the API (413), not cut off mid-JSON.
+  experimental: { proxyClientMaxBodySize: "26mb" },
   // Standalone build for Docker (apps/web/Dockerfile): emits .next/standalone with a
   // minimal, self-contained server.js + only the node_modules actually reachable from
   // this app's trace, instead of shipping the whole workspace node_modules.

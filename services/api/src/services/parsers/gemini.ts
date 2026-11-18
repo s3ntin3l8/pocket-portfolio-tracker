@@ -1,4 +1,5 @@
 import type { Logger, ParserImage, ParseResult, ScreenshotParser } from "./types.js";
+import { geminiInlineData } from "../ai/media-blocks.js";
 import {
   JSON_EXTRACTION_PROMPT,
   parseJsonObject,
@@ -64,7 +65,7 @@ export class GeminiVisionParser implements ScreenshotParser {
           {
             role: "user",
             parts: [
-              { inline_data: { mime_type: image.mimeType, data: image.data.toString("base64") } },
+              geminiInlineData(image.mimeType, image.data.toString("base64")),
               { text: JSON_EXTRACTION_PROMPT },
             ],
           },

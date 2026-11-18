@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiClient } from "@portfolio/api-client";
+import type { ApiClient, AssistantAttachment } from "@portfolio/api-client";
 import {
   applyEvent,
   errorKeyFor,
   settleTurn,
+  splitAttachmentMarkers,
   MAX_MESSAGE_CHARS,
   toRequestMessages,
   type ChatTurn,
@@ -28,9 +29,15 @@ const newId = () => `t${++nextId}`;
  * later sends carry so the turn is appended to it). `send` streams one answer, `stop` cancels it — the abort travels through the
  * proxy to the API, which stops the model call. Turns are kept in a ref so a send always sees
  * the latest history regardless of render timing.
+ *
+ * Attached documents (opt-in) are held in memory per user turn and resent with later turns, so a
+ * follow-up still sees the document. They are dropped by `reset` and a reload, and are never put
+ * in the turn list, the URL or any storage; a reopened conversation only knows the file names.
  */
 export function useAssistantChat(client: ChatClient, getScope: () => string) {
   const turnsRef = useRef<ChatTurn[]>([]);
+  /** The bytes of attached documents by user turn id. Memory only: never persisted. */
+  const filesRef = useRef<Map<string, AssistantAttachment[]>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -61,15 +68,20 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
 
   /** Starts an answer; returns false (and does nothing) when one is already streaming. */
   const send = useCallback(
-    (raw: string): boolean => {
+    (raw: string, files: AssistantAttachment[] = []): boolean => {
       const text = raw.trim().slice(0, MAX_MESSAGE_CHARS);
       if (!text || abortRef.current) return false;
 
-      const history = [
-        ...turnsRef.current,
-        { id: newId(), role: "user", content: text, steps: [] } satisfies ChatTurn,
-      ];
-      const request = toRequestMessages(history);
+      const userTurn: ChatTurn = {
+        id: newId(),
+        role: "user",
+        content: text,
+        steps: [],
+        ...(files.length ? { attachments: files.map((f) => ({ name: f.name })) } : {}),
+      };
+      if (files.length) filesRef.current.set(userTurn.id, files);
+      const history = [...turnsRef.current, userTurn];
+      const request = toRequestMessages(history, filesRef.current);
       commit([
         ...history,
         { id: newId(), role: "assistant", content: "", steps: [], pending: true },
@@ -140,6 +152,7 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     abortRef.current = null;
     setStreaming(false);
     setConversation(null);
+    filesRef.current.clear();
     commit([]);
   }, [commit, setConversation]);
 
@@ -156,12 +169,16 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
                 abortRef.current?.abort();
                 abortRef.current = null;
                 setStreaming(false);
+                // A stored file is only a `📎 name` marker: show the name, flag it for re-attaching.
+                filesRef.current.clear();
                 commit(
                   conv.messages.map((m) => ({
                     id: newId(),
                     role: m.role,
-                    content: m.content,
                     steps: [],
+                    ...(m.role === "user"
+                      ? splitAttachmentMarkers(m.content)
+                      : { content: m.content }),
                   })),
                 );
                 setConversation(conv.id);

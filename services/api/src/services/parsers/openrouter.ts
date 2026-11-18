@@ -1,4 +1,5 @@
 import type { Logger, ParserImage, ParseResult, ScreenshotParser } from "./types.js";
+import { openAiImagePart } from "../ai/media-blocks.js";
 import {
   EXTRACTION_PROMPT,
   TOOL_NAME,
@@ -55,7 +56,7 @@ export class OpenRouterVisionParser implements ScreenshotParser {
     );
     const t0 = Date.now();
 
-    const dataUrl = `data:${image.mimeType};base64,${image.data.toString("base64")}`;
+    const imagePart = openAiImagePart(image.mimeType, image.data.toString("base64"));
     const res = await this.doFetch(`${this.baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
@@ -78,10 +79,7 @@ export class OpenRouterVisionParser implements ScreenshotParser {
         messages: [
           {
             role: "user",
-            content: [
-              { type: "text", text: EXTRACTION_PROMPT },
-              { type: "image_url", image_url: { url: dataUrl } },
-            ],
+            content: [{ type: "text", text: EXTRACTION_PROMPT }, imagePart],
           },
         ],
       }),

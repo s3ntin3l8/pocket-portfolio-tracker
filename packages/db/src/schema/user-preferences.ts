@@ -25,6 +25,8 @@ export const userPreferences = pgTable("user_preferences", {
   retirementAge: integer("retirement_age"),
   /** Opt-in: keep assistant conversations server-side (see `assistant_conversations`). */
   assistantSaveHistory: boolean("assistant_save_history").notNull().default(false),
+  /** Opt-in: attach documents to an assistant chat (sent unredacted to the chat provider). */
+  assistantAttachments: boolean("assistant_attachments").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS();

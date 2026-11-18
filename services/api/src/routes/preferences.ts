@@ -60,6 +60,7 @@ export async function preferencesRoute(app: FastifyInstance) {
       riskFreeRate: prefs?.riskFreeRate ? Number(prefs.riskFreeRate) : null,
       retirementAge: prefs?.retirementAge ?? null,
       assistantSaveHistory: prefs?.assistantSaveHistory ?? false,
+      assistantAttachments: prefs?.assistantAttachments ?? false,
     };
   });
 
@@ -103,6 +104,7 @@ export async function preferencesRoute(app: FastifyInstance) {
           riskFreeRate: body.riskFreeRate != null ? String(body.riskFreeRate) : null,
           retirementAge: body.retirementAge ?? null,
           assistantSaveHistory: body.assistantSaveHistory ?? false,
+          assistantAttachments: body.assistantAttachments ?? false,
           createdAt: now,
           updatedAt: now,
         })
@@ -121,6 +123,9 @@ export async function preferencesRoute(app: FastifyInstance) {
             ...(body.retirementAge !== undefined ? { retirementAge: body.retirementAge } : {}),
             ...(body.assistantSaveHistory !== undefined
               ? { assistantSaveHistory: body.assistantSaveHistory }
+              : {}),
+            ...(body.assistantAttachments !== undefined
+              ? { assistantAttachments: body.assistantAttachments }
               : {}),
             updatedAt: now,
           },
@@ -169,6 +174,7 @@ export async function preferencesRoute(app: FastifyInstance) {
       riskFreeRate: updated?.riskFreeRate ? Number(updated.riskFreeRate) : null,
       retirementAge: updated?.retirementAge ?? null,
       assistantSaveHistory: updated?.assistantSaveHistory ?? false,
+      assistantAttachments: updated?.assistantAttachments ?? false,
     };
   });
 }

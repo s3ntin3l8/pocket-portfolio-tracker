@@ -7,11 +7,27 @@ import { createHash } from "node:crypto";
 // screen is the one read in EUR; everything else in the seed's IDR.
 // `assistantSaveHistory` is off everywhere but the saved-chats scene: turning it off deletes every stored
 // conversation, so each scene starts from nothing and none depends on the order the scenes ran in.
-const SETTINGS = { displayCurrency: "IDR", taxRegime: "DE", assistantSaveHistory: false };
+// `assistantAttachments` is off everywhere but the two attachment scenes, for the same reason.
+const SETTINGS = {
+  displayCurrency: "IDR",
+  taxRegime: "DE",
+  assistantSaveHistory: false,
+  assistantAttachments: false,
+};
 const SCENE_SETTINGS = {
   tax: { displayCurrency: "EUR" },
   "assistant-history-saved": { assistantSaveHistory: true },
+  "assistant-attachment": { assistantAttachments: true },
+  "settings-assistant-attachments": { assistantAttachments: true },
 };
+
+// Scenes have no upload step, so the paperclip's file chooser is answered here: the scene clicks it,
+// this hands the chooser a tiny PNG. The scripted chat provider ignores the bytes.
+const PNG_1X1 = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
+const FILE_CHOOSER_SCENES = new Set(["assistant-attachment"]);
 
 // The one question of the saved-chats scene, answered by the demo's scripted chat provider
 // (services/api/src/services/chat/demo-stub.ts). Stored under the frozen DEMO_NOW clock.
@@ -25,6 +41,7 @@ const ENDPOINTS = {
   displayCurrency: { method: "PATCH", path: "/api/backend/me" },
   taxRegime: { method: "PUT", path: "/api/backend/me/preferences" },
   assistantSaveHistory: { method: "PUT", path: "/api/backend/me/preferences" },
+  assistantAttachments: { method: "PUT", path: "/api/backend/me/preferences" },
 };
 
 /** The demo as the browser reaches it (the launcher aliases the host when it has no host network). */
@@ -55,6 +72,12 @@ export async function beforeScene({ context, page, scene, cfg, host }) {
     const echoed = (await res.json())[key];
     if (String(echoed) !== String(value))
       throw new Error(`setting ${key} to ${value} did not stick (API answered ${echoed})`);
+  }
+
+  if (FILE_CHOOSER_SCENES.has(scene.name)) {
+    page.on("filechooser", (chooser) =>
+      chooser.setFiles({ name: "statement.png", mimeType: "image/png", buffer: PNG_1X1 }),
+    );
   }
 
   // A stored conversation to list: asked through the web proxy, read to the end so it is saved.

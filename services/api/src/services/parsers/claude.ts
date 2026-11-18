@@ -1,4 +1,5 @@
 import type { Logger, ParserImage, ParseResult, ScreenshotParser } from "./types.js";
+import { anthropicMediaBlock } from "../ai/media-blocks.js";
 import {
   EXTRACTION_PROMPT,
   TOOL_NAME,
@@ -55,15 +56,7 @@ export class ClaudeVisionParser implements ScreenshotParser {
 
     // PDFs go in a `document` block; screenshots in an `image` block. Both carry
     // base64 data + media type and are read by the same vision model.
-    const source = {
-      type: "base64" as const,
-      media_type: image.mimeType,
-      data: image.data.toString("base64"),
-    };
-    const mediaBlock =
-      image.mimeType === "application/pdf"
-        ? { type: "document", source }
-        : { type: "image", source };
+    const mediaBlock = anthropicMediaBlock(image.mimeType, image.data.toString("base64"));
 
     const res = await this.doFetch(`${this.baseUrl}/v1/messages`, {
       method: "POST",

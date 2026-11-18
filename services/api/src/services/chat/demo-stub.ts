@@ -80,6 +80,8 @@ export function createDemoChatProvider({
     label: "Demo",
     local: true,
     isConfigured: () => true,
+    // Reads everything (and ignores it), so the attachment UI can be shown in the visual checks.
+    attachmentSupport: async () => ({ images: "yes", pdf: true }),
     complete: (req) => run(req),
     async stream(req, onDelta, _log, onThinking) {
       const result = await run(req, onThinking);
