@@ -2472,6 +2472,8 @@
     "cancel": "Cancel"
   },
   "unmappedTypes": {
+    "owner": "Account: {email}",
+    "ownerDescription": "These reached the importer but have no mapping yet, so they're excluded from that account's balances until added to the mapper.",
     "title": "{count, plural, one {# unmapped Trade Republic event type} other {# unmapped Trade Republic event types}}",
     "description": "These reached the importer but have no mapping yet, so they're excluded from your balances until added to the mapper.",
     "unparseable": "(no event type)",

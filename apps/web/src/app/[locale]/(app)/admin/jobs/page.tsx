@@ -3,7 +3,7 @@ import { AdminJobs } from "@/components/admin-jobs";
 import { UnmappedTypesAlert } from "@/components/unmapped-types-alert";
 import { PageHeader } from "@/components/page-header";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
-import { requireAdmin, loadAdminJobs, loadUnmappedEventTypes } from "@/lib/server-api";
+import { requireAdmin, loadAdminJobs, loadAdminUnmappedEventTypes } from "@/lib/server-api";
 
 export default async function AdminJobsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -13,14 +13,21 @@ export default async function AdminJobsPage({ params }: { params: Promise<{ loca
   const gate = await requireAdmin();
   if (gate.status !== "ok") return <AdminGateFailure gate={gate} />;
 
-  const [result, unmappedTypes] = await Promise.all([loadAdminJobs(), loadUnmappedEventTypes()]);
+  const [result, unmappedByUser] = await Promise.all([
+    loadAdminJobs(),
+    loadAdminUnmappedEventTypes(),
+  ]);
 
   return (
     <>
       <PageHeader title={t("jobs")} backHref="/admin" />
       <p className="mb-4 text-sm text-muted-foreground">{t("jobsHint")}</p>
 
-      <UnmappedTypesAlert types={unmappedTypes} />
+      <div className="space-y-3">
+        {unmappedByUser.map((u) => (
+          <UnmappedTypesAlert key={u.userId} types={u.types} owner={u.email} />
+        ))}
+      </div>
 
       <div className="mt-4">
         {result.status === "ok" ? (

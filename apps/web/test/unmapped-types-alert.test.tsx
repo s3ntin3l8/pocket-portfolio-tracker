@@ -7,7 +7,11 @@ import type { UnmappedEventType } from "@portfolio/api-client";
 vi.mock("next-intl/server", () => ({
   getTranslations: vi.fn(
     async () => (key: string, vars?: Record<string, unknown>) =>
-      vars && "count" in vars ? `${key}:${vars.count}` : key,
+      vars && "count" in vars
+        ? `${key}:${vars.count}`
+        : vars && "email" in vars
+          ? `${key}:${vars.email}`
+          : key,
   ),
 }));
 
@@ -52,5 +56,22 @@ describe("UnmappedTypesAlert", () => {
     // Raw debug payload present (behind a <details>) so a gap is diagnosable.
     expect(container.querySelector("details")).not.toBeNull();
     expect(container.textContent).toContain("unmapped event type: TAXES");
+  });
+});
+
+describe("UnmappedTypesAlert owner", () => {
+  it("names the account the events belong to in the admin view", async () => {
+    const el = await UnmappedTypesAlert({ types: TYPES, owner: "someone@example.com" });
+    render(el as React.ReactElement);
+    expect(screen.getByText("owner:someone@example.com")).toBeInTheDocument();
+    expect(screen.getByText("ownerDescription")).toBeInTheDocument();
+    expect(screen.queryByText("description")).toBeNull();
+  });
+
+  it("shows no account line without an owner", async () => {
+    const el = await UnmappedTypesAlert({ types: TYPES });
+    render(el as React.ReactElement);
+    expect(screen.queryByText(/^owner/)).toBeNull();
+    expect(screen.getByText("description")).toBeInTheDocument();
   });
 });

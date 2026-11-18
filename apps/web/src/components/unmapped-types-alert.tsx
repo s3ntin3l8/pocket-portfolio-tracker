@@ -8,7 +8,14 @@ import type { UnmappedEventType } from "@portfolio/api-client";
  * than buried in an import's errors. Server component; the raw debug payload sits behind a
  * native <details> toggle (no client JS). Renders nothing when there are no unmapped types.
  */
-export async function UnmappedTypesAlert({ types }: { types: UnmappedEventType[] }) {
+export async function UnmappedTypesAlert({
+  types,
+  owner,
+}: {
+  types: UnmappedEventType[];
+  /** The account the events belong to (admin view across users). */
+  owner?: string;
+}) {
   if (!types.length) return null;
   const t = await getTranslations("unmappedTypes");
   return (
@@ -20,7 +27,8 @@ export async function UnmappedTypesAlert({ types }: { types: UnmappedEventType[]
         <AlertTriangle className="mt-0.5 size-5 shrink-0" />
         <div className="min-w-0 space-y-2">
           <p className="font-medium">{t("title", { count: types.length })}</p>
-          <p className="text-sm opacity-90">{t("description")}</p>
+          {owner ? <p className="text-sm font-medium">{t("owner", { email: owner })}</p> : null}
+          <p className="text-sm opacity-90">{t(owner ? "ownerDescription" : "description")}</p>
           <ul className="space-y-1.5 text-sm">
             {types.map((x) => (
               <li key={`${x.code}:${x.eventType ?? x.message}`}>
