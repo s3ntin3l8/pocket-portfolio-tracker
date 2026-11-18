@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 
 vi.mock("next-intl/server", () => ({
   getTranslations: async () => (key: string) => key,
@@ -125,9 +125,17 @@ describe("Instrument sections", () => {
     expect(screen.getByTestId("price")).toHaveTextContent("i1|10");
   });
 
-  it("open lots render in the holding's currency, and not at all without lots", async () => {
+  it("open lots render in the cost currency, and not at all without lots", async () => {
     render(await InstrumentLotsSection({ id: "i1" }));
     expect(screen.getByTestId("lots")).toHaveTextContent("1|USD");
+    cleanup();
+    // A US stock bought in EUR: lot costs are EUR even though the quote is USD.
+    data.scopeOnce.mockResolvedValueOnce({
+      holding: { ...holding, costCurrency: "EUR" },
+      displayCurrency: "EUR",
+    });
+    render(await InstrumentLotsSection({ id: "i1" }));
+    expect(screen.getByTestId("lots")).toHaveTextContent("1|EUR");
     data.scopeOnce.mockResolvedValue({ holding: null, displayCurrency: "EUR" });
     expect(await InstrumentLotsSection({ id: "i1" })).toBeNull();
   });
