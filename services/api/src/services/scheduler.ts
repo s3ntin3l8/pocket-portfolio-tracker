@@ -149,11 +149,18 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   const watchdog = createPoolWatchdog({
     // A trivial query through boss's own pool: if it answers, the pool is merely slow.
     probe: async () => {
-      await Promise.race([
-        boss.getDb().executeSql("select 1"),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("probe timeout")), 15_000)),
-      ]);
-      return true;
+      let timer: NodeJS.Timeout | undefined;
+      try {
+        await Promise.race([
+          boss.getDb().executeSql("select 1"),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error("probe timeout")), 15_000);
+          }),
+        ]);
+        return true;
+      } finally {
+        clearTimeout(timer);
+      }
     },
     exit: async () => {
       app.log.fatal("pg-boss pool unresponsive for 15 min; shutting down so the process restarts");
