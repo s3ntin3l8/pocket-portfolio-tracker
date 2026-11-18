@@ -544,6 +544,9 @@ export async function startDemo({
       PORT: DEMO_API_PORT,
       HOST: "127.0.0.1",
       LOG_LEVEL: "warn",
+      // A scripted chat provider (no network, no key) so the assistant panel can be rendered.
+      // The API refuses it against anything but this embedded database (demo-stub.ts).
+      DEMO_CHAT_STUB: "1",
       // Local folder storage: the default S3 backend would try to reach (and,
       // outside production, create a bucket on) an object store.
       STORAGE_PROVIDER: "folder",

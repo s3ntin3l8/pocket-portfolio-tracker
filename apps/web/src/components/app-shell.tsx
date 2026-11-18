@@ -16,7 +16,7 @@ import { PortfolioSwitcher } from "@/components/portfolio-switcher";
 import { AddTransactionMenu } from "@/components/add-transaction-menu";
 import { GlobalSearch } from "@/components/global-search";
 import { AssistantButton } from "@/components/assistant/assistant-button";
-import { AssistantProvider } from "@/components/assistant/assistant-provider";
+import { AssistantProvider, AssistantSlot } from "@/components/assistant/assistant-provider";
 import { PageCommandsProvider } from "@/components/page-commands";
 import { InstallPrompt } from "@/components/install-prompt";
 import { Brand } from "@/components/brand";
@@ -308,6 +308,9 @@ export function AppShell({
                   </PullToRefresh>
                 </PageHeaderProvider>
               </div>
+
+              {/* The assistant's desktop dock mounts here, beside the page column. */}
+              <AssistantSlot />
 
               <BottomNav anomalyCount={anomalyCount} anomalyError={anomalyError} />
             </div>

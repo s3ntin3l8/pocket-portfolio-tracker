@@ -112,6 +112,46 @@ describe("DialogContent", () => {
     expect(floatingClose?.className).toContain("max-md:hidden");
   });
 
+  it("keeps a floor of bottom padding in the mobile footer when there is no safe-area inset", () => {
+    render(
+      <Dialog open>
+        <DialogContent footer={<span>Cancel</span>}>
+          <DialogTitle>T</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    const footer = document.querySelector('[data-slot="dialog-footer"]')!;
+    // `env()` alone resolves to 0 on a device without a home indicator, which pinned the
+    // composer/buttons to the screen edge.
+    expect(footer.className).toContain("max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]");
+    expect(footer.className).not.toContain("max-md:pb-[env(");
+  });
+
+  it("mobileHeader.actions render in the header row after the title", () => {
+    render(
+      <Dialog open>
+        <DialogContent mobileHeader={{ title: "Assistant", actions: <button>Extra</button> }}>
+          <DialogTitle className="sr-only">Assistant</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    const heading = screen.getByRole("heading", { name: "Assistant", level: 1 });
+    expect(heading.nextElementSibling).toBe(screen.getByRole("button", { name: "Extra" }));
+  });
+
+  it("bodyClassName replaces the default scrolling wrapper", () => {
+    render(
+      <Dialog open>
+        <DialogContent footer={<span>f</span>} bodyClassName="flex min-h-0 flex-1 flex-col">
+          <DialogTitle>T</DialogTitle>
+          <span data-testid="child" />
+        </DialogContent>
+      </Dialog>,
+    );
+    const wrapper = screen.getByTestId("child").parentElement!;
+    expect(wrapper.className).toBe("flex min-h-0 flex-1 flex-col");
+  });
+
   it("provides SheetFooterContext to children when a footer is given", () => {
     function Probe() {
       const footerEl = useSheetFooter();

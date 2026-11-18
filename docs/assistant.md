@@ -143,6 +143,15 @@ turn is appended to a stored conversation so it can be reopened on any device (*
   `GET /assistant/conversations/:id` returns the messages. An unknown or foreign `conversationId` on a chat request
   just starts a new conversation (the `conversation` event carries the id to use next).
 
+## Demo provider (visual checks only)
+
+`make demo` starts the API with `DEMO_CHAT_STUB=1`, which swaps in a scripted provider
+(`services/api/src/services/chat/demo-stub.ts`: no network, no key, fixed text) so `visual/scenes.json` can render the
+panel in every state. It is wired in `server.ts`, not in provider resolution, and `demoChatProviderFromEnv` throws at
+startup unless `DATABASE_URL` is an embedded `pglite://` one, so the variable cannot take effect on a real deployment.
+The question _How is my portfolio doing?_ runs one real `get_net_worth` call; _What is driving my gains?_ writes a
+progress note and then waits until the client aborts (the mid-answer scene).
+
 ## Privacy
 
 Tool results (derived figures and holding names — never account numbers, IBANs, holder names or transaction memos)
@@ -158,11 +167,24 @@ the longest model turn (the per-call upstream timeout is 120 s).
 
 ## Web UI
 
-Entry points (both hidden unless `GET /assistant/status` reports `available`; if the lookup fails, nothing is shown):
+Entry points (all hidden unless `GET /assistant/status` reports `available`; if the lookup fails, nothing is shown):
 
-- the **Assistant** button in the top bar (every route);
+- the **Assistant** button in the top bar (every route); it toggles the panel (`aria-expanded`);
 - **Ask the assistant to explain** in the gain explainer — closes the explainer, opens the panel and sends a seeded
-  question. If an answer is already streaming, the question waits for it to finish instead of being dropped.
+  question. If an answer is already streaming, the question waits for it to finish instead of being dropped;
+- **Describe it to the assistant** in _Add transaction_ (the manual-entry tab on desktop, a card in the phone
+  chooser) — closes the form and opens the panel with a starter text for the selected portfolio typed into the
+  composer (**not sent**), and the conversation scoped to that portfolio (`p:<id>`, dropped on New chat or when the
+  panel closes). The assistant then records it through `propose_transactions`, which only ever creates a draft to
+  review; nothing is booked from the chat. `useAssistant().open()` takes a string (a question, sent straight away) or
+  `{ question?, prefill?, scope? }`.
+
+Where it lives: on a phone (< `md`) the panel is a full-screen page, with History and New chat in the header row next to
+the back arrow. From `md` up it is a right-hand **dock**, not a modal: the page stays readable and interactive beside
+it. From `xl` (1280px) the dock sits in the shell's flex row and the page narrows; between `md` and `xl` it floats over
+the page's right edge with no scrim. From `2xl` (1536px) a toggle widens it (400 → 640px; the choice is remembered per
+device in `localStorage`, the open state is not). Esc or × closes it and hands focus back to the top-bar button. One
+conversation (and the unsent draft) is kept in the host, so it survives closing the panel and a resize across `md`.
 
 The panel (`apps/web/src/components/assistant/`):
 

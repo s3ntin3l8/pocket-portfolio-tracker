@@ -1,8 +1,12 @@
 import { buildApp } from "./app.js";
+import { demoChatProviderFromEnv } from "./services/chat/demo-stub.js";
 import { startScheduler } from "./services/scheduler.js";
 
 async function start() {
-  const app = await buildApp();
+  // Demo only (DEMO_CHAT_STUB=1, embedded database): a scripted chat provider, so the assistant
+  // panel can be rendered without a key or a network. Null everywhere else.
+  const chatProvider = demoChatProviderFromEnv();
+  const app = await buildApp(chatProvider ? { chatProvider } : {});
 
   // Close the server (and DB via the onClose hook) on termination signals.
   for (const signal of ["SIGINT", "SIGTERM"] as const) {

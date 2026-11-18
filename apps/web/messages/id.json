@@ -2955,6 +2955,12 @@
     "historyOff": "Penyimpanan chat nonaktif, jadi belum ada yang bisa dibuka kembali. Aktifkan untuk menyimpan teks percakapan selama 90 hari dan membukanya lagi di sini.",
     "historyEnable": "Aktifkan penyimpanan",
     "historyEnableError": "Gagal mengaktifkan penyimpanan. Anda juga bisa mengaturnya di Pengaturan → Investasi.",
-    "historyFull": "Percakapan ini sudah penuh, sehingga pesan baru tidak disimpan. Mulai chat baru untuk melanjutkan."
+    "historyFull": "Percakapan ini sudah penuh, sehingga pesan baru tidak disimpan. Mulai chat baru untuk melanjutkan.",
+    "expand": "Perlebar asisten",
+    "collapse": "Persempit asisten",
+    "close": "Tutup asisten",
+    "handOff": "Jelaskan ke asisten",
+    "handOffPrefill": "Catat ini di {portfolio}: ",
+    "handOffDesc": "Tempel email broker atau rinciannya; Anda meninjau draf yang dibuatnya."
   }
 }

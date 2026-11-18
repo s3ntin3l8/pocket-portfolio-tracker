@@ -94,8 +94,12 @@ function DialogContent({
   fullScreenOnMobile = true,
   mobileHeader,
   footer,
+  bodyClassName,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  /** Replaces the default scrolling body wrapper's classes (`min-h-0 flex-1 overflow-y-auto`)
+   *  when the content owns its own scroll region, e.g. a chat panel with a pinned composer. */
+  bodyClassName?: string;
   /** Suppress the built-in top-right close button — for shells that render their own
    *  close/back affordances in a custom header (mirrors `SheetContent`'s `hideClose`). */
   hideClose?: boolean;
@@ -112,7 +116,7 @@ function DialogContent({
    *  floating X there (matches `PageHeader`'s look, reused by every full-page form).
    *  Desktop still gets the floating X (or nothing, if `hideClose`). No effect when
    *  `fullScreenOnMobile` is false. */
-  mobileHeader?: { title: React.ReactNode };
+  mobileHeader?: { title: React.ReactNode; actions?: React.ReactNode };
   /** A persistent, non-scrolling footer — pinned flush to the safe area on mobile
    *  full-screen, an in-flow bottom bar on desktop. Provides `SheetFooterContext` with
    *  its own portal node, so a form already using `useSheetFooter()` (the pattern
@@ -135,7 +139,7 @@ function DialogContent({
   const [footerEl, setFooterEl] = React.useState<HTMLDivElement | null>(null);
 
   const body = structured ? (
-    <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
+    <div className={bodyClassName ?? "min-h-0 flex-1 overflow-y-auto"}>{children}</div>
   ) : (
     children
   );
@@ -192,7 +196,8 @@ function DialogContent({
                 caller's own DialogTitle already renders. This is the visible mobile
                 heading only; a caller using mobileHeader still owns the one accessible
                 DialogTitle (a visually-hidden one is fine if it has no other use for it). */}
-            <h1 className="min-w-0 truncate text-lg font-semibold">{mobileHeader.title}</h1>
+            <h1 className="min-w-0 flex-1 truncate text-lg font-semibold">{mobileHeader.title}</h1>
+            {mobileHeader.actions}
           </div>
         )}
 
@@ -209,7 +214,7 @@ function DialogContent({
               // body above it stays sized to the full viewport, hiding the body's own
               // last content behind the footer (the exact bug this migration fixes on
               // the selection bar, finding 4).
-              fullScreenOnMobile && "max-md:pb-[env(safe-area-inset-bottom)]",
+              fullScreenOnMobile && "max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
             )}
           >
             {footer !== true && footer}

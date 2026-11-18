@@ -4,9 +4,19 @@ import { BACK_BUTTON_CLASS, BackIcon } from "@/components/back-button";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
-import { Plus, PenLine, FileSpreadsheet, Camera, Briefcase, UserPlus, X } from "lucide-react";
+import {
+  Plus,
+  PenLine,
+  FileSpreadsheet,
+  Camera,
+  Briefcase,
+  Sparkles,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import { useAssistant } from "@/components/assistant/assistant-provider";
 import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { SheetFooterChromeContext, SheetFooterContext } from "@/components/ui/sheet";
 import type { NewEntryTab } from "@/components/new-entry-tabs";
@@ -71,6 +81,8 @@ export function AddTransactionMenu({
   const tm = useTranslations("Manage");
   const tA = useTranslations("A11y");
   const ti = useTranslations("Import");
+  const ta = useTranslations("Assistant");
+  const assistant = useAssistant();
   const api = useApiClient();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -309,6 +321,22 @@ export function AddTransactionMenu({
     setHasHolders(true);
   }
 
+  // Closing this overlay normally returns focus to its trigger; for a hand-off the assistant's
+  // composer must keep it instead.
+  const handingOff = useRef(false);
+  function handOffToAssistant(portfolio: { id: string; name: string }) {
+    handingOff.current = true;
+    onAddOpenChange(false);
+    // After the close has committed, so the assistant (not this dialog) ends up focused.
+    requestAnimationFrame(() =>
+      assistant.open({
+        prefill: ta("handOffPrefill", { portfolio: portfolio.name }),
+        scope: `p:${portfolio.id}`,
+      }),
+    );
+  }
+  const handOffPortfolio = portfolios?.find((p) => p.id === defaultPortfolioId) ?? portfolios?.[0];
+
   const dismissible = step !== "import";
   // The shared Cancel+submit-portal footer bar: absent for "import" (its own step-local
   // upload/parsing/review actions, unchanged from before the merge) and "choose" (the
@@ -359,6 +387,15 @@ export function AddTransactionMenu({
             tone="gold"
             onClick={() => void openManual()}
           />
+          {assistant.available && handOffPortfolio && (
+            <MethodCard
+              icon={Sparkles}
+              title={ta("handOff")}
+              description={ta("handOffDesc")}
+              tone="violet"
+              onClick={() => handOffToAssistant(handOffPortfolio)}
+            />
+          )}
         </div>
 
         <hr className="my-2 border-border" />
@@ -395,6 +432,7 @@ export function AddTransactionMenu({
           isDesktop={isDesktop}
           hideTabList={manualStepDesktop}
           visibleTabs={manualStepDesktop ? ["transaction"] : undefined}
+          onAssistantHandOff={handOffToAssistant}
         />
       )
     ) : step === "events" ? (
@@ -472,6 +510,12 @@ export function AddTransactionMenu({
         <DialogContent
           hideClose
           size="xl"
+          onCloseAutoFocus={(e) => {
+            if (handingOff.current) {
+              handingOff.current = false;
+              e.preventDefault();
+            }
+          }}
           onEscapeKeyDown={(e) => {
             if (!dismissible) e.preventDefault();
           }}
@@ -540,7 +584,7 @@ export function AddTransactionMenu({
                 </div>
 
                 {showFooter && (
-                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-background px-5 py-3 max-md:pb-[env(safe-area-inset-bottom)] md:px-[26px] md:py-4">
+                  <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border bg-background px-5 py-3 max-md:pb-[max(0.75rem,env(safe-area-inset-bottom))] md:px-[26px] md:py-4">
                     <Button
                       type="button"
                       variant="outline"

@@ -155,6 +155,120 @@
       "name": "insights-id",
       "path": "/id/insights",
       "tags": ["audit"]
+    },
+    {
+      "name": "assistant-empty",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "waitFor": "role=log[name=\"Conversation\"]"
+        }
+      ]
+    },
+    {
+      "name": "assistant-answer",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "click": "role=button[name=\"How is my portfolio doing?\"]"
+        },
+        {
+          "waitFor": "text=This is a demo answer"
+        }
+      ]
+    },
+    {
+      "name": "assistant-progress",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "click": "role=button[name=\"What is driving my gains?\"]"
+        },
+        {
+          "waitFor": "text=Looking at your net worth"
+        }
+      ]
+    },
+    {
+      "name": "assistant-history-off",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "click": "role=button[name=\"History\"]"
+        },
+        {
+          "waitFor": "text=Saving chats is off"
+        }
+      ]
+    },
+    {
+      "name": "assistant-history-saved",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "click": "role=button[name=\"History\"]"
+        },
+        {
+          "waitFor": "role=button[name=/^Open: /]"
+        }
+      ]
+    },
+    {
+      "name": "assistant-wide",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "click": "role=button[name=\"Widen the assistant\"]"
+        },
+        {
+          "waitFor": "role=button[name=\"Narrow the assistant\"]"
+        }
+      ],
+      "viewports": ["wide"]
+    },
+    {
+      "name": "add-hand-off",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Add transaction\"] >> nth=0"
+        },
+        {
+          "waitFor": "role=button[name=\"Describe it to the assistant\"]"
+        }
+      ],
+      "viewports": ["desktop"]
     }
-  ]
+  ],
+  "viewports": {
+    "wide": {
+      "width": 1600,
+      "height": 900
+    }
+  }
 }
