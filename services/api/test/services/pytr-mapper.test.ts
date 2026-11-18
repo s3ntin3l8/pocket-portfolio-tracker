@@ -576,6 +576,7 @@ describe("mapTrEventToDraft", () => {
         skip: true,
         severity: "attention",
         code: "unmapped_event_type",
+        reason: expect.stringContaining("IPO_TRADE_EXECUTED"),
       });
     }
   });
