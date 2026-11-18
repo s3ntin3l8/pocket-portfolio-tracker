@@ -57,6 +57,9 @@ export const CARD_EVENTS = new Set([
  *  in {@link TRADE_EVENTS} only so it classifies as a `trade`. */
 export const DIVIDEND_REINVESTMENT_TRADE = "DIVIDEND_REINVESTMENT_TRADE_EXECUTED";
 
+/** An IPO subscription filled: shares bought for the cash paid, with no execution price on the event. */
+export const IPO_TRADE = "IPO_TRADE_EXECUTED";
+
 export const FIXED_ACTIONS: Record<string, ParsedAction> = {
   PAYMENT_INBOUND: "deposit",
   PAYMENT_INBOUND_SEPA_DIRECT_DEBIT: "deposit",
@@ -97,6 +100,7 @@ export const TRADE_EVENTS = new Set([
   "TRADE_INVOICE",
   "TRADING_TRADE_EXECUTED",
   DIVIDEND_REINVESTMENT_TRADE,
+  IPO_TRADE,
 ]);
 
 export const CASH_BY_SIGN = new Set(["JUNIOR_P2P_TRANSFER", "SSP_TAX_CORRECTION", "CARD_AFT"]);

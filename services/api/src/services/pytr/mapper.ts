@@ -21,6 +21,7 @@ import {
   CASH_NON_DIVIDEND_CORPORATE_ACTION,
   CASH_AND_STOCK_CORPORATE_ACTION,
   DIVIDEND_REINVESTMENT_TRADE,
+  IPO_TRADE,
   SHARE_CORPORATE_ACTION,
   NO_CASH_CORPORATE_ACTION,
   SKIP_EVENTS,
@@ -124,7 +125,10 @@ export function mapTrEventToDraft(raw: unknown): MapResult {
     return skip(`unmapped event type: ${ev.eventType}`, "attention", ev, "unmapped_event_type");
   }
 
-  if (ev.eventType === DIVIDEND_REINVESTMENT_TRADE && ev.amount >= 0) {
+  if (
+    (ev.eventType === DIVIDEND_REINVESTMENT_TRADE || ev.eventType === IPO_TRADE) &&
+    ev.amount >= 0
+  ) {
     // Pinned to a buy, whose cost is the cash paid. A positive amount would book cash paid that was
     // in fact received; a zero amount would land the shares at a silent zero cost basis (a fully
     // taxable later sale). Neither is a trustworthy booking, so both stay a gap to look at.
