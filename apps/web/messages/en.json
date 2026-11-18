@@ -464,6 +464,7 @@
     "storageDiskTotal": "Disk total",
     "storageStatsUnavailable": "Statistics unavailable",
     "users": "Users",
+    "usersUnavailable": "Users are unavailable right now.",
     "usersHint": "View registered users, their storage usage, and manage access.",
     "revokeTokens": "Revoke tokens",
     "revokeTokensConfirm": "Revoke all personal access tokens for {email}? They will need to log in again to mint new ones.",
@@ -2478,6 +2479,8 @@
     "cancel": "Cancel"
   },
   "unmappedTypes": {
+    "owner": "Account: {email}",
+    "ownerDescription": "These reached the importer but have no mapping yet, so they're excluded from that account's balances until added to the mapper.",
     "title": "{count, plural, one {# unmapped Trade Republic event type} other {# unmapped Trade Republic event types}}",
     "description": "These reached the importer but have no mapping yet, so they're excluded from your balances until added to the mapper.",
     "unparseable": "(no event type)",

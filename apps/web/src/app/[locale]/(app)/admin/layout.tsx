@@ -3,7 +3,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { LineChart, Sparkles, ArrowDownUp, HardDrive, Database, Clock, Users } from "lucide-react";
 import { SettingsShell, type ShellNavItem } from "@/components/settings-shell";
 import { AdminGateFailure } from "@/components/admin-gate-failure";
-import { requireAdmin, loadUnmappedEventTypes } from "@/lib/server-api";
+import { requireAdmin, loadAdminUnmappedEventTypes } from "@/lib/server-api";
 import { tint } from "@/lib/tint";
 
 /**
@@ -30,8 +30,11 @@ export default async function AdminLayout({
   const gate = await requireAdmin();
   if (gate.status !== "ok") return <AdminGateFailure gate={gate} />;
   // Data-mapping problems (unmapped broker event types) are an admin concern: a count badge
-  // on the Jobs entry, where the list lives.
-  const unmappedCount = (await loadUnmappedEventTypes()).length;
+  // on the Jobs entry, where the per-user list lives.
+  const unmappedCount = (await loadAdminUnmappedEventTypes()).reduce(
+    (n, u) => n + u.types.length,
+    0,
+  );
 
   const navItems: ShellNavItem[] = [
     {

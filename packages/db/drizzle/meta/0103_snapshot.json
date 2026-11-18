@@ -1,5 +1,5 @@
 {
-  "id": "ba85a3b7-1af2-41d4-86d5-3a716d0b2bf9",
+  "id": "cb3ae76e-b0a7-4468-937f-a801d053f6cc",
   "prevId": "63fdd33b-b306-4064-ad0d-ffe7f540fb19",
   "version": "7",
   "dialect": "postgresql",
@@ -1956,7 +1956,23 @@
           "default": "now()"
         }
       },
-      "indexes": {},
+      "indexes": {
+        "api_tokens_user_id_idx": {
+          "name": "api_tokens_user_id_idx",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {
         "api_tokens_user_id_users_id_fk": {
           "name": "api_tokens_user_id_users_id_fk",
@@ -4508,13 +4524,6 @@
         },
         "assistant_save_history": {
           "name": "assistant_save_history",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "assistant_attachments": {
-          "name": "assistant_attachments",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,

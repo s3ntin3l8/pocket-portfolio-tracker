@@ -464,6 +464,7 @@
     "storageDiskTotal": "Total disk",
     "storageStatsUnavailable": "Statistik tidak tersedia",
     "users": "Pengguna",
+    "usersUnavailable": "Daftar pengguna tidak tersedia saat ini.",
     "usersHint": "Lihat pengguna terdaftar, penggunaan penyimpanan mereka, dan kelola akses.",
     "revokeTokens": "Cabut token",
     "revokeTokensConfirm": "Cabut semua token akses pribadi untuk {email}? Mereka harus login lagi untuk membuat token baru.",
@@ -2478,6 +2479,8 @@
     "cancel": "Batal"
   },
   "unmappedTypes": {
+    "owner": "Akun: {email}",
+    "ownerDescription": "Ini sampai ke pengimpor tetapi belum memiliki pemetaan, sehingga dikecualikan dari saldo akun tersebut hingga ditambahkan ke mapper.",
     "title": "{count, plural, other {# jenis transaksi Trade Republic belum terpetakan}}",
     "description": "Ini sampai ke pengimpor tetapi belum memiliki pemetaan, sehingga dikecualikan dari saldo Anda hingga ditambahkan ke mapper.",
     "unparseable": "(tanpa jenis transaksi)",

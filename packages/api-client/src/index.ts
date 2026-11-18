@@ -2212,6 +2212,13 @@ export interface InboxDocument {
   storedAt: string;
 }
 
+/** One user's unmapped broker events, as seen by an admin (`GET /admin/imports/unmapped-types`). */
+export interface AdminUnmappedEventTypes {
+  userId: string;
+  email: string;
+  types: UnmappedEventType[];
+}
+
 /**
  * An event type that reached the importer but had no mapping (the safety net). A non-empty
  * list means a sync source (Trade Republic) emitted a type we don't yet classify — it is
@@ -3688,6 +3695,9 @@ export function createApiClient(config: ApiClientConfig) {
     listImports: () => request<ImportRecord[]>("GET", "/imports"),
     /** Safety net: event types that reached the importer but have no mapping yet. */
     getUnmappedEventTypes: () => request<UnmappedEventType[]>("GET", "/imports/unmapped-types"),
+    /** Admin: unmapped broker events of every user that has any. */
+    getAdminUnmappedEventTypes: () =>
+      request<AdminUnmappedEventTypes[]>("GET", "/admin/imports/unmapped-types"),
     /** Fetch a single import with its parsed drafts (to review a staged draft). */
     getImport: (importId: string) => request<ImportDetail>("GET", `/imports/${importId}`),
     /** Discard a draft import (draft → discarded). */

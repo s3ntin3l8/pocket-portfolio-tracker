@@ -27,6 +27,8 @@ const PNG_1X1 = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
   "base64",
 );
+// Settings added by a change under review: the base side of a check may not know them (see below).
+const NEW_SETTINGS = new Set(["assistantAttachments"]);
 const FILE_CHOOSER_SCENES = new Set(["assistant-attachment"]);
 
 // The one question of the saved-chats scene, answered by the demo's scripted chat provider
@@ -68,8 +70,13 @@ export async function beforeScene({ context, page, scene, cfg, host }) {
     const { method, path } = ENDPOINTS[key];
     const res = await page.request.fetch(`${origin}${path}`, { method, data: { [key]: value } });
     if (!res.ok()) throw new Error(`${method} ${path} failed with HTTP ${res.status()}`);
+    const body = await res.json();
+    // A base that predates a setting does not echo it, and has nothing to reset to its default
+    // (`false`): without this every scene would fail on the base and be reported as new. Turning one
+    // ON still has to stick, so a scene that needs the setting fails on such a base, as it should.
+    if (!(key in body) && NEW_SETTINGS.has(key) && value === false) continue;
     // String compare: the API may echo a coerced form.
-    const echoed = (await res.json())[key];
+    const echoed = body[key];
     if (String(echoed) !== String(value))
       throw new Error(`setting ${key} to ${value} did not stick (API answered ${echoed})`);
   }

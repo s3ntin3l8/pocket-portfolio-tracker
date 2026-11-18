@@ -4,7 +4,7 @@ import type {
   DocumentCategory,
   ImportRecord,
   ImportDetail,
-  UnmappedEventType,
+  AdminUnmappedEventTypes,
   Portfolio,
 } from "@portfolio/api-client";
 import { documentsForPortfolios, inboxPortfolios } from "@/lib/inbox-documents";
@@ -67,11 +67,12 @@ export async function loadImports(): Promise<ImportRecord[]> {
   }
 }
 
-export const loadUnmappedEventTypes = cache(async (): Promise<UnmappedEventType[]> => {
+/** Admin only: every user's unmapped broker events (the caller must already have passed `requireAdmin`). */
+export const loadAdminUnmappedEventTypes = cache(async (): Promise<AdminUnmappedEventTypes[]> => {
   const api = await getServerApi();
   if (!api) return [];
   try {
-    return await api.getUnmappedEventTypes();
+    return await api.getAdminUnmappedEventTypes();
   } catch {
     return [];
   }
