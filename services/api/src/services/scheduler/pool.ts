@@ -18,22 +18,35 @@ export const POOL_FAILURE_EXIT_AFTER_MS = 15 * 60_000;
 const STREAK_GAP_MS = 2 * 60_000;
 
 const CONNECTION_ERROR =
-  /timeout exceeded when trying to connect|ECONNRESET|ETIMEDOUT|ECONNREFUSED|EPIPE|Connection terminated|Client has encountered a connection error/i;
+  /timeout exceeded when trying to connect|Query read timeout|ECONNRESET|ETIMEDOUT|ECONNREFUSED|EPIPE|Connection terminated|Client has encountered a connection error/i;
+const CONNECTION_CODES = new Set([
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "ECONNREFUSED",
+  "EPIPE",
+  "57P01",
+  "08006",
+]);
 
 export function isPoolConnectionError(err: unknown): boolean {
-  const message =
-    err instanceof Error ? err.message : (err as { message?: unknown } | null)?.message;
-  return typeof message === "string" && CONNECTION_ERROR.test(message);
+  // pg-boss re-emits some errors as plain objects (`{...error, message, stack}`), so read
+  // `message`/`code` off anything rather than requiring an Error instance.
+  const e = err as { message?: unknown; code?: unknown } | null;
+  if (typeof e?.code === "string" && CONNECTION_CODES.has(e.code)) return true;
+  return typeof e?.message === "string" && CONNECTION_ERROR.test(e.message);
 }
 
 /**
  * Self-heal backstop: if pg-boss keeps reporting connection errors for
- * {@link POOL_FAILURE_EXIT_AFTER_MS} without a quiet gap, call `exit` so the container
- * restart policy brings up a fresh pool. Healthy operation emits no errors, so no
- * success signal is needed — a gap ends the streak.
+ * {@link POOL_FAILURE_EXIT_AFTER_MS} without a quiet gap, run `probe`. The same errors
+ * also appear on a saturated-but-working pool, which a restart cannot fix, so `probe`
+ * (a trivial query through the pool itself) decides: it resolves `true` when the pool
+ * answers (streak reset, no exit) and `false`/rejects when it does not (`exit` fires, once).
+ * Healthy operation emits no errors, so no success signal is needed — a gap ends the streak.
  */
 export function createPoolWatchdog(opts: {
-  exit: () => void;
+  exit: () => void | Promise<void>;
+  probe?: () => Promise<boolean>;
   now?: () => number;
   exitAfterMs?: number;
 }) {
@@ -41,13 +54,27 @@ export function createPoolWatchdog(opts: {
   const exitAfterMs = opts.exitAfterMs ?? POOL_FAILURE_EXIT_AFTER_MS;
   let streakStart: number | null = null;
   let lastError = 0;
+  let busy = false;
+  let fired = false;
   return {
-    onError(err: unknown): void {
-      if (!isPoolConnectionError(err)) return;
+    async onError(err: unknown): Promise<void> {
+      if (fired || !isPoolConnectionError(err)) return;
       const t = now();
       if (streakStart === null || t - lastError > STREAK_GAP_MS) streakStart = t;
       lastError = t;
-      if (t - streakStart >= exitAfterMs) opts.exit();
+      if (t - streakStart < exitAfterMs || busy) return;
+      busy = true;
+      try {
+        const alive = opts.probe ? await opts.probe().catch(() => false) : false;
+        if (alive) {
+          streakStart = null; // pool answers: slow/saturated, not wedged
+          return;
+        }
+        fired = true;
+        await opts.exit();
+      } finally {
+        busy = false;
+      }
     },
   };
 }

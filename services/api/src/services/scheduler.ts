@@ -147,14 +147,24 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   const boss = new PgBoss({ connectionString: url, ...PG_BOSS_POOL_OPTIONS });
   setActiveBoss(boss);
   const watchdog = createPoolWatchdog({
-    exit: () => {
-      app.log.fatal("pg-boss pool unreachable for 15 min; exiting so the process restarts");
+    // A trivial query through boss's own pool: if it answers, the pool is merely slow.
+    probe: async () => {
+      await Promise.race([
+        boss.getDb().executeSql("select 1"),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("probe timeout")), 15_000)),
+      ]);
+      return true;
+    },
+    exit: async () => {
+      app.log.fatal("pg-boss pool unresponsive for 15 min; shutting down so the process restarts");
+      // Same graceful path as SIGTERM (boss.stop, db close), capped so a stuck close can't hang.
+      await Promise.race([app.close(), new Promise((r) => setTimeout(r, 20_000))]).catch(() => {});
       process.exit(1);
     },
   });
   boss.on("error", (err) => {
     app.log.error({ err }, "pg-boss error");
-    watchdog.onError(err);
+    void watchdog.onError(err);
   });
   await boss.start();
 
