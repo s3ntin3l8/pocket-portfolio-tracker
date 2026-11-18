@@ -3,6 +3,7 @@ import {
   ChatProviderError,
   STREAM_IDLE_TIMEOUT_MS,
   withTimeout,
+  type AttachmentSupport,
   type ChatMessage,
   type ChatProvider,
   type ChatRequest,
@@ -10,6 +11,7 @@ import {
   type ChatToolCall,
 } from "./types.js";
 import type { Logger } from "../parsers/types.js";
+import { geminiInlineDataCamel } from "../ai/media-blocks.js";
 
 export interface GeminiChatOptions {
   baseUrl?: string;
@@ -41,6 +43,11 @@ export class GeminiChatProvider implements ChatProvider {
   readonly name = "gemini";
   readonly label = "Gemini (Google)";
   readonly local = false;
+  /** Gemini reads images and PDFs natively. */
+  readonly attachmentSupport = async (): Promise<AttachmentSupport> => ({
+    images: "yes",
+    pdf: true,
+  });
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly doFetch: typeof fetch;
@@ -279,7 +286,15 @@ function mapStop(reason: string | undefined, hasToolCalls: boolean): ChatResult[
 }
 
 function toGeminiContent(m: ChatMessage) {
-  if (m.role === "user") return { role: "user", parts: [{ text: m.content }] };
+  if (m.role === "user") {
+    return {
+      role: "user",
+      parts: [
+        ...(m.attachments ?? []).map((a) => geminiInlineDataCamel(a.mediaType, a.data)),
+        { text: m.content },
+      ],
+    };
+  }
   if (m.role === "tool") {
     return {
       role: "user",

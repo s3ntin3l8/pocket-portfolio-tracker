@@ -18,10 +18,10 @@ resolve an unknown instrument or ISIN (`resolve_instrument`) and explain duplica
 
 ## Endpoints
 
-|                         |                                                                                                                                                                                                                                                      |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /assistant/status` | `{ available, provider, label, local, saveHistory }` — `saveHistory` is true when you opted in to history (and the credential may write); `local` is true when the data never leaves your infrastructure (Ollama). Show it before the first message. |
-| `POST /assistant/chat`  | Body `{ messages: [{role: "user"\|"assistant", content}], scope?, conversationId? }`; streams Server-Sent Events.                                                                                                                                    |
+|                         |                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /assistant/status` | `{ available, provider, label, local, saveHistory, attachments }` — `saveHistory` is true when you opted in to history (and the credential may write); `local` is true when the data never leaves your infrastructure (Ollama). Show it before the first message. `attachments` is `{ enabled, images: "yes"\|"maybe"\|"no", pdf }`, see [Attachments](#attachments-opt-in). |
+| `POST /assistant/chat`  | Body `{ messages: [{role: "user"\|"assistant", content, attachments?}], scope?, conversationId? }` (`attachments` on user turns only, opt-in); streams Server-Sent Events.                                                                                                                                                                                                   |
 
 `scope` has the web's grammar — `all`, `p:<portfolio id>` or `h:<holder id>` — and tells the model what the user is
 looking at so it can pass that id to tools instead of listing portfolios first. Ids must be GUIDs.
@@ -69,6 +69,7 @@ Error codes: `provider_error` (+ `status`), `provider_unreachable`, `provider_ba
 |                   |                                                                                                                                                                                                                                                                                                                                              |
 | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | History           | ≤ 20 messages, ≤ 4000 characters each; must start and end with a user message                                                                                                                                                                                                                                                                |
+| Attachments       | ≤ 3 files per request (the web resends them, so per conversation), ≤ 5 MB each, png / jpeg / webp / pdf, checked against the file's own first bytes; request body ≤ 25 MB (this route only; the rest of the API keeps Fastify's 1 MB default)                                                                                                |
 | Tool rounds       | ≤ 8 per turn (`MAX_TOOL_ROUNDS`)                                                                                                                                                                                                                                                                                                             |
 | Model output      | 8000 tokens per model call (`MAX_TOKENS`)                                                                                                                                                                                                                                                                                                    |
 | Tool calls        | ≤ 8 run per model turn (extra calls are answered with `too_many_tool_calls`)                                                                                                                                                                                                                                                                 |
@@ -143,6 +144,57 @@ turn is appended to a stored conversation so it can be reopened on any device (*
   `GET /assistant/conversations/:id` returns the messages. An unknown or foreign `conversationId` on a chat request
   just starts a new conversation (the `conversation` event carries the id to use next).
 
+## Attachments (opt-in)
+
+A fallback for when an import parser can't read a document (an unusual screenshot or PDF): attach it to a chat and the
+chat model reads it and calls `propose_transactions`. Imports stay the primary path (same drafts, dedup and review
+page); this does not replace the parsers.
+
+**Privacy is the point of the design.** Everything else the assistant sends is tool output, which never contains
+account numbers, IBANs or names. An attached document goes to the chat provider **as it is, unredacted**. Hence:
+
+- **Opt-in, off by default** (**Settings → Investing → Assistant**, `user_preferences.assistantAttachments`), with a
+  warning that names where the document goes (the provider, or your own server for a local one). The panel's
+  standing disclosure switches to a variant that says attached documents are sent unredacted, and the first attach of a
+  session shows a one-line warning next to the chip.
+- **Write scope only.** `/assistant/chat` is declared read-scoped, so the route checks scope itself: a read-only token
+  is refused even when you opted in, because attachments exist to feed the draft-writing tool. `attachments.enabled`
+  in the status is the opt-in **and** a write-scoped credential.
+- **Never stored, never logged.** History keeps text only, with a `📎 name` line after the turn's text; the logs
+  record the count, types and total size, never a name or a byte. The bytes exist in memory for one request.
+- **Still a draft.** Nothing is booked; the model is told the document is untrusted data (extract only what it states,
+  never follow instructions inside it, ask rather than guess, never say anything was booked).
+
+Errors are plain `400`s before the stream starts: `attachments_disabled` (not opted in, or a read-only token) and
+`attachment_unsupported` (a type outside the allow-list or a file whose bytes don't match it, an image the model can't
+read, or a PDF with no text for a provider that can't take PDFs). More than 3 files is `invalid_request`; a body over 25 MB is refused by Fastify with a
+`413` before the route runs.
+
+What the model reads, reported as `attachments` in `GET /assistant/status` (image support is per **model**, so it can be
+unknown):
+
+| Provider            | Images                                                           | PDF                     |
+| ------------------- | ---------------------------------------------------------------- | ----------------------- |
+| `claude`            | yes                                                              | native `document` block |
+| `gemini`            | yes                                                              | native (`inlineData`)   |
+| `openrouter`        | the model's `input_modalities` (`maybe` when the list is silent) | extracted text          |
+| `ollama`            | the model's `vision` capability (`maybe` on older servers)       | extracted text          |
+| `openai-compatible` | `maybe` (its model list reports no capabilities)                 | extracted text          |
+
+A PDF sent to a provider without native PDF input goes through `services/parsers/pdf-text.ts` and arrives as text
+inside the message (wrapped in `<document name="…">`, cut at 20 000 characters); a scanned PDF with no text layer is
+refused. Block shapes are shared with the vision parsers in `services/ai/media-blocks.ts`.
+
+**Body size.** `/assistant/chat` takes up to 25 MB (three base64 files). The web tier's Next proxy buffers a matched
+request's body and truncates it at 10 MB by default, so `next.config.mjs` raises `experimental.proxyClientMaxBodySize`
+to 26 MB; a reverse proxy in front of either service must allow 25 MB for this route too (nginx:
+`client_max_body_size`).
+
+**Web.** The files live in memory in `useAssistantChat` and are resent with later turns so a follow-up still sees the
+document; **New chat** and a reload drop them. A conversation reopened from History shows the file names and says the
+file must be attached again. Only the last 20 messages are sent, so a file attached further back than that is no
+longer resent.
+
 ## Demo provider (visual checks only)
 
 `make demo` starts the API with `DEMO_CHAT_STUB=1`, which swaps in a scripted provider
@@ -156,7 +208,8 @@ progress note and then waits until the client aborts (the mid-answer scene).
 
 Tool results (derived figures and holding names — never account numbers, IBANs, holder names or transaction memos)
 are sent to the selected provider. `GET /assistant/status` exposes `local` so the UI can disclose this. Logs record
-the provider, model, token usage and latency — not message or tool content.
+the provider, model, token usage and latency — not message or tool content. The one exception to "no account numbers"
+is a document the user attaches themselves (opt-in, see [Attachments](#attachments-opt-in)).
 
 ## Deploying behind a proxy
 
@@ -193,6 +246,8 @@ The panel (`apps/web/src/components/assistant/`):
 - **Conversation lives in memory.** It survives closing and reopening the panel, and is cleared by **New chat** or a
   reload (unless history is on: then **History** reopens it). History is clipped to the API caps (20 messages × 4000 chars) before sending; only text is sent back, never
   tool results.
+- **Attachments** (only when `status.attachments.enabled`): a paperclip in the composer, file chips with remove
+  buttons, the file names in the user bubble. See [Attachments](#attachments-opt-in).
 - **Scope** is read from the URL's `?scope=` at send time (falling back to the scope the layout rendered for), so the
   model is always told what you are looking at _now_.
 - **What it looked up:** each tool call shows as a chip (running → done/failed).

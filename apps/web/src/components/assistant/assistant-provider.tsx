@@ -28,6 +28,8 @@ export interface AssistantOpenOptions {
 interface AssistantContextValue {
   /** True once the API reports a configured chat provider. */
   available: boolean;
+  /** What the API reported about the assistant (provider, opt-ins, attachment support); null until known. */
+  status: AssistantStatus | null;
   /** Whether the panel is showing. */
   isOpen: boolean;
   /** Open the panel: a string is a question to send straight away. */
@@ -38,6 +40,7 @@ interface AssistantContextValue {
 
 const AssistantContext = createContext<AssistantContextValue>({
   available: false,
+  status: null,
   isOpen: false,
   open: () => {},
   close: () => {},
@@ -110,8 +113,8 @@ export function AssistantProvider({
   }, []);
   const closeAssistant = useCallback(() => setOpen(false), []);
   const value = useMemo(
-    () => ({ available, isOpen: open, open: openAssistant, close: closeAssistant }),
-    [available, open, openAssistant, closeAssistant],
+    () => ({ available, status, isOpen: open, open: openAssistant, close: closeAssistant }),
+    [available, status, open, openAssistant, closeAssistant],
   );
 
   return (

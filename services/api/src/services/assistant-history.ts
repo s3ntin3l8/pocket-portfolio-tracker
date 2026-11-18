@@ -17,6 +17,16 @@ export async function isHistoryEnabled(db: DB, userId: string): Promise<boolean>
   return row?.on === true;
 }
 
+/** Opt-in to attaching documents to a chat (`user_preferences.assistant_attachments`). */
+export async function isAttachmentsEnabled(db: DB, userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ on: userPreferences.assistantAttachments })
+    .from(userPreferences)
+    .where(eq(userPreferences.userId, userId))
+    .limit(1);
+  return row?.on === true;
+}
+
 const titleOf = (text: string) => {
   const oneLine = text.replace(/\s+/g, " ").trim();
   return oneLine.length > TITLE_CHARS ? `${oneLine.slice(0, TITLE_CHARS - 1)}…` : oneLine;

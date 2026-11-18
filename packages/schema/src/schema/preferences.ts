@@ -46,5 +46,7 @@ export const userPreferencesSchema = z.object({
   retirementAge: z.number().int().min(50).max(80).nullable().optional(),
   /** Opt-in: keep assistant conversations server-side. Turning it off deletes them. */
   assistantSaveHistory: z.boolean().optional(),
+  /** Opt-in: attach documents to an assistant chat. They go to the chat provider unredacted. */
+  assistantAttachments: z.boolean().optional(),
 });
 export type UserPreferencesInput = z.infer<typeof userPreferencesSchema>;

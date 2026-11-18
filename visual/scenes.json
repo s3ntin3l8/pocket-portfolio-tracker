@@ -251,6 +251,31 @@
       "viewports": ["wide"]
     },
     {
+      "name": "assistant-attachment",
+      "path": "/en/holdings",
+      "tags": ["check", "audit"],
+      "steps": [
+        {
+          "click": "role=button[name=\"Open the assistant\"]"
+        },
+        {
+          "click": "role=button[name=\"Attach a document\"]"
+        },
+        {
+          "waitFor": "role=button[name=\"Remove statement.png\"]"
+        },
+        {
+          "fill": "role=textbox[name=\"Message to the assistant\"]",
+          "value": "Record this trade"
+        }
+      ]
+    },
+    {
+      "name": "settings-assistant-attachments",
+      "path": "/en/settings/investing",
+      "tags": ["check", "audit"]
+    },
+    {
       "name": "add-hand-off",
       "path": "/en/holdings",
       "tags": ["check", "audit"],

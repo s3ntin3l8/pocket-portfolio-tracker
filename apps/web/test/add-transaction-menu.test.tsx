@@ -14,11 +14,13 @@ const search = { value: "" };
 // The assistant entry points: availability and `open` are controlled per test.
 const assistantMock = vi.hoisted(() => ({
   available: false,
+  status: null as { attachments?: { enabled: boolean } } | null,
   open: vi.fn(),
 }));
 vi.mock("@/components/assistant/assistant-provider", () => ({
   useAssistant: () => ({
     available: assistantMock.available,
+    status: assistantMock.status,
     isOpen: false,
     open: assistantMock.open,
     close: () => {},
@@ -147,6 +149,7 @@ describe("AddTransactionMenu", () => {
     lastEntryTabsProps.current = null;
     entryTabsMountCount.current = 0;
     assistantMock.available = false;
+    assistantMock.status = null;
     assistantMock.open.mockClear();
   });
 
@@ -198,6 +201,20 @@ describe("AddTransactionMenu", () => {
       // A plain string would auto-send; a hand-off must only prefill.
       expect(typeof assistantMock.open.mock.calls[0]![0]).toBe("object");
       await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("invites a statement in the starter text when attachments are on", async () => {
+      assistantMock.available = true;
+      assistantMock.status = { attachments: { enabled: true } };
+      listPortfolios.mockResolvedValue([PORTFOLIO]);
+      renderMenu();
+      openMenu();
+      fireEvent.click(await screen.findByText(handOff));
+      await waitFor(() => expect(assistantMock.open).toHaveBeenCalledTimes(1));
+      expect(assistantMock.open).toHaveBeenCalledWith({
+        prefill: "Record this in Main depot — paste the text or attach a statement: ",
+        scope: `p:${PORTFOLIO.id}`,
+      });
     });
 
     it("threads the same action into the manual-entry tabs", async () => {

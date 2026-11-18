@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ApiClient } from "@portfolio/api-client";
+import type { ApiClient, AssistantAttachment } from "@portfolio/api-client";
 import {
   applyEvent,
   errorKeyFor,
   settleTurn,
+  splitAttachmentMarkers,
   MAX_MESSAGE_CHARS,
   toRequestMessages,
   type ChatTurn,
@@ -28,9 +29,24 @@ const newId = () => `t${++nextId}`;
  * later sends carry so the turn is appended to it). `send` streams one answer, `stop` cancels it — the abort travels through the
  * proxy to the API, which stops the model call. Turns are kept in a ref so a send always sees
  * the latest history regardless of render timing.
+ *
+ * Attached documents (opt-in) are held in memory per user turn and resent with later turns, so a
+ * follow-up still sees the document. They are dropped by `reset` and a reload, and are never put
+ * in the turn list, the URL or any storage; a reopened conversation only knows the file names.
  */
-export function useAssistantChat(client: ChatClient, getScope: () => string) {
+export function useAssistantChat(
+  client: ChatClient,
+  getScope: () => string,
+  /** Called when the API refused the documents of a turn, so the composer can take them back. */
+  onRefused?: (files: AssistantAttachment[], text: string) => void,
+) {
+  const refusedRef = useRef(onRefused);
+  useEffect(() => {
+    refusedRef.current = onRefused;
+  }, [onRefused]);
   const turnsRef = useRef<ChatTurn[]>([]);
+  /** The bytes of attached documents by user turn id. Memory only: never persisted. */
+  const filesRef = useRef<Map<string, AssistantAttachment[]>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -45,9 +61,18 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     setConversationFull(full);
   }, []);
 
+  /** Files the next request still carries (turns outside its 20-message window are not resent). */
+  const [sentFiles, setSentFiles] = useState(0);
+
   const commit = useCallback((next: ChatTurn[]) => {
     turnsRef.current = next;
     setTurns(next);
+    setSentFiles(
+      toRequestMessages(next, filesRef.current).reduce(
+        (n, m) => n + (m.attachments?.length ?? 0),
+        0,
+      ),
+    );
   }, []);
 
   const patchLast = useCallback(
@@ -61,15 +86,20 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
 
   /** Starts an answer; returns false (and does nothing) when one is already streaming. */
   const send = useCallback(
-    (raw: string): boolean => {
+    (raw: string, files: AssistantAttachment[] = []): boolean => {
       const text = raw.trim().slice(0, MAX_MESSAGE_CHARS);
       if (!text || abortRef.current) return false;
 
-      const history = [
-        ...turnsRef.current,
-        { id: newId(), role: "user", content: text, steps: [] } satisfies ChatTurn,
-      ];
-      const request = toRequestMessages(history);
+      const userTurn: ChatTurn = {
+        id: newId(),
+        role: "user",
+        content: text,
+        steps: [],
+        ...(files.length ? { attachments: files.map((f) => ({ name: f.name })) } : {}),
+      };
+      if (files.length) filesRef.current.set(userTurn.id, files);
+      const history = [...turnsRef.current, userTurn];
+      const request = toRequestMessages(history, filesRef.current);
       commit([
         ...history,
         { id: newId(), role: "assistant", content: "", steps: [], pending: true },
@@ -112,7 +142,22 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
           }
         } catch (err) {
           if (!ac.signal.aborted && current()) {
-            patchLast((t) => ({ ...t, error: errorKeyFor(err) }));
+            const key = errorKeyFor(err);
+            if (
+              files.length > 0 &&
+              (key === "attachment_unsupported" || key === "attachments_disabled")
+            ) {
+              // Refused before anything was read: hand the files back for a retry or a removal,
+              // and don't show them as sent.
+              filesRef.current.delete(userTurn.id);
+              commit(
+                turnsRef.current.map((t) =>
+                  t.id === userTurn.id ? { ...t, attachments: undefined } : t,
+                ),
+              );
+              refusedRef.current?.(files, text);
+            }
+            patchLast((t) => ({ ...t, error: key }));
           }
         } finally {
           if (current()) {
@@ -140,6 +185,7 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     abortRef.current = null;
     setStreaming(false);
     setConversation(null);
+    filesRef.current.clear();
     commit([]);
   }, [commit, setConversation]);
 
@@ -156,12 +202,16 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
                 abortRef.current?.abort();
                 abortRef.current = null;
                 setStreaming(false);
+                // A stored file is only a `📎 name` marker: show the name, flag it for re-attaching.
+                filesRef.current.clear();
                 commit(
                   conv.messages.map((m) => ({
                     id: newId(),
                     role: m.role,
-                    content: m.content,
                     steps: [],
+                    ...(m.role === "user"
+                      ? splitAttachmentMarkers(m.content)
+                      : { content: m.content }),
                   })),
                 );
                 setConversation(conv.id);
@@ -198,5 +248,15 @@ export function useAssistantChat(client: ChatClient, getScope: () => string) {
     };
   }, []);
 
-  return { turns, streaming, send, stop, reset, conversationId, conversationFull, history };
+  return {
+    turns,
+    streaming,
+    sentFiles,
+    send,
+    stop,
+    reset,
+    conversationId,
+    conversationFull,
+    history,
+  };
 }

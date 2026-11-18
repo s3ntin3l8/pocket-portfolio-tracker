@@ -80,7 +80,9 @@ This repo's domain invariants live in `.claude/skills/pocket/SKILL.md`: the cash
   (EN/ID). Talks to the API over HTTP (base URL is config-driven → Vercel-migratable).
   Includes an in-app assistant panel (`components/assistant/`, streams `POST /assistant/chat`: a docked
   sidebar from `md`, a full-screen page on phones, with a hand-off from Add transaction that only prefills the
-  composer; model output is untrusted — Markdown never renders images or raw HTML; see `docs/assistant.md`).
+  composer; model output is untrusted — Markdown never renders images or raw HTML; opt-in document attachments
+  (`assistantAttachments`, write-scoped, draft-only) go to the chat provider unredacted and are never stored or logged;
+  see `docs/assistant.md`).
 - **`packages/*`** — `schema` (zod + types), `core` (holdings, cost basis, XIRR/TWR,
   contributions, tax DE/ID, trade-log, allocation/rebalancing, forecasting, corp-actions,
   FX — the domain logic derived from transactions, the source of truth), `db` (Drizzle

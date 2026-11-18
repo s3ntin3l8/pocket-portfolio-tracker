@@ -10,6 +10,7 @@ import {
   type ChatToolCall,
 } from "./types.js";
 import type { Logger } from "../parsers/types.js";
+import { openAiImagePart } from "../ai/media-blocks.js";
 
 export interface OpenAICompatOptions {
   name: string;
@@ -253,7 +254,19 @@ function stripSchemaMarker(schema: Record<string, unknown>): Record<string, unkn
 }
 
 function toOpenAI(m: ChatMessage): Record<string, unknown>[] {
-  if (m.role === "user") return [{ role: "user", content: m.content }];
+  if (m.role === "user") {
+    // Images only: a PDF was turned into text before it got here (`prepareAttachments`).
+    if (!m.attachments?.length) return [{ role: "user", content: m.content }];
+    return [
+      {
+        role: "user",
+        content: [
+          { type: "text", text: m.content },
+          ...m.attachments.map((a) => openAiImagePart(a.mediaType, a.data)),
+        ],
+      },
+    ];
+  }
   if (m.role === "tool") {
     return m.results.map((r) => ({ role: "tool", tool_call_id: r.callId, content: r.content }));
   }

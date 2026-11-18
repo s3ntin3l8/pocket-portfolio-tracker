@@ -1,9 +1,10 @@
 import { aiProviderSettings, aiTaskSettings, providerCredentials } from "@portfolio/db";
 import { getDb, getEncryption } from "../../db/client.js";
-import type { ChatProvider } from "../chat/types.js";
+import type { AttachmentSupport, ChatProvider } from "../chat/types.js";
 import type { ResolvedSecret } from "../market-data/types.js";
 import type { ScreenshotParser } from "../parsers/types.js";
 import { deriveTask, OFF, type TaskSetting } from "./derive.js";
+import { listModels } from "./models.js";
 import { AI_TASKS, env, findProvider, type AiTask } from "./registry.js";
 
 /** `provider_credentials` rows of the AI providers are stored as `ai:<provider id>`. */
@@ -167,8 +168,20 @@ export async function getChatProvider(): Promise<ChatProvider | null> {
   const t = resolveTask("chat", cfg);
   const d = findProvider(t.provider);
   if (!d || !t.model || !t.usable) return null;
-  return d.createChat(cfg.credentials.get(d.id), t.model, {
+  const secret = cfg.credentials.get(d.id);
+  const provider = d.createChat(secret, t.model, {
     effort: t.effort ?? undefined,
     allowDataCollection: allowsDataCollection(cfg, d.id),
   });
+  // Claude and Gemini answer for themselves. The OpenAI-compatible family has no native PDF input
+  // and image support is per model, so ask the provider's own model list (cached) about this one.
+  if (!provider.attachmentSupport) {
+    const model = t.model;
+    provider.attachmentSupport = async (): Promise<AttachmentSupport> => {
+      const { models, error } = await listModels(d.id, "chat", secret);
+      const vision = error ? null : (models.find((m) => m.id === model)?.vision ?? null);
+      return { images: vision === true ? "yes" : vision === false ? "no" : "maybe", pdf: false };
+    };
+  }
+  return provider;
 }

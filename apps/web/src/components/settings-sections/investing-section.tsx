@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import { PreferenceChips } from "@/components/preference-chips";
 import { BenchmarkSettingsForm } from "@/components/settings-sections/benchmark-settings-form";
 import { AssistantHistoryToggle } from "@/components/settings-sections/assistant-history-toggle";
+import { AssistantAttachmentsToggle } from "@/components/settings-sections/assistant-attachments-toggle";
 import { RetirementAgeForm } from "@/components/settings-sections/retirement-age-form";
 import type { UserPreferences } from "@portfolio/api-client";
 
@@ -89,6 +90,8 @@ export async function InvestingSection({ prefs }: { prefs: UserPreferences | nul
         <Card className="overflow-hidden">
           <div className="p-4">
             <AssistantHistoryToggle enabled={prefs?.assistantSaveHistory ?? false} />
+            <hr className="my-4 border-border" />
+            <AssistantAttachmentsToggle enabled={prefs?.assistantAttachments ?? false} />
           </div>
         </Card>
       </div>

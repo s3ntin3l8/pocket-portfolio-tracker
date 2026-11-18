@@ -143,6 +143,8 @@ describe("GET /assistant/status", () => {
       label: "Fake model",
       local: true,
       saveHistory: false,
+      // Off until the user opts in; a provider that doesn't say what it reads is "maybe".
+      attachments: { enabled: false, optedIn: false, images: "maybe", pdf: false },
     });
   });
 });

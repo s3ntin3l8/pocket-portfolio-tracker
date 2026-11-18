@@ -8,23 +8,31 @@ import {
   History,
   Maximize2,
   Minimize2,
+  Paperclip,
   RotateCcw,
   Send,
   Square,
   Trash2,
   X,
 } from "lucide-react";
-import type { AssistantConversationSummary, AssistantStatus } from "@portfolio/api-client";
+import type {
+  AssistantAttachment,
+  AssistantConversationSummary,
+  AssistantStatus,
+} from "@portfolio/api-client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { AssistantMarkdown } from "@/components/assistant/assistant-markdown";
 import { MAX_MESSAGE_CHARS, displayText, type ChatTurn, type ToolStep } from "@/lib/assistant-chat";
-import { cn, formatDateTime } from "@/lib/utils";
+import type { ComposerAttachments } from "@/lib/use-composer-attachments";
+import { Link } from "@/i18n/navigation";
+import { cn, formatBytes, formatDateTime } from "@/lib/utils";
 
 export interface AssistantChatApi {
   turns: ChatTurn[];
   streaming: boolean;
-  send: (text: string) => boolean;
+  /** Starts an answer; `files` are the opt-in documents attached to this turn. */
+  send: (text: string, files?: AssistantAttachment[]) => boolean;
   stop: () => void;
   reset: () => void;
   /** The stored conversation is full: new messages are not being saved. */
@@ -66,9 +74,22 @@ function Turn({ turn }: { turn: ChatTurn }) {
   if (turn.role === "user") {
     return (
       <div className="flex justify-end">
-        <p className="max-w-[85%] whitespace-pre-wrap break-words rounded-xl bg-primary px-3 py-2 text-sm text-primary-foreground">
-          {turn.content}
-        </p>
+        <div className="max-w-[85%] space-y-1 rounded-xl bg-primary px-3 py-2 text-sm text-primary-foreground">
+          <p className="whitespace-pre-wrap break-words">{turn.content}</p>
+          {turn.attachments && turn.attachments.length > 0 && (
+            <ul aria-label={t("attachedFiles")} className="space-y-0.5 text-xs">
+              {turn.attachments.map((a, i) => (
+                <li key={`${a.name}-${i}`} className="flex items-center gap-1 break-all">
+                  <Paperclip className="size-3 shrink-0" aria-hidden />
+                  {a.name}
+                </li>
+              ))}
+            </ul>
+          )}
+          {turn.attachments?.some((a) => a.reattach) && (
+            <p className="text-xs">{t("attachAgain")}</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -246,6 +267,8 @@ export interface AssistantPanelState {
   showHistory: boolean;
   setShowHistory: (show: boolean) => void;
   inputRef: RefObject<HTMLTextAreaElement | null>;
+  /** Files waiting in the composer. Absent = the panel has no attachment control. */
+  attachments?: ComposerAttachments;
 }
 
 /**
@@ -343,6 +366,10 @@ export function AssistantPanel({ state }: { state: AssistantPanelState }) {
     inputRef,
   } = state;
   const historyOn = Boolean(status?.saveHistory) || savingEnabled;
+  const att = state.attachments;
+  const capability = status?.attachments;
+  const attachmentsOn = capability?.enabled === true && att !== undefined;
+  const fileInput = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   // Keep the newest content in view as the answer streams in.
@@ -352,13 +379,22 @@ export function AssistantPanel({ state }: { state: AssistantPanelState }) {
 
   const submit = () => {
     if (!draft.trim() || chat.streaming) return;
-    chat.send(draft);
+    // The wire shape only: the chip's size is for display.
+    const files = attachmentsOn
+      ? att.files.map(({ name, mediaType, data }) => ({ name, mediaType, data }))
+      : undefined;
+    chat.send(draft, files);
     setDraft("");
+    att?.clear();
   };
 
+  const provider = status?.label ?? "";
   const disclosure = status?.local
-    ? t("disclosureLocal")
-    : t("disclosureCloud", { provider: status?.label ?? "" });
+    ? t(capability?.enabled ? "disclosureLocalAttachments" : "disclosureLocal")
+    : t(capability?.enabled ? "disclosureCloudAttachments" : "disclosureCloud", { provider });
+  // Off, but the model could read a document: point at the setting instead of a dead end.
+  const offerAttachments =
+    capability !== undefined && !capability.optedIn && capability.images !== "no";
 
   // A missing suggestion key must never render the key path: fall back to the id.
   const suggestionLabel = (key: string) =>
@@ -384,6 +420,17 @@ export function AssistantPanel({ state }: { state: AssistantPanelState }) {
             <div className="space-y-3">
               <p className="text-xs text-text-2">{disclosure}</p>
               <p className="text-sm text-text-2">{t("emptyHint")}</p>
+              {offerAttachments && (
+                <p className="text-xs text-text-2">
+                  {t.rich("attachHint", {
+                    link: (chunks) => (
+                      <Link href="/settings/investing" className="font-semibold underline">
+                        {chunks}
+                      </Link>
+                    ),
+                  })}
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
                 {SUGGESTIONS.map((key) => (
                   <Button
@@ -410,6 +457,42 @@ export function AssistantPanel({ state }: { state: AssistantPanelState }) {
         </p>
       )}
       <div className="shrink-0 border-t border-border bg-card px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 md:px-5">
+        {attachmentsOn && att.files.length > 0 && (
+          <div className="mb-2 space-y-1.5">
+            {att.warningOpen && (
+              <p role="status" className="text-xs text-text-2">
+                {t(status?.local ? "attachWarningLocal" : "attachWarning", { provider })}
+              </p>
+            )}
+            <ul aria-label={t("attachedFiles")} className="flex flex-wrap gap-1.5">
+              {att.files.map((f, i) => (
+                <li
+                  key={`${f.name}-${i}`}
+                  className="inline-flex max-w-full items-center gap-1 rounded-full bg-muted py-0.5 pl-2.5 pr-1 text-xs"
+                >
+                  <Paperclip className="size-3 shrink-0" aria-hidden />
+                  <span className="truncate">{f.name}</span>
+                  <span className="shrink-0 text-text-2">{formatBytes(f.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => att.remove(i)}
+                    aria-label={t("removeAttachment", { name: f.name })}
+                    className="inline-flex size-5 shrink-0 items-center justify-center rounded-full hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {attachmentsOn && att.error && (
+          <p role="alert" className="mb-2 text-xs font-semibold text-destructive">
+            {t.has(`attachErrors.${att.error}`)
+              ? t(`attachErrors.${att.error}`)
+              : t("attachErrors.read")}
+          </p>
+        )}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -417,6 +500,33 @@ export function AssistantPanel({ state }: { state: AssistantPanelState }) {
           }}
           className="flex w-full items-end gap-2"
         >
+          {attachmentsOn && (
+            <>
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                hidden
+                accept={att.accept.join(",")}
+                onChange={(e) => {
+                  const picked = Array.from(e.target.files ?? []);
+                  // Reset so choosing the same file again fires a change.
+                  e.target.value = "";
+                  if (picked.length > 0) void att.add(picked);
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label={t("attach")}
+                disabled={att.room <= 0 || chat.streaming}
+                onClick={() => fileInput.current?.click()}
+              >
+                <Paperclip />
+              </Button>
+            </>
+          )}
           <textarea
             ref={inputRef}
             value={draft}

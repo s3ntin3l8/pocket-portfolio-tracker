@@ -1,4 +1,5 @@
 import type { Logger, ParserImage, ParseResult, ScreenshotParser } from "./types.js";
+import { openAiImagePart } from "../ai/media-blocks.js";
 import {
   JSON_EXTRACTION_PROMPT,
   parseJsonObject,
@@ -72,7 +73,7 @@ export class OllamaVisionParser implements ScreenshotParser {
     );
     const t0 = Date.now();
 
-    const dataUrl = `data:${image.mimeType};base64,${image.data.toString("base64")}`;
+    const imagePart = openAiImagePart(image.mimeType, image.data.toString("base64"));
     const res = await this.doFetch(`${this.baseUrl}/v1/chat/completions`, {
       method: "POST",
       headers: {
@@ -84,10 +85,7 @@ export class OllamaVisionParser implements ScreenshotParser {
         messages: [
           {
             role: "user",
-            content: [
-              { type: "image_url", image_url: { url: dataUrl } },
-              { type: "text", text: JSON_EXTRACTION_PROMPT },
-            ],
+            content: [imagePart, { type: "text", text: JSON_EXTRACTION_PROMPT }],
           },
         ],
       }),

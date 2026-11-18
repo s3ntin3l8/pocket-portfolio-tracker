@@ -73,6 +73,7 @@ describe("InvestingSection", () => {
         riskFreeRate: null,
         retirementAge: null,
         assistantSaveHistory: false,
+        assistantAttachments: false,
       },
     });
     renderWithIntl(element as React.ReactElement);
