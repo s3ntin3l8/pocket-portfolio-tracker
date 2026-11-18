@@ -73,7 +73,8 @@ export async function InstrumentLotsSection({ id }: { id: string }) {
   const holding = scope.holding;
   const lots = holding?.lots ?? [];
   if (lots.length === 0) return null;
-  const lotCurrency = holding?.currency ?? data.instrument.currency;
+  // Lot unit cost / cost are qty × price + fees in the trade (cost) currency, not the quote's.
+  const lotCurrency = holding?.costCurrency ?? holding?.currency ?? data.instrument.currency;
   return (
     <Card>
       <CardHeader>

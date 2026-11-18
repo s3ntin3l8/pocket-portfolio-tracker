@@ -21,6 +21,7 @@ import { HoldingsSidebar } from "@/components/holdings/holdings-sidebar";
 import { FxMissingBanner } from "@/components/fx-missing-banner";
 import { TrConnectionBanner } from "@/components/holdings/tr-connection-banner";
 import { collectFxMissing } from "@/lib/fx-missing";
+import { HOLDINGS_EXPORT_HEADERS, cashExportRow, holdingExportRow } from "@/lib/holdings-export";
 import {
   loadHoldings,
   loadNetWorth,
@@ -154,44 +155,12 @@ export default async function HoldingsPage({
     (key) => key === "all" || (key === "cash" ? hasCash : (classCounts[key] ?? 0) > 0),
   );
 
-  // Per-unit avgCost is in the cost currency (AvgCostCurrency), price in the quote currency (PriceCurrency); position
-  // value/P&L are in the display currency (the trailing Currency column).
   const exportRows: (string | number)[][] = [
-    ...holdings.map((h) => [
-      h.instrument?.symbol ?? "",
-      h.instrument?.name ?? "",
-      h.instrument?.assetClass ?? "",
-      Number(h.quantity),
-      h.instrument?.unit ?? "",
-      h.avgCost,
-      h.costCurrency ?? h.currency ?? currency,
-      h.price ?? "",
-      h.currency ?? currency,
-      h.marketValueDisplay ?? "",
-      h.unrealizedPnLDisplay ?? "",
-      currency,
-    ]),
-    // Cash rows for cash-inclusive portfolios (one row per currency). Like the holdings
-    // rows, MarketValue/Currency are in the display currency — empty when the cash
-    // currency has no FX rate, exactly like an fxMissing holding (writing the native
-    // amount there would label it with the wrong currency). For cash, Quantity is the
-    // native balance (an amount, not a share count) and PriceCurrency names its currency.
+    ...holdings.map((h) => holdingExportRow(h, currency)),
+    // Cash rows for cash-inclusive portfolios (one row per currency).
     ...Object.entries(cash)
       .filter(([, v]) => Number(v) !== 0)
-      .map(([ccy, balance]) => [
-        "Cash",
-        t("cash"),
-        "cash",
-        balance,
-        "",
-        "",
-        "",
-        "",
-        ccy,
-        cashDisplay[ccy] ?? "",
-        "",
-        currency,
-      ]),
+      .map(([ccy, balance]) => cashExportRow(t("cash"), ccy, balance, cashDisplay[ccy], currency)),
   ];
 
   // Export moved out of the heading into the positions toolbar (it exports the table, so
@@ -206,20 +175,7 @@ export default async function HoldingsPage({
     <ExportCsvButton
       key="export-csv"
       filename="holdings.csv"
-      headers={[
-        "Symbol",
-        "Name",
-        "AssetClass",
-        "Quantity",
-        "Unit",
-        "AvgCost",
-        "AvgCostCurrency",
-        "Price",
-        "PriceCurrency",
-        "MarketValue",
-        "UnrealizedPnL",
-        "Currency",
-      ]}
+      headers={[...HOLDINGS_EXPORT_HEADERS]}
       rows={exportRows}
       label={t("exportCsv")}
       iconOnly
