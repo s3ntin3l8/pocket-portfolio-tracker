@@ -47,8 +47,9 @@ it current.
   CSV exports, phone screenshots of broker apps.
 - Yearly tax rhythm: Freistellungsauftrag allocation per depot, Vorabpauschale, the
   German annual tax picture, or the Indonesian final-tax module, chosen per user.
-- Access paths beyond the web UI: an in-app assistant, a read-only MCP endpoint for
-  claude.ai/mobile connectors, and personal access tokens.
+- Access paths beyond the web UI: an in-app assistant, an MCP endpoint for claude.ai/mobile
+  connectors (read-only by default; a write-scoped token can only propose draft imports),
+  and personal access tokens.
 - Deployment: self-hosted Docker stack (API + web) behind the host's own ingress; auth via
   Authentik OIDC or local email/password.
 
@@ -75,7 +76,8 @@ it current.
 ## Evidence on Hand
 
 - Scripted demo dataset covering every asset class (`make demo`, `seed-demo.ts`), used for
-  screenshots and visual checks; README and landing stills in `docs/screenshots/`.
+  screenshots and visual checks; README stills in `docs/screenshots/` (`make screenshots`).
+  Landing captures come from `make screenshots-landing` into the gitignored `landing-shots/`.
 - Product and domain docs: `docs/tax.md`, `docs/loans.md`, `docs/mcp.md`,
   `docs/assistant.md`, broker docs (`trade_republic.md`, `interactive_brokers.md`,
   `dkb.md`), app audits in `docs/audits/`.

@@ -6,6 +6,9 @@ Republic, Coinbase), and direct broker sync (**Trade Republic** push-approval, *
 Brokers** Flex token-pull), tracking **equities, gold, bonds, mutual funds (reksa dana), and
 cash** with live IDX prices and a real-time gold ticker.
 
+Users, positioning, product principles and the accessibility bar live in `PRODUCT.md`; read it
+before planning UI or product work (it is also the Impeccable design skill's product context).
+
 <!-- mullion:briefing:start -->
 
 This repo's domain invariants live in `.claude/skills/pocket/SKILL.md`: the cash boundary, the three separate transfer valuations, missing-FX and missing-price handling, derived-never-stored figures, tax switches, import drafts, auth scopes, response contracts and URL view state. Read it before you change `packages/core`, `services/api` or `apps/web`, or plan work that touches money, performance, tax or imports. To review a diff, delegate to the `pocket-reviewer` agent (`.claude/agents/pocket-reviewer.md`). It applies that skill as its checklist and reports only verified findings.
