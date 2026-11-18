@@ -21,7 +21,7 @@ export default async function AdminUsersPage({ params }: { params: Promise<{ loc
       {result.status === "ok" ? (
         <AdminUsersTable users={result.users} />
       ) : (
-        <p className="text-sm text-muted-foreground">{t("unavailable")}</p>
+        <p className="text-sm text-muted-foreground">{t("usersUnavailable")}</p>
       )}
     </>
   );

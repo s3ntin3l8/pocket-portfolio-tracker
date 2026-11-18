@@ -817,11 +817,10 @@ describe("admin provider config", () => {
     await app.db.delete(users).where(eq(users.id, idB));
   });
 
-  // Regression guard for a join fan-out: the query LEFT JOINs portfolios→transactions,
-  // documents, and apiTokens onto users then GROUP BY users.id. Counts survive because
-  // they use count(distinct …), but a plain sum(documents.sizeBytes) would be multiplied
-  // once per (transaction × token) row in the joined Cartesian product. With 2
-  // transactions and 2 tokens, a naive sum would report storageBytes 4x too large.
+  // Regression guard for a join fan-out: joining portfolios→transactions, documents and
+  // apiTokens side by side multiplies rows per user (slow, and a plain sum would inflate
+  // storageBytes). Each figure is now its own scalar subquery; with 2 transactions and
+  // 2 tokens, a naive join-sum would report storageBytes 4x too large.
   it("does not inflate storageBytes via joined transactions/tokens fan-out", async () => {
     const id = await ensureUser("user-fanout-check");
 

@@ -464,6 +464,7 @@
     "storageDiskTotal": "Disk total",
     "storageStatsUnavailable": "Statistics unavailable",
     "users": "Users",
+    "usersUnavailable": "Users are unavailable right now.",
     "usersHint": "View registered users, their storage usage, and manage access.",
     "revokeTokens": "Revoke tokens",
     "revokeTokensConfirm": "Revoke all personal access tokens for {email}? They will need to log in again to mint new ones.",
