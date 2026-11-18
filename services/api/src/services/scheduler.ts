@@ -50,6 +50,7 @@ export {
 } from "./scheduler/enqueue.js";
 
 import { PgBoss } from "pg-boss";
+import { PG_BOSS_POOL_OPTIONS, createPoolWatchdog } from "./scheduler/pool.js";
 import { and, eq, lt, or } from "drizzle-orm";
 // The re-export at the top of this file does not bring the name into scope — import it
 // separately for the cron claim's lease.
@@ -143,9 +144,18 @@ export async function startScheduler(app: FastifyInstance): Promise<void> {
   // Cap pg-boss's own connection pool explicitly — left unset it falls back to `pg`'s
   // default of 10, which combined with the app's query pool (client.ts) can exhaust a
   // Supabase pooler's connection ceiling (see the EMAXCONNSESSION investigation).
-  const boss = new PgBoss({ connectionString: url, max: 5 });
+  const boss = new PgBoss({ connectionString: url, ...PG_BOSS_POOL_OPTIONS });
   setActiveBoss(boss);
-  boss.on("error", (err) => app.log.error({ err }, "pg-boss error"));
+  const watchdog = createPoolWatchdog({
+    exit: () => {
+      app.log.fatal("pg-boss pool unreachable for 15 min; exiting so the process restarts");
+      process.exit(1);
+    },
+  });
+  boss.on("error", (err) => {
+    app.log.error({ err }, "pg-boss error");
+    watchdog.onError(err);
+  });
   await boss.start();
 
   // See resetStaleSyncFlags: a killed/crashed worker leaves `syncing=true` with no lease
