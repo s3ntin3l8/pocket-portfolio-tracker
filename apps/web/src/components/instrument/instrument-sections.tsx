@@ -312,7 +312,7 @@ export async function InstrumentPositionSection({ id, locale }: SectionProps) {
               label={t("avgCostLabel")}
               value={formatMoney(
                 Number(holding.avgCost),
-                holding.currency ?? instrument.currency,
+                holding.costCurrency ?? holding.currency ?? instrument.currency,
                 locale,
               )}
             />

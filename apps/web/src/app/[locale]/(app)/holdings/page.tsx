@@ -154,7 +154,7 @@ export default async function HoldingsPage({
     (key) => key === "all" || (key === "cash" ? hasCash : (classCounts[key] ?? 0) > 0),
   );
 
-  // Per-unit avgCost/price are native quotes (labeled by PriceCurrency); position
+  // Per-unit avgCost is in the cost currency (AvgCostCurrency), price in the quote currency (PriceCurrency); position
   // value/P&L are in the display currency (the trailing Currency column).
   const exportRows: (string | number)[][] = [
     ...holdings.map((h) => [
@@ -164,6 +164,7 @@ export default async function HoldingsPage({
       Number(h.quantity),
       h.instrument?.unit ?? "",
       h.avgCost,
+      h.costCurrency ?? h.currency ?? currency,
       h.price ?? "",
       h.currency ?? currency,
       h.marketValueDisplay ?? "",
@@ -182,6 +183,7 @@ export default async function HoldingsPage({
         t("cash"),
         "cash",
         balance,
+        "",
         "",
         "",
         "",
@@ -211,6 +213,7 @@ export default async function HoldingsPage({
         "Quantity",
         "Unit",
         "AvgCost",
+        "AvgCostCurrency",
         "Price",
         "PriceCurrency",
         "MarketValue",

@@ -146,6 +146,15 @@ describe("HoldingsTable", () => {
     expect(screen.getAllByText(/16,000/).length).toBeGreaterThan(0);
   });
 
+  it("shows avg cost in the cost currency, not the quote currency", () => {
+    // A US stock bought in EUR: avg cost is EUR, the quote is USD.
+    const h = { ...makeHolding("NVDA", "10", "146.73"), costCurrency: "EUR", currency: "USD" };
+    renderTable({ rows: [h] });
+    expect(screen.getAllByText(/€\s?146\.73/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/\$\s?146\.73/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/\$\s?100\.00/).length).toBeGreaterThan(0);
+  });
+
   it("badges and footnotes a holding valued at cost (no market price — issue #744)", () => {
     const atCost = { ...makeHolding("MWOF", "10", "100"), valuedAtCost: true as const };
     renderTable({ rows: [makeHolding("ZZYX", "50", "200"), atCost] });

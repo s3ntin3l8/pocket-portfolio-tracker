@@ -54,8 +54,12 @@ function computeRowValues(h: HoldingValuation, currency: string, locale: string)
   const pct =
     pnl !== null && costBasis !== null && costBasis !== 0 ? (pnl / costBasis) * 100 : null;
   const native = (n: number) => formatMoney(n, h.currency ?? currency, locale);
+  // Average cost is in the trade (cost) currency, which can differ from the quote currency
+  // (a US stock bought in EUR): labelling it with the quote's symbol made a EUR cost read as
+  // a USD one, so a loss looked like a gain next to the USD price.
+  const cost = (n: number) => formatMoney(n, h.costCurrency ?? h.currency ?? currency, locale);
   const display = (n: number) => formatMoney(n, currency, locale);
-  return { pnl, pct, native, display };
+  return { pnl, pct, native, cost, display };
 }
 
 export interface HoldingsTableProps {
@@ -216,7 +220,7 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
           </TableHeader>
           <TableBody>
             {sorted.map((h) => {
-              const { pnl, pct, native, display } = computeRowValues(h, currency, locale);
+              const { pnl, pct, native, cost, display } = computeRowValues(h, currency, locale);
               const pnlColor = pnl === null ? "text-muted-foreground" : signToneClass(pnl);
               return (
                 <TableRow key={h.instrumentId}>
@@ -248,7 +252,7 @@ export function HoldingsTable({ rows, currency, cash, cashDisplay }: HoldingsTab
                     {formatQuantity(Number(h.quantity), h.instrument?.unit, locale)}
                   </TableCell>
                   <TableCell className={cn(TABLE_VALUE, "text-text-mute")}>
-                    {native(Number(h.avgCost))}
+                    {cost(Number(h.avgCost))}
                   </TableCell>
                   <TableCell className={TABLE_VALUE}>
                     {h.price !== null ? native(Number(h.price)) : "—"}
