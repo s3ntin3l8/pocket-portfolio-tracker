@@ -548,6 +548,39 @@ describe("mapTrEventToDraft", () => {
     }
   });
 
+  it("maps IPO_TRADE_EXECUTED to a plain buy with the price derived from the cash paid", () => {
+    const draft = draftOf({
+      ...base,
+      eventType: "IPO_TRADE_EXECUTED",
+      isin: "US0000000001",
+      shares: 0.5,
+      amount: -20,
+      title: "Example IPO",
+    });
+    expect(draft).toMatchObject({
+      action: "buy",
+      quantity: "0.5",
+      price: "40",
+      total: "20",
+      isin: "US0000000001",
+      externalId: base.id,
+    });
+    expect(draft.kind ?? null).toBeNull();
+    expect(categoryForEventType("IPO_TRADE_EXECUTED")).toBe("trade");
+  });
+
+  it("books IPO_TRADE_EXECUTED only as a paid buy; zero or positive amounts stay a gap", () => {
+    const common = { ...base, eventType: "IPO_TRADE_EXECUTED", isin: "US0000000001", shares: 0.5 };
+    for (const amount of [0, 20]) {
+      expect(mapTrEventToDraft({ ...common, amount })).toMatchObject({
+        skip: true,
+        severity: "attention",
+        code: "unmapped_event_type",
+        reason: expect.stringContaining("IPO_TRADE_EXECUTED"),
+      });
+    }
+  });
+
   it("does not turn cash RECEIVED alongside shares (SSP_CORPORATE_ACTION_CASH_AND_STOCK) into a buy", () => {
     expect(
       mapTrEventToDraft({
