@@ -11,6 +11,20 @@ import {
 
 const search = { value: "" };
 
+// The assistant entry points: availability and `open` are controlled per test.
+const assistantMock = vi.hoisted(() => ({
+  available: false,
+  open: vi.fn(),
+}));
+vi.mock("@/components/assistant/assistant-provider", () => ({
+  useAssistant: () => ({
+    available: assistantMock.available,
+    isOpen: false,
+    open: assistantMock.open,
+    close: () => {},
+  }),
+}));
+
 // next/navigation's useSearchParams drives the auto-open effect.
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(search.value),
@@ -132,6 +146,8 @@ describe("AddTransactionMenu", () => {
     getSummary.mockReset();
     lastEntryTabsProps.current = null;
     entryTabsMountCount.current = 0;
+    assistantMock.available = false;
+    assistantMock.open.mockClear();
   });
 
   afterEach(() => {
@@ -148,6 +164,61 @@ describe("AddTransactionMenu", () => {
     expect(screen.getByText(messages.Manage.addMenu.recommended)).toBeInTheDocument();
     expect(screen.getByText(messages.Manage.addMenu.csv)).toBeInTheDocument();
     expect(screen.getByText(messages.Manage.addMenu.manual)).toBeInTheDocument();
+  });
+
+  describe("hand-off to the assistant", () => {
+    const PORTFOLIO = {
+      id: "33333333-3333-3333-3333-333333333333",
+      name: "Main depot",
+      brokerage: null,
+      accountHolder: null,
+    };
+    const handOff = messages.Assistant.handOff;
+
+    it("offers no hand-off card when the assistant is not configured", async () => {
+      listPortfolios.mockResolvedValue([PORTFOLIO]);
+      renderMenu();
+      openMenu();
+      await waitFor(() => expect(listPortfolios).toHaveBeenCalled());
+      expect(screen.queryByText(handOff)).toBeNull();
+    });
+
+    it("closes the sheet and opens the assistant with an unsent, portfolio-scoped prefill", async () => {
+      assistantMock.available = true;
+      listPortfolios.mockResolvedValue([PORTFOLIO]);
+      renderMenu();
+      openMenu();
+      fireEvent.click(await screen.findByText(handOff));
+
+      await waitFor(() => expect(assistantMock.open).toHaveBeenCalledTimes(1));
+      expect(assistantMock.open).toHaveBeenCalledWith({
+        prefill: "Record this in Main depot: ",
+        scope: `p:${PORTFOLIO.id}`,
+      });
+      // A plain string would auto-send; a hand-off must only prefill.
+      expect(typeof assistantMock.open.mock.calls[0]![0]).toBe("object");
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("threads the same action into the manual-entry tabs", async () => {
+      assistantMock.available = true;
+      listPortfolios.mockResolvedValue([PORTFOLIO]);
+      renderMenu();
+      openMenu();
+      fireEvent.click(screen.getByText(messages.Manage.addMenu.manual));
+      await waitFor(() => expect(screen.getByTestId("entry-tabs")).toBeInTheDocument());
+      const onHandOff = lastEntryTabsProps.current!.onAssistantHandOff as (p: {
+        id: string;
+        name: string;
+      }) => void;
+      act(() => onHandOff({ id: PORTFOLIO.id, name: PORTFOLIO.name }));
+      await waitFor(() => expect(assistantMock.open).toHaveBeenCalledTimes(1));
+      // An options object with a prefill and the portfolio scope; a bare string would auto-send.
+      expect(assistantMock.open).toHaveBeenCalledWith({
+        prefill: "Record this in Main depot: ",
+        scope: `p:${PORTFOLIO.id}`,
+      });
+    });
   });
 
   it("swaps to the in-sheet manual entry tabs from the manual card", async () => {

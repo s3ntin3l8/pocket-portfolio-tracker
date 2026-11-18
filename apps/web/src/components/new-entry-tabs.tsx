@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useAssistant } from "@/components/assistant/assistant-provider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PortfolioPicker, type PickablePortfolio } from "@/components/portfolio-picker";
 import { AddTransaction } from "@/components/add-transaction";
@@ -32,6 +35,7 @@ export function NewEntryTabs({
   onValueChange,
   hideTabList = false,
   visibleTabs = ALL_TABS,
+  onAssistantHandOff,
 }: {
   portfolios: PickablePortfolio[];
   initialPortfolioId: string;
@@ -57,9 +61,14 @@ export function NewEntryTabs({
   /** Restrict which tabs are mounted — e.g. the desktop rail's "Add transaction" destination
    *  only ever shows the transaction tab. Defaults to both tabs. */
   visibleTabs?: NewEntryTab[];
+  /** Offer "Describe it to the assistant" on the transaction tab (when the assistant is
+   *  configured). The caller closes this overlay and opens the assistant for the portfolio. */
+  onAssistantHandOff?: (portfolio: { id: string; name: string }) => void;
 }) {
   const tt = useTranslations("Manage.tx");
   const tca = useTranslations("CorpAction");
+  const ta = useTranslations("Assistant");
+  const { available: assistantAvailable } = useAssistant();
   const [portfolioId, setPortfolioId] = useState(initialPortfolioId);
   const activePortfolio = portfolios.find((p) => p.id === portfolioId) ?? portfolios[0];
 
@@ -95,6 +104,18 @@ export function NewEntryTabs({
       )}
       {visibleTabs.includes("transaction") && (
         <TabsContent value="transaction">
+          {onAssistantHandOff && assistantAvailable && activePortfolio && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mb-4"
+              onClick={() => onAssistantHandOff(activePortfolio)}
+            >
+              <Sparkles />
+              {ta("handOff")}
+            </Button>
+          )}
           <AddTransaction
             portfolioId={portfolioId}
             portfolio={activePortfolio}

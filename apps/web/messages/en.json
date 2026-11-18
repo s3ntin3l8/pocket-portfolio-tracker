@@ -2955,6 +2955,12 @@
     "historyOff": "Saving chats is off, so there is nothing to reopen yet. Turn it on to keep the text of your conversations for 90 days and reopen them here.",
     "historyEnable": "Turn on saving",
     "historyEnableError": "Couldn't turn on saving. You can also do it in Settings → Investing.",
-    "historyFull": "This conversation is full, so new messages aren't being saved. Start a new chat to keep going."
+    "historyFull": "This conversation is full, so new messages aren't being saved. Start a new chat to keep going.",
+    "expand": "Widen the assistant",
+    "collapse": "Narrow the assistant",
+    "close": "Close the assistant",
+    "handOff": "Describe it to the assistant",
+    "handOffPrefill": "Record this in {portfolio}: ",
+    "handOffDesc": "Paste a broker email or details; you review the draft it creates."
   }
 }

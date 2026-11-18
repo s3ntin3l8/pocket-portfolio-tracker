@@ -194,14 +194,6 @@ describe("the chat panel", () => {
     s.push("end");
   });
 
-  it("puts the close button in the header row with the other controls", async () => {
-    render(<Shell />);
-    const dialog = await openPanel();
-    const close = within(dialog).getByRole("button", { name: "Close" });
-    expect(close).not.toHaveClass("absolute");
-    expect(close.closest("div")?.className).toContain("flex");
-  });
-
   it("sends the earlier conversation as text on the next question", async () => {
     const first = controllable();
     const second = controllable();

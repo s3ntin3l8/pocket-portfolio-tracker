@@ -677,6 +677,18 @@ describe("startDemo clock and session hand-off", () => {
     }
   });
 
+  it("turns on the scripted chat provider for the API only, against the embedded database", async () => {
+    const seen = {};
+    const boot = async (ctx) => {
+      for (const key of ["seedEnv", "apiEnv", "webEnv"]) seen[key] = ctx[key];
+    };
+    await startDemo({ quiet: true, boot }).then((d) => d.stop());
+    expect(seen.apiEnv.DEMO_CHAT_STUB).toBe("1");
+    expect(seen.apiEnv.DATABASE_URL).toMatch(/^pglite:\/\//);
+    expect(seen.seedEnv.DEMO_CHAT_STUB).toBeUndefined();
+    expect(seen.webEnv.DEMO_CHAT_STUB).toBeUndefined();
+  });
+
   it("gives the web app a long session only while the clock is frozen", async () => {
     // Auth.js stamps the session cookie's Expires from the server clock; frozen behind the
     // browser's, the default 30 days would hand out a cookie that is already expired.

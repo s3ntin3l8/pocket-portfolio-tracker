@@ -20,6 +20,7 @@ vi.mock("@/components/app-version", () => ({ AppVersion: () => null }));
 // The assistant provider fetches status through the api client; this test is about layout only.
 vi.mock("@/components/assistant/assistant-provider", () => ({
   AssistantProvider: ({ children }: { children: React.ReactNode }) => children,
+  AssistantSlot: () => null,
 }));
 vi.mock("@/components/assistant/assistant-button", () => ({ AssistantButton: () => null }));
 vi.mock("@/components/nav-progress", () => ({

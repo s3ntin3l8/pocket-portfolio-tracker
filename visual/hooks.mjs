@@ -5,8 +5,17 @@ import { createHash } from "node:crypto";
 
 // Every scene states its settings, so none depends on the order or on a --routes filter. The tax
 // screen is the one read in EUR; everything else in the seed's IDR.
-const SETTINGS = { displayCurrency: "IDR", taxRegime: "DE" };
-const SCENE_SETTINGS = { tax: { displayCurrency: "EUR" } };
+// `assistantSaveHistory` is off everywhere but the saved-chats scene: turning it off deletes every stored
+// conversation, so each scene starts from nothing and none depends on the order the scenes ran in.
+const SETTINGS = { displayCurrency: "IDR", taxRegime: "DE", assistantSaveHistory: false };
+const SCENE_SETTINGS = {
+  tax: { displayCurrency: "EUR" },
+  "assistant-history-saved": { assistantSaveHistory: true },
+};
+
+// The one question of the saved-chats scene, answered by the demo's scripted chat provider
+// (services/api/src/services/chat/demo-stub.ts). Stored under the frozen DEMO_NOW clock.
+const SAVED_CHAT_QUESTION = "How is my portfolio doing?";
 
 // Charts that must be drawn before a screen is shot.
 const MIN_CHARTS = { holdings: 2, "holdings-range": 1, insights: 2 };
@@ -15,6 +24,7 @@ const MIN_CHARTS = { holdings: 2, "holdings-range": 1, insights: 2 };
 const ENDPOINTS = {
   displayCurrency: { method: "PATCH", path: "/api/backend/me" },
   taxRegime: { method: "PUT", path: "/api/backend/me/preferences" },
+  assistantSaveHistory: { method: "PUT", path: "/api/backend/me/preferences" },
 };
 
 /** The demo as the browser reaches it (the launcher aliases the host when it has no host network). */
@@ -45,6 +55,17 @@ export async function beforeScene({ context, page, scene, cfg, host }) {
     const echoed = (await res.json())[key];
     if (String(echoed) !== String(value))
       throw new Error(`setting ${key} to ${value} did not stick (API answered ${echoed})`);
+  }
+
+  // A stored conversation to list: asked through the web proxy, read to the end so it is saved.
+  if (settings.assistantSaveHistory) {
+    const res = await page.request.fetch(`${origin}/api/backend/assistant/chat`, {
+      method: "POST",
+      data: { messages: [{ role: "user", content: SAVED_CHAT_QUESTION }], scope: "all" },
+    });
+    if (!res.ok()) throw new Error(`POST /assistant/chat failed with HTTP ${res.status()}`);
+    if (!(await res.text()).includes("event: conversation"))
+      throw new Error("the demo's chat turn was not saved (is the scripted provider on?)");
   }
 
   // Not in a loop's recording context: a second page there would be recorded and shift the trim.

@@ -28,4 +28,7 @@ export const stackEnv = {
   AUTH_SECRET: "e2e-only-not-a-secret-e2e-only-not-a-secret", // pragma: allowlist secret
   RATE_LIMIT_MAX: "100000",
   CHAT_PROVIDER: "",
+  // The scripted chat provider (services/api/src/services/chat/demo-stub.ts): lets the assistant
+  // specs run with no key or network. Only honoured against this pglite:// database.
+  DEMO_CHAT_STUB: "1",
 };
