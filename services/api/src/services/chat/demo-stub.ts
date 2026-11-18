@@ -30,16 +30,30 @@ function lastUserText(messages: ChatMessage[]): string {
   return "";
 }
 
-/** Resolves when `signal` aborts, rejecting like a real aborted request would. */
-function untilAborted(signal?: AbortSignal): Promise<never> {
+/** How long the hold question waits for the client before giving up, like a dead upstream would. */
+const DEFAULT_HOLD_MS = 120_000;
+
+/**
+ * Rejects when `signal` aborts (like a real aborted request), or after `holdMs` when nothing
+ * aborts it, so a held turn can never keep a request open forever.
+ */
+function untilAborted(signal: AbortSignal | undefined, holdMs: number): Promise<never> {
   return new Promise((_resolve, reject) => {
-    const fail = () => reject(new ChatProviderError("provider_unreachable"));
+    const timer = setTimeout(fail, holdMs);
+    timer.unref?.();
+    function fail() {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", fail);
+      reject(new ChatProviderError("provider_unreachable"));
+    }
     if (signal?.aborted) fail();
     else signal?.addEventListener("abort", fail, { once: true });
   });
 }
 
-export function createDemoChatProvider(): ChatProvider {
+export function createDemoChatProvider({
+  holdMs = DEFAULT_HOLD_MS,
+}: { holdMs?: number } = {}): ChatProvider {
   async function run(req: ChatRequest, onThinking?: (text: string) => void): Promise<ChatResult> {
     const last = req.messages[req.messages.length - 1];
     // After the tool ran, the one thing left is the answer.
@@ -48,7 +62,7 @@ export function createDemoChatProvider(): ChatProvider {
     const question = lastUserText(req.messages);
     if (question === HOLD_QUESTION) {
       onThinking?.(STUB_THINKING_NOTE);
-      return untilAborted(req.signal);
+      return untilAborted(req.signal, holdMs);
     }
     if (question === OVERVIEW_QUESTION) {
       onThinking?.(STUB_THINKING_NOTE);

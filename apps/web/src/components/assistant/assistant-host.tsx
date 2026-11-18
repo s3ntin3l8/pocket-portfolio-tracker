@@ -100,6 +100,15 @@ export default function AssistantHost({
     inputRef.current?.focus();
   }, [seed]);
 
+  // A scope with nothing to send or prefill still pins the conversation.
+  const handledScopeOnly = useRef(0);
+  useEffect(() => {
+    if (!seed || seed.text || seed.prefill || !seed.scope) return;
+    if (seed.id === handledScopeOnly.current) return;
+    handledScopeOnly.current = seed.id;
+    scopeOverride.current = seed.scope;
+  }, [seed]);
+
   const enableHistory = useCallback(async () => {
     try {
       await client.putPreferences({ assistantSaveHistory: true });

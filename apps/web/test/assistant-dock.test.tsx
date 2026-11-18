@@ -116,8 +116,10 @@ describe("the desktop dock", () => {
 
     toggle.focus();
     fireEvent.click(toggle);
-    const dock = await screen.findByRole("complementary", { name: "Assistant" });
-    fireEvent.keyDown(dock, { key: "Escape" });
+    await screen.findByRole("complementary", { name: "Assistant" });
+    // Focus is on the page, not in the dock: the page stays interactive beside it.
+    (document.activeElement as HTMLElement | null)?.blur();
+    fireEvent.keyDown(document.body, { key: "Escape" });
     await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
     expect(toggle).toHaveFocus();
 
@@ -266,5 +268,30 @@ describe("hand-off from another screen", () => {
     act(() => api.open({ prefill: "Record this in Main: ", scope: `p:${PORTFOLIO}` }));
     await waitFor(() => expect(input).toHaveValue("Record this in Main: bought 2 VWCE"));
     expect(calls).toHaveLength(0);
+  });
+
+  it("leaves Escape to an overlay that is open on top of the dock", async () => {
+    render(<Shell />);
+    fireEvent.click(await openButton());
+    await screen.findByRole("complementary", { name: "Assistant" });
+    const overlay = document.createElement("div");
+    overlay.setAttribute("role", "dialog");
+    document.body.appendChild(overlay);
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(screen.getByRole("complementary", { name: "Assistant" })).toBeInTheDocument();
+    overlay.remove();
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("complementary")).toBeNull());
+  });
+
+  it("honours a scope on its own, with nothing to send or prefill", async () => {
+    render(<Shell />);
+    await openButton();
+    act(() => api.open({ scope: `p:${PORTFOLIO}` }));
+    const input = await screen.findByLabelText("Message to the assistant");
+    fireEvent.change(input, { target: { value: "What is in here?" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]!.scope).toBe(`p:${PORTFOLIO}`);
   });
 });

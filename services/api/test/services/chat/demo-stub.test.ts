@@ -78,6 +78,21 @@ describe("demo chat stub", () => {
   });
 });
 
+describe("demo chat stub hold", () => {
+  it("gives up on its own when nothing aborts it (no signal)", async () => {
+    const events: ChatEvent[] = [];
+    await runChat({
+      provider: createDemoChatProvider({ holdMs: 20 }),
+      system: "",
+      history: [{ role: "user", content: HOLD_QUESTION }],
+      tools: [netWorth],
+      emit: (e) => events.push(e),
+    });
+    expect(events.map((e) => e.type)).toEqual(["thinking", "error"]);
+    expect(events[1]).toEqual({ type: "error", error: "provider_unreachable" });
+  });
+});
+
 describe("demoChatProviderFromEnv", () => {
   it("is off unless the flag is set", () => {
     expect(demoChatProviderFromEnv({ DATABASE_URL: "pglite://x" })).toBeNull();

@@ -99,7 +99,7 @@ export function AssistantProvider({
     setLoaded(true);
     setOpen(true);
     const options = typeof arg === "string" ? { question: arg } : (arg ?? {});
-    if (options.question || options.prefill) {
+    if (options.question || options.prefill || options.scope) {
       setSeed((s) => ({
         id: (s?.id ?? 0) + 1,
         text: options.question,

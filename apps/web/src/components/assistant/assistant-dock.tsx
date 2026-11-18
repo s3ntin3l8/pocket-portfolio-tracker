@@ -55,15 +55,21 @@ export function AssistantDock({
     };
   }, [inputRef]);
 
+  // Esc closes the dock wherever focus is: the page stays interactive beside it. An overlay that
+  // is open on top (a dialog, a menu, the command palette) takes the key for itself first.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]')) return;
+      onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
   return (
     <aside
       aria-label={t("title")}
-      onKeyDown={(e) => {
-        if (e.key === "Escape" && !e.defaultPrevented) {
-          e.stopPropagation();
-          onClose();
-        }
-      }}
       className={cn(
         "material-chrome z-40 hidden shrink-0 flex-col border-l border-border bg-card md:flex",
         "max-xl:fixed max-xl:inset-y-0 max-xl:right-0 max-xl:shadow-modal",
