@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import {
   ASSISTANT_MAX_ATTACHMENTS,
+  type AssistantAttachment,
   type AssistantAttachmentCapability,
 } from "@portfolio/api-client";
 import {
@@ -68,6 +69,12 @@ export function useComposerAttachments(
     });
   }, []);
 
+  /** Take back files the API refused, so they can be retried or removed. */
+  const restore = useCallback((back: AssistantAttachment[]) => {
+    setFiles(back.map((f) => ({ ...f, size: Math.floor((f.data.length * 3) / 4) })));
+    setError(null);
+  }, []);
+
   /** Empty the composer (after a send, or on New chat). Keeps "already warned". */
   const clear = useCallback(() => {
     setFiles([]);
@@ -83,6 +90,7 @@ export function useComposerAttachments(
     accept: acceptedAttachmentTypes(capability),
     add,
     remove,
+    restore,
     clear,
   };
 }

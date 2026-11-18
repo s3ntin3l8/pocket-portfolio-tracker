@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import type { AssistantStatus } from "@portfolio/api-client";
+import type { AssistantAttachment, AssistantStatus } from "@portfolio/api-client";
 import { AssistantDialog } from "@/components/assistant/assistant-dialog";
 import { AssistantDock } from "@/components/assistant/assistant-dock";
 import type { AssistantPanelState } from "@/components/assistant/assistant-panel";
@@ -62,16 +62,21 @@ export default function AssistantHost({
     () => scopeOverride.current ?? currentScope(window.location.search, serverScope),
     [serverScope],
   );
-  const chat = useAssistantChat(client, getScope);
-  // Files the conversation already carries count against the API's cap of 3 per conversation.
-  const sentFiles = chat.turns.reduce(
-    (n, t) => n + (t.attachments?.filter((a) => !a.reattach).length ?? 0),
-    0,
-  );
-  const attachments = useComposerAttachments(status?.attachments, sentFiles);
+  // The composer's files are cleared on send; a refused turn gives them (and the text) back.
+  const refused = useRef<(files: AssistantAttachment[], text: string) => void>(undefined);
+  const chat = useAssistantChat(client, getScope, (files, text) => refused.current?.(files, text));
+  // Files the next request still carries count against the API's cap of 3 per conversation.
+  const attachments = useComposerAttachments(status?.attachments, chat.sentFiles);
+  const restoreFiles = attachments.restore;
   const clearAttachments = attachments.clear;
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [draft, setDraft] = useState("");
+  useEffect(() => {
+    refused.current = (files, text) => {
+      restoreFiles(files);
+      setDraft((current) => current || text);
+    };
+  }, [restoreFiles]);
   const [showHistory, setShowHistory] = useState(false);
   const [wide, setWide] = useState(readWide);
   // Kept here (not in the panel) so turning saving on survives a resize between dock and dialog.

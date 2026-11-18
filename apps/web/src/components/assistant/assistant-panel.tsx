@@ -394,7 +394,7 @@ export function AssistantPanel({ state }: { state: AssistantPanelState }) {
     : t(capability?.enabled ? "disclosureCloudAttachments" : "disclosureCloud", { provider });
   // Off, but the model could read a document: point at the setting instead of a dead end.
   const offerAttachments =
-    capability !== undefined && !capability.enabled && capability.images !== "no";
+    capability !== undefined && !capability.optedIn && capability.images !== "no";
 
   // A missing suggestion key must never render the key path: fall back to the id.
   const suggestionLabel = (key: string) =>

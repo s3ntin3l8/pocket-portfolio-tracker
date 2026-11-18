@@ -10,7 +10,7 @@ export interface AssistantStatus {
   /** The user opted in to keeping conversations (and this credential may write them). */
   saveHistory?: boolean;
   /**
-   * Attaching documents to a chat: `enabled` = the user opted in AND this credential may write.
+   * Attaching documents to a chat: `enabled` = the user opted in (`optedIn`) AND this credential may write.
    * `images` is per model ("maybe" = the provider doesn't say); `pdf` = native PDF input (without
    * it a PDF is sent as extracted text).
    */
@@ -19,6 +19,8 @@ export interface AssistantStatus {
 
 export interface AssistantAttachmentCapability {
   enabled: boolean;
+  /** The user's preference alone (`enabled` also needs a write-scoped credential). */
+  optedIn: boolean;
   images: "yes" | "maybe" | "no";
   pdf: boolean;
 }

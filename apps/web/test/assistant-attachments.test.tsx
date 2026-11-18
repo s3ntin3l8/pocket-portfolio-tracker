@@ -9,6 +9,7 @@ import {
   within,
 } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
+import { ApiError } from "@portfolio/api-client";
 import type {
   AssistantAttachmentCapability,
   AssistantConversation,
@@ -61,6 +62,7 @@ vi.mock("@/i18n/navigation", () => ({
 
 const capability = (over: Partial<AssistantAttachmentCapability> = {}) => ({
   enabled: true,
+  optedIn: true,
   images: "yes" as const,
   pdf: true,
   ...over,
@@ -121,7 +123,7 @@ describe("the attach control", () => {
   });
 
   it("is absent when the preference is off, and points at the setting when the model could read a document", async () => {
-    status = baseStatus(capability({ enabled: false }));
+    status = baseStatus(capability({ enabled: false, optedIn: false }));
     render(<Shell />);
     await openPanel();
     expect(screen.queryByRole("button", { name: A.attach })).toBeNull();
@@ -130,9 +132,18 @@ describe("the attach control", () => {
   });
 
   it("offers no setting hint when the model can't read images", async () => {
-    status = baseStatus(capability({ enabled: false, images: "no" }));
+    status = baseStatus(capability({ enabled: false, optedIn: false, images: "no" }));
     render(<Shell />);
     await openPanel();
+    expect(screen.queryByRole("link", { name: /attachments/i })).toBeNull();
+  });
+
+  it("does not tell an opted-in session without write access to turn the setting on", async () => {
+    // A read-only token: the preference is already on, so Settings can't fix it.
+    status = baseStatus(capability({ enabled: false, optedIn: true }));
+    render(<Shell />);
+    await openPanel();
+    expect(screen.queryByRole("button", { name: A.attach })).toBeNull();
     expect(screen.queryByRole("link", { name: /attachments/i })).toBeNull();
   });
 
@@ -231,6 +242,30 @@ describe("attaching and sending", () => {
     expect(sent[2]!.messages).toEqual([{ role: "user", content: "Fresh start" }]);
   });
 
+  it("gives the files and the text back when the API refuses the documents", async () => {
+    client.streamAssistantChat.mockImplementationOnce(async function* (body: Sent) {
+      sent.push(structuredClone(body));
+      throw new ApiError(400, '{"error":"attachment_unsupported"}');
+    });
+    render(<Shell />);
+    await openPanel();
+    pick(png("stmt.png"));
+    await screen.findByText("stmt.png");
+    ask("Record this trade");
+
+    // The refusal is shown, the chip is back to retry or remove, and the text is restored.
+    expect(await screen.findByRole("alert")).toHaveTextContent(A.errors.attachment_unsupported);
+    expect(await screen.findByRole("button", { name: "Remove stmt.png" })).toBeInTheDocument();
+    expect(screen.getByLabelText(A.inputLabel)).toHaveValue("Record this trade");
+    // The failed turn no longer lists the file as sent, and the retry sends it again.
+    expect(screen.queryByRole("list", { name: A.attachedFiles })?.textContent).toContain(
+      "stmt.png",
+    );
+    fireEvent.click(screen.getByRole("button", { name: A.send }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]!.messages.at(-1)!.attachments).toHaveLength(1);
+  });
+
   it("refuses a wrong type, an oversize file, and more than 3 files", async () => {
     render(<Shell />);
     await openPanel();
@@ -284,6 +319,24 @@ describe("a conversation reopened from History", () => {
     act(() => void result.current.send("It is 10 EUR"));
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]!.messages.every((m) => m.attachments === undefined)).toBe(true);
+  });
+});
+
+describe("the per-conversation file count", () => {
+  it("counts only files the next request still carries (older turns fall out of the window)", async () => {
+    const { result } = renderHook(() =>
+      useAssistantChat({ streamAssistantChat: client.streamAssistantChat as never }, () => "all"),
+    );
+    const file = { name: "s.png", mediaType: "image/png" as const, data: "AQID" };
+    const turn = async (text: string, files?: (typeof file)[]) => {
+      act(() => void result.current.send(text, files));
+      await waitFor(() => expect(result.current.streaming).toBe(false));
+    };
+    await turn("first", [file]);
+    expect(result.current.sentFiles).toBe(1);
+    // 20 messages are sent: 10 more exchanges push the first turn out of the window.
+    for (let i = 0; i < 10; i++) await turn(`q${i}`);
+    expect(result.current.sentFiles).toBe(0);
   });
 });
 

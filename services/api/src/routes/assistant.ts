@@ -193,7 +193,12 @@ export async function assistantRoute(app: FastifyInstance) {
 
   app.get("/assistant/status", { preHandler: app.authenticate }, async (request) => {
     const provider = await app.resolveChatProvider();
-    const attachmentsEnabled = provider ? await attachmentsOn(request).catch(() => false) : false;
+    // `optedIn` is the preference alone; `enabled` also needs a write-scoped credential. The web
+    // needs both to tell "turn it on in Settings" from "this session can't use it".
+    const optedIn = provider
+      ? await isAttachmentsEnabled(app.db, request.userId).catch(() => false)
+      : false;
+    const attachmentsEnabled = optedIn && request.user?.scope === "write";
     const support: AttachmentSupport = (await provider
       ?.attachmentSupport?.()
       .catch(() => null)) ?? {
@@ -209,7 +214,12 @@ export async function assistantRoute(app: FastifyInstance) {
       /** Opted in to keeping conversations, and allowed to (a read-only token never writes). */
       saveHistory: await historyOn(request),
       /** Documents in the chat: opted in and write-scoped, and what the model reads. */
-      attachments: { enabled: attachmentsEnabled, images: support.images, pdf: support.pdf },
+      attachments: {
+        enabled: attachmentsEnabled,
+        optedIn,
+        images: support.images,
+        pdf: support.pdf,
+      },
     };
   });
 

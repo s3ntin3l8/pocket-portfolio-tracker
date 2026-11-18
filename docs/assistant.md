@@ -167,8 +167,8 @@ account numbers, IBANs or names. An attached document goes to the chat provider 
 
 Errors are plain `400`s before the stream starts: `attachments_disabled` (not opted in, or a read-only token) and
 `attachment_unsupported` (a type outside the allow-list or a file whose bytes don't match it, an image the model can't
-read, or a PDF with no text for a provider that can't take PDFs). More than 3 files or an oversize body is
-`invalid_request`.
+read, or a PDF with no text for a provider that can't take PDFs). More than 3 files is `invalid_request`; a body over 25 MB is refused by Fastify with a
+`413` before the route runs.
 
 What the model reads, reported as `attachments` in `GET /assistant/status` (image support is per **model**, so it can be
 unknown):

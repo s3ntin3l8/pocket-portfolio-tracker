@@ -123,7 +123,12 @@ beforeEach(async () => {
 
 describe("opt-in and scope gates", () => {
   it("is off by default: status says so and a chat with a file is refused before the model", async () => {
-    expect((await status(owner)).attachments).toEqual({ enabled: false, images: "yes", pdf: true });
+    expect((await status(owner)).attachments).toEqual({
+      enabled: false,
+      optedIn: false,
+      images: "yes",
+      pdf: true,
+    });
     const res = await chat(owner, ask([file()]));
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: "attachments_disabled" });
@@ -135,6 +140,7 @@ describe("opt-in and scope gates", () => {
     support = { images: "maybe", pdf: false };
     expect((await status(owner)).attachments).toEqual({
       enabled: true,
+      optedIn: true,
       images: "maybe",
       pdf: false,
     });
@@ -145,6 +151,7 @@ describe("opt-in and scope gates", () => {
     fake.attachmentSupport = undefined;
     expect((await status(owner)).attachments).toEqual({
       enabled: true,
+      optedIn: true,
       images: "maybe",
       pdf: false,
     });
@@ -153,7 +160,8 @@ describe("opt-in and scope gates", () => {
   it("refuses a read-scoped token even when the user opted in, and shows it as disabled", async () => {
     await prefs(owner, { assistantAttachments: true });
     const ro = await readToken();
-    expect((await status(ro)).attachments.enabled).toBe(false);
+    // Opted in, but this credential can't write: not enabled, yet the opt-in is reported as set.
+    expect((await status(ro)).attachments).toMatchObject({ enabled: false, optedIn: true });
     const res = await chat(ro, ask([file()]));
     expect(res.statusCode).toBe(400);
     expect(res.json()).toEqual({ error: "attachments_disabled" });
